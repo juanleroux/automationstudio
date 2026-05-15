@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
+import { uploadToIgnition } from '../../api/client';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
 
@@ -347,38 +348,46 @@ export default function TemplateTree({ selected, onSelect }) {
     setContextMenu(null);
   };
 
-  // Export template in Ignition JSON format
-  const exportIgnitionJSON = (template) => {
-    const eng = project?.engineering || {};
-    const payload = {
-      tagType: 'UdtType',
-      name: template.name,
-      parameters: (template.attributes || [])
-        .filter(a => a.parameter)
-        .map(a => ({ name: a.name, dataType: a.dataType, value: a.value })),
-      tags: (template.attributes || [])
-        .filter(a => !a.parameter)
-        .map(a => ({ name: a.name, tagType: 'AtomicTag', dataType: a.dataType, value: a.value })),
-      instances: (template.instances || []).map(inst => ({
-        name: inst.name,
-        tagType: 'UdtInstance',
-        typeId: template.name,
-        parameters: (inst.attributes || []).reduce((acc, ia) => {
-          const ta = (template.attributes || []).find(a => a.id === ia.id);
-          if (ta?.parameter) acc[ta.name] = ia.value;
-          return acc;
-        }, {})
-      }))
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${template.name}_ignition.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported "${template.name}" as Ignition JSON`);
+  // Upload template to Ignition as UDT via API
+  const uploadTemplateToIgnition = async (template) => {
     setContextMenu(null);
+    const eng = project?.engineering;
+    if (!eng?.ignitionGateway) {
+      toast.error('Configure Ignition gateway in Settings first');
+      return;
+    }
+    const payload = {
+      tagType: 'Folder',
+      name: eng.folderPath || template.name,
+      tags: [
+        {
+          name: template.name,
+          tagType: 'UdtType',
+          parameters: (template.attributes || [])
+            .filter(a => a.parameter)
+            .map(a => ({ name: a.name, dataType: a.dataType, value: a.value })),
+          tags: (template.attributes || [])
+            .filter(a => !a.parameter)
+            .map(a => ({ name: a.name, tagType: 'AtomicTag', dataType: a.dataType, value: a.value }))
+        },
+        ...(template.instances || []).map(inst => ({
+          name: inst.name,
+          tagType: 'UdtInstance',
+          typeId: template.name,
+          parameters: (inst.attributes || []).reduce((acc, ia) => {
+            const ta = (template.attributes || []).find(a => a.id === ia.id);
+            if (ta?.parameter) acc[ta.name] = ia.value;
+            return acc;
+          }, {})
+        }))
+      ]
+    };
+    try {
+      await uploadToIgnition({ gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey, payload });
+      toast.success(`Uploaded "${template.name}" to Ignition`);
+    } catch (err) {
+      toast.error('Upload failed: ' + (err.response?.data?.error || err.message));
+    }
   };
 
   // Export all templates as JSON
@@ -701,9 +710,9 @@ export default function TemplateTree({ selected, onSelect }) {
                   {project?.engineering?.enableIgnitionMenuItems && (
                     <div className="context-menu-item" onClick={() => {
                       const t = templates.find(x => x.id === contextMenu.templateId);
-                      if (t) exportIgnitionJSON(t);
+                      if (t) uploadTemplateToIgnition(t);
                     }}>
-                      <Download size={14} /> Export Ignition
+                      <Upload size={14} /> Upload to Ignition
                     </div>
                   )}
                 </div>
