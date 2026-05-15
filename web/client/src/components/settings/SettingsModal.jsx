@@ -218,7 +218,7 @@ export default function SettingsModal({ onClose }) {
               disabled={!project}
             />
             <label htmlFor="enableIgnition" className="text-sm text-text-primary cursor-pointer">
-              Enable Ignition menu items
+              Enable Ignition Menu Items
             </label>
           </div>
         </div>
