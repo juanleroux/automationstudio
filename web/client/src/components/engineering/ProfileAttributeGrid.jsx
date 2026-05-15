@@ -16,7 +16,7 @@ const RULE_SUGGESTIONS = [
   'Attribute.Name',
 ];
 
-function EditCell({ value, onChange, suggestions }) {
+function EditCell({ value, onChange, suggestions, placeholder }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value);
   const [showSugg, setShowSugg] = useState(false);
@@ -41,6 +41,7 @@ function EditCell({ value, onChange, suggestions }) {
             if (e.key === 'Escape') { setVal(value); setEditing(false); }
           }}
           autoFocus
+          placeholder={placeholder}
           style={{ padding: '2px 4px', fontSize: 13, width: '100%' }}
         />
         {showSugg && filtered.length > 0 && (
@@ -144,6 +145,7 @@ export default function ProfileAttributeGrid({ attributes, onChange }) {
                     value={attr.rule}
                     onChange={v => updateAttr(attr.id, 'rule', v)}
                     suggestions={RULE_SUGGESTIONS}
+                    placeholder="e.g. Instance.Name"
                   />
                 </td>
                 <td style={{ textAlign: 'center' }}>
