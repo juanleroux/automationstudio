@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Wifi, WifiOff, Building2, Zap } from 'lucide-react';
+import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, Sun, Moon } from 'lucide-react';
 import Modal from '../shared/Modal';
 import { useProject } from '../../context/ProjectContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
 import { loadConfig, saveConfig, testIgnitionConnection } from '../../api/client';
 
 export default function SettingsModal({ onClose }) {
   const { project, updateProject } = useProject();
+  const { theme, setTheme } = useTheme();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState('engineering');
+  const [activeTab, setActiveTab] = useState('general');
   const [config, setConfig] = useState(null);
   const [engineering, setEngineering] = useState(
     project?.engineering || {
@@ -78,6 +80,7 @@ export default function SettingsModal({ onClose }) {
   };
 
   const tabs = [
+    { id: 'general', label: 'General', icon: SlidersHorizontal },
     { id: 'engineering', label: 'Engineering', icon: Zap },
     { id: 'company', label: 'Company', icon: Building2 },
   ];
@@ -112,6 +115,40 @@ export default function SettingsModal({ onClose }) {
           );
         })}
       </div>
+
+      {/* General tab */}
+      {activeTab === 'general' && (
+        <div className="flex flex-col gap-6">
+          <div>
+            <label className="block text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>Appearance</label>
+            <div className="flex gap-3">
+              {[
+                { value: 'dark', label: 'Dark', Icon: Moon },
+                { value: 'light', label: 'Light', Icon: Sun },
+              ].map(({ value, label, Icon }) => {
+                const active = theme === value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setTheme(value)}
+                    className="flex flex-col items-center gap-2 p-4 rounded-lg transition-all"
+                    style={{
+                      flex: 1,
+                      border: active ? '2px solid var(--accent)' : '2px solid var(--border)',
+                      background: active ? 'var(--accent-bg)' : 'var(--bg-card)',
+                      color: active ? 'var(--accent)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Icon size={22} />
+                    <span className="text-sm font-medium">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Engineering tab */}
       {activeTab === 'engineering' && (
@@ -165,14 +202,14 @@ export default function SettingsModal({ onClose }) {
             {testResult && (
               <div className="flex items-center gap-2 text-sm">
                 {testResult.success
-                  ? <><Wifi size={14} style={{ color: '#3ecf8e' }} /><span style={{ color: '#3ecf8e' }}>{testResult.message}</span></>
+                  ? <><Wifi size={14} style={{ color: 'var(--accent)' }} /><span style={{ color: 'var(--accent)' }}>{testResult.message}</span></>
                   : <><WifiOff size={14} style={{ color: '#e55353' }} /><span style={{ color: '#e55353' }}>{testResult.message}</span></>
                 }
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid #333' }}>
+          <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
             <input
               type="checkbox"
               id="enableIgnition"
@@ -230,7 +267,7 @@ export default function SettingsModal({ onClose }) {
               <input type="text" value={config.proposal?.currencySymbol || '$'} onChange={e => setCompany('currencySymbol', e.target.value)} style={{ maxWidth: 80 }} maxLength={5} />
             </div>
           </div>
-          <div style={{ borderTop: '1px solid #333', paddingTop: 12 }}>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <p className="text-xs text-text-muted mb-2">Preview Colors</p>
             <div className="grid grid-cols-2 gap-3">
               {['previewBodyColor', 'previewHeaderColor', 'previewFooterColor', 'previewSummaryColor'].map(key => (
@@ -239,7 +276,7 @@ export default function SettingsModal({ onClose }) {
                     type="color"
                     value={config.proposal?.[key] || '#ffffff'}
                     onChange={e => setCompany(key, e.target.value)}
-                    style={{ width: 36, height: 30, padding: 2, border: '1px solid #444', borderRadius: 4, background: '#2a2a2a', cursor: 'pointer' }}
+                    style={{ width: 36, height: 30, padding: 2, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)', cursor: 'pointer' }}
                   />
                   <label className="text-xs text-text-muted capitalize">
                     {key.replace('preview', '').replace('Color', '')}

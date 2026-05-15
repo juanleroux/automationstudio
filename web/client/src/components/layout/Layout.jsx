@@ -4,7 +4,7 @@ import TopBar from './TopBar';
 
 export default function Layout({ activeView, onChangeView, children }) {
   return (
-    <div className="flex h-full" style={{ background: '#1c1c1c' }}>
+    <div className="flex h-full" style={{ background: 'var(--bg-main)' }}>
       <Sidebar activeView={activeView} onChangeView={onChangeView} />
       <div className="flex flex-col flex-1 min-w-0">
         <TopBar activeView={activeView} />

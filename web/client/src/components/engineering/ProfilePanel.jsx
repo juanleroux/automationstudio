@@ -127,7 +127,7 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
   return (
     <div className="flex flex-col h-full">
       {/* Profile tab bar */}
-      <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid #333', background: '#1c1c1c' }}>
+      <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-main)' }}>
         <div className="flex-1 flex overflow-x-auto">
           {profiles.length === 0 && (
             <span className="px-4 py-2 text-xs text-text-muted italic">No profiles</span>
@@ -161,7 +161,7 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
 
       {/* Profile settings bar */}
       {profile && (
-        <div className="flex items-center gap-4 px-3 py-2 flex-shrink-0 text-xs" style={{ borderBottom: '1px solid #2a2a2a', background: '#242424' }}>
+        <div className="flex items-center gap-4 px-3 py-2 flex-shrink-0 text-xs" style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
           <div className="flex items-center gap-2">
             <span className="text-text-muted">Export:</span>
             <span className="text-text-primary">{EXPORT_TYPES.find(e => e.value === profile.exportType)?.label}</span>

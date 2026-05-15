@@ -25,7 +25,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
 
   if (!selected) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ color: '#555' }}>
+      <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-disabled)' }}>
         <div className="text-center">
           <p className="text-sm">Select a template or instance from the tree</p>
         </div>
@@ -71,7 +71,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
       )}
 
       {/* Tab bar */}
-      <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid #333', background: '#1c1c1c' }}>
+      <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-main)' }}>
         <div className="flex-1 flex overflow-x-auto" style={{ border: 'none' }}>
           {tabs.map((tab, i) => (
             <button
@@ -126,7 +126,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
       </div>
 
       {/* Status bar */}
-      <div className="flex-shrink-0 px-3 py-1 text-xs flex items-center gap-4" style={{ borderTop: '1px solid #2a2a2a', background: '#1c1c1c', color: '#666' }}>
+      <div className="flex-shrink-0 px-3 py-1 text-xs flex items-center gap-4" style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-main)', color: 'var(--text-disabled)' }}>
         {mode === 'template' && selectedTemplate && (
           <>
             <span>{selectedTemplate.attributes?.length || 0} attributes</span>
@@ -273,10 +273,10 @@ export default function EngineeringView() {
 
   if (!project) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ color: '#555' }}>
+      <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-disabled)' }}>
         <div className="text-center">
           <Cpu size={48} className="mx-auto mb-3" style={{ opacity: 0.2 }} />
-          <p className="text-lg font-medium" style={{ color: '#9e9e9e' }}>No Project Open</p>
+          <p className="text-lg font-medium" style={{ color: 'var(--text-muted)' }}>No Project Open</p>
           <p className="text-sm mt-1">Create or open a project from the sidebar</p>
         </div>
       </div>
@@ -287,14 +287,14 @@ export default function EngineeringView() {
     <div className="flex h-full">
       <div
         className="flex flex-col flex-shrink-0 overflow-hidden"
-        style={{ width: paneWidth, background: '#242424', borderRight: '1px solid #333' }}
+        style={{ width: paneWidth, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}
       >
         <TemplateTree selected={selected} onSelect={setSelected} />
       </div>
 
       <div className="resize-handle" onMouseDown={onMouseDown} />
 
-      <div className="flex-1 overflow-hidden" style={{ background: '#1c1c1c' }}>
+      <div className="flex-1 overflow-hidden" style={{ background: 'var(--bg-main)' }}>
         <RightPanel
           selected={selected}
           selectedTemplate={selectedTemplate}

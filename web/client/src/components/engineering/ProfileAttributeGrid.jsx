@@ -47,7 +47,7 @@ function EditCell({ value, onChange, suggestions, placeholder }) {
         {showSugg && filtered.length > 0 && (
           <div style={{
             position: 'absolute', top: '100%', left: 0, zIndex: 100,
-            background: '#2a2a2a', border: '1px solid #444', borderRadius: 4,
+            background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4,
             minWidth: 160, boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
           }}>
             {filtered.map(s => (
@@ -72,7 +72,7 @@ function EditCell({ value, onChange, suggestions, placeholder }) {
       onClick={() => { setEditing(true); setVal(value); }}
       style={{ cursor: 'text', minHeight: 22 }}
     >
-      {value || <span style={{ color: '#555' }}>—</span>}
+      {value || <span style={{ color: 'var(--text-disabled)' }}>—</span>}
     </div>
   );
 }
@@ -161,7 +161,7 @@ export default function ProfileAttributeGrid({ attributes, templateAttributes = 
             ))}
             <tr onClick={addAttr} style={{ cursor: 'pointer' }} className="add-row">
               <td colSpan={5} style={{ padding: '6px 12px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#555', fontSize: 12 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
                   <Plus size={13} /> Add Column
                 </span>
               </td>

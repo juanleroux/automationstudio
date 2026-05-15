@@ -20,12 +20,12 @@ export default function Modal({ title, onClose, children, width = 520, footer })
           width,
           maxWidth: '95vw',
           maxHeight: '90vh',
-          background: '#242424',
-          border: '1px solid #333'
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)'
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #333' }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
           <h2 className="text-base font-semibold text-text-primary">{title}</h2>
           <button
             onClick={onClose}
@@ -44,7 +44,7 @@ export default function Modal({ title, onClose, children, width = 520, footer })
         {footer && (
           <div
             className="flex items-center justify-end gap-2 px-5 py-3"
-            style={{ borderTop: '1px solid #333' }}
+            style={{ borderTop: '1px solid var(--border)' }}
           >
             {footer}
           </div>

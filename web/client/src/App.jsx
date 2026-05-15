@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ProjectProvider } from './context/ProjectContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/shared/Toast';
 import Layout from './components/layout/Layout';
 import EngineeringView from './components/engineering/EngineeringView';
@@ -29,10 +30,12 @@ function AppInner() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <ProjectProvider>
-        <AppInner />
-      </ProjectProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <ProjectProvider>
+          <AppInner />
+        </ProjectProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

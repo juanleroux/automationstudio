@@ -19,7 +19,7 @@ function EditCell({ value, onChange, disabled, type = 'text', style }) {
   };
 
   if (disabled) {
-    return <span style={{ color: '#666', ...style }}>{value}</span>;
+    return <span style={{ color: 'var(--text-disabled)', ...style }}>{value}</span>;
   }
 
   if (editing) {
@@ -46,7 +46,7 @@ function EditCell({ value, onChange, disabled, type = 'text', style }) {
       onClick={() => { setEditing(true); setVal(value); }}
       style={{ cursor: 'text', minHeight: 22, ...style }}
     >
-      {value || <span style={{ color: '#555' }}>—</span>}
+      {value || <span style={{ color: 'var(--text-disabled)' }}>—</span>}
     </div>
   );
 }
@@ -210,7 +210,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                 className="add-row"
               >
                 <td colSpan={6} style={{ padding: '6px 12px' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#555', fontSize: 12 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
                     <Plus size={13} /> Add Attribute
                   </span>
                 </td>

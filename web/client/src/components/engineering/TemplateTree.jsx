@@ -402,7 +402,7 @@ export default function TemplateTree({ selected, onSelect }) {
   return (
     <div className="flex flex-col h-full">
       {/* Search & filter bar */}
-      <div className="px-2 py-2 flex-shrink-0 flex gap-1" style={{ borderBottom: '1px solid #333' }}>
+      <div className="px-2 py-2 flex-shrink-0 flex gap-1" style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex-1 relative">
           <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
@@ -424,7 +424,7 @@ export default function TemplateTree({ selected, onSelect }) {
       </div>
 
       {/* Add template button */}
-      <div className="px-2 py-1 flex-shrink-0" style={{ borderBottom: '1px solid #2a2a2a' }}>
+      <div className="px-2 py-1 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <button
           className="btn btn-ghost w-full text-xs justify-start"
           style={{ padding: '4px 8px' }}
@@ -467,7 +467,7 @@ export default function TemplateTree({ selected, onSelect }) {
                 >
                   {isExp ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                 </button>
-                {isExp ? <FolderOpen size={14} style={{ color: '#3ecf8e', flexShrink: 0 }} /> : <Folder size={14} style={{ color: '#3ecf8e', flexShrink: 0 }} />}
+                {isExp ? <FolderOpen size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} /> : <Folder size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
 
                 {renaming?.type === 'template' && renaming.templateId === template.id ? (
                   <input
@@ -507,7 +507,7 @@ export default function TemplateTree({ selected, onSelect }) {
                     draggable
                     onDragStart={e => handleDragStart(e, template.id, inst.id)}
                   >
-                    <Tag size={13} style={{ color: '#9e9e9e', flexShrink: 0 }} />
+                    <Tag size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                     {inst.isFlagged && (
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e55353', flexShrink: 0 }} />
                     )}

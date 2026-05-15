@@ -76,20 +76,20 @@ export default function Sidebar({ activeView, onChangeView }) {
         className="flex flex-col h-full flex-shrink-0 transition-all duration-200"
         style={{
           width: collapsed ? 56 : 220,
-          background: '#242424',
-          borderRight: '1px solid #333'
+          background: 'var(--bg-surface)',
+          borderRight: '1px solid var(--border)'
         }}
       >
         {/* Logo */}
         <div
           className="flex items-center gap-3 px-3 py-4 flex-shrink-0"
-          style={{ borderBottom: '1px solid #333' }}
+          style={{ borderBottom: '1px solid var(--border)' }}
         >
           <div
             className="flex items-center justify-center rounded-md flex-shrink-0"
-            style={{ width: 32, height: 32, background: '#3ecf8e' }}
+            style={{ width: 32, height: 32, background: 'var(--accent)' }}
           >
-            <Zap size={18} color="#1c1c1c" />
+            <Zap size={18} color="var(--bg-main)" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
@@ -113,9 +113,9 @@ export default function Sidebar({ activeView, onChangeView }) {
                 disabled={!project && item.id !== 'settings'}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-none transition-colors"
                 style={{
-                  background: active ? 'rgba(62,207,142,0.1)' : 'transparent',
-                  color: active ? '#3ecf8e' : (!project && item.id !== 'settings') ? '#555' : '#9e9e9e',
-                  borderLeft: active ? '3px solid #3ecf8e' : '3px solid transparent',
+                  background: active ? 'var(--accent-bg)' : 'transparent',
+                  color: active ? 'var(--accent)' : (!project && item.id !== 'settings') ? 'var(--text-disabled)' : 'var(--text-muted)',
+                  borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
                   cursor: (!project && item.id !== 'settings') ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -129,7 +129,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         </nav>
 
         {/* Bottom actions */}
-        <div className="flex-shrink-0 py-2" style={{ borderTop: '1px solid #333' }}>
+        <div className="flex-shrink-0 py-2" style={{ borderTop: '1px solid var(--border)' }}>
           {collapsed ? (
             <div className="flex flex-col items-center gap-1 px-2">
               <button
@@ -202,7 +202,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         {/* Collapse toggle */}
         <button
           className="w-full flex items-center justify-center py-2 text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
-          style={{ borderTop: '1px solid #333' }}
+          style={{ borderTop: '1px solid var(--border)' }}
           onClick={() => setCollapsed(c => !c)}
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
@@ -264,9 +264,9 @@ export default function Sidebar({ activeView, onChangeView }) {
                   key={proj.filename}
                   onClick={() => handleOpenProject(proj)}
                   className="flex items-center justify-between p-3 rounded-md text-left transition-colors"
-                  style={{ background: '#1c1c1c', border: '1px solid #333' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = '#3ecf8e'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = '#333'}
+                  style={{ background: 'var(--bg-main)', border: '1px solid var(--border)' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
                 >
                   <div>
                     <div className="text-sm font-medium text-text-primary">{proj.name}</div>
