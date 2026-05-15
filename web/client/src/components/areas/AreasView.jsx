@@ -149,9 +149,6 @@ export default function AreasView() {
           <h2 className="text-sm font-semibold text-text-primary">Model</h2>
           <p className="text-xs text-text-muted">{areas.length} areas, {templates.reduce((s, t) => s + (t.instances?.length || 0), 0)} total instances</p>
         </div>
-        <button className="btn btn-primary text-sm" onClick={() => { setNewArea({ name: '', description: '' }); setShowAddArea(true); }}>
-          <Plus size={14} /> Add Area
-        </button>
       </div>
 
       {/* Areas table */}
@@ -303,6 +300,13 @@ export default function AreasView() {
                 </React.Fragment>
               );
             })}
+            <tr onClick={() => { setNewArea({ name: '', description: '' }); setShowAddArea(true); }} style={{ cursor: 'pointer' }} className="add-row">
+              <td colSpan={5} style={{ padding: '6px 12px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
+                  <Plus size={13} /> Add Area
+                </span>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
