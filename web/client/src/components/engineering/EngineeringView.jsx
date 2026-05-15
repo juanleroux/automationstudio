@@ -7,6 +7,7 @@ import Modal from '../shared/Modal';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
+import { buildIgnitionPayload } from '../../utils/ignition';
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
@@ -239,32 +240,7 @@ export default function EngineeringView() {
       return;
     }
     const eng = project.engineering;
-    const payload = {
-      tagType: 'Folder',
-      name: eng.folderPath || selectedTemplate.name,
-      tags: [
-        {
-          name: selectedTemplate.name,
-          tagType: 'UdtType',
-          parameters: (selectedTemplate.attributes || [])
-            .filter(a => a.parameter)
-            .map(a => ({ name: a.name, dataType: a.dataType, value: a.value })),
-          tags: (selectedTemplate.attributes || [])
-            .filter(a => !a.parameter)
-            .map(a => ({ name: a.name, tagType: 'AtomicTag', dataType: a.dataType, value: a.value }))
-        },
-        ...(selectedTemplate.instances || []).map(inst => ({
-          name: inst.name,
-          tagType: 'UdtInstance',
-          typeId: selectedTemplate.name,
-          parameters: (inst.attributes || []).reduce((acc, ia) => {
-            const ta = (selectedTemplate.attributes || []).find(a => a.id === ia.id);
-            if (ta?.parameter) acc[ta.name] = ia.value;
-            return acc;
-          }, {})
-        }))
-      ]
-    };
+    const payload = buildIgnitionPayload(selectedTemplate, eng.folderPath);
     try {
       await uploadToIgnition({ gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey, payload });
       toast.success(`Uploaded "${selectedTemplate.name}" to Ignition`);

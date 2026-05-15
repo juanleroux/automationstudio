@@ -24,7 +24,6 @@ router.post('/upload', async (req, res) => {
 
     const response = await axios.post(url, body, {
       headers,
-      params: { provider: 'default', collisionPolicy: 'o' },
       timeout: 30000
     });
 

@@ -7,6 +7,7 @@ import {
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
+import { buildIgnitionPayload } from '../../utils/ignition';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
 
@@ -356,32 +357,7 @@ export default function TemplateTree({ selected, onSelect }) {
       toast.error('Configure Ignition gateway in Settings first');
       return;
     }
-    const payload = {
-      tagType: 'Folder',
-      name: eng.folderPath || template.name,
-      tags: [
-        {
-          name: template.name,
-          tagType: 'UdtType',
-          parameters: (template.attributes || [])
-            .filter(a => a.parameter)
-            .map(a => ({ name: a.name, dataType: a.dataType, value: a.value })),
-          tags: (template.attributes || [])
-            .filter(a => !a.parameter)
-            .map(a => ({ name: a.name, tagType: 'AtomicTag', dataType: a.dataType, value: a.value }))
-        },
-        ...(template.instances || []).map(inst => ({
-          name: inst.name,
-          tagType: 'UdtInstance',
-          typeId: template.name,
-          parameters: (inst.attributes || []).reduce((acc, ia) => {
-            const ta = (template.attributes || []).find(a => a.id === ia.id);
-            if (ta?.parameter) acc[ta.name] = ia.value;
-            return acc;
-          }, {})
-        }))
-      ]
-    };
+    const payload = buildIgnitionPayload(template, eng.folderPath);
     try {
       await uploadToIgnition({ gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey, payload });
       toast.success(`Uploaded "${template.name}" to Ignition`);
