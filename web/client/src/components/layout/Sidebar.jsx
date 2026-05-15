@@ -16,7 +16,7 @@ const NAV_ITEMS = [
 export default function Sidebar({ activeView, onChangeView }) {
   const { project, filename, isDirty, isSaving, openProject, saveCurrentProject, closeProject } = useProject();
   const toast = useToast();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showOpenDialog, setShowOpenDialog] = useState(false);
   const [projects, setProjects] = useState([]);
