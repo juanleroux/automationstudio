@@ -467,17 +467,6 @@ export default function TemplateTree({ selected, onSelect }) {
         </select>
       </div>
 
-      {/* Add template button */}
-      <div className="px-2 py-1 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-        <button
-          className="btn btn-ghost w-full text-xs justify-start"
-          style={{ padding: '4px 8px' }}
-          onClick={() => { setNewName(''); setShowAddTemplate(true); }}
-        >
-          <Plus size={13} /> Add Template
-        </button>
-      </div>
-
       {/* Hidden file input for template JSON import */}
       <input
         ref={importTemplateRef}
@@ -607,6 +596,19 @@ export default function TemplateTree({ selected, onSelect }) {
             </div>
           );
         })}
+
+        {/* Add Template inline row */}
+        {!search && filter === 'all' && (
+          <div
+            className="flex items-center gap-1 px-2 py-1 cursor-pointer"
+            style={{ fontSize: 12, color: 'var(--text-disabled)' }}
+            onClick={() => { setNewName(''); setShowAddTemplate(true); }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-disabled)'}
+          >
+            <Plus size={13} /> Add Template
+          </div>
+        )}
       </div>
 
       {/* Context Menu */}
