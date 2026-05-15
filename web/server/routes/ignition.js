@@ -19,8 +19,12 @@ router.post('/upload', async (req, res) => {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
-    const response = await axios.post(url, payload, {
+    // Ignition Tag CI/CD API expects an array of tag objects
+    const body = Array.isArray(payload) ? payload : [payload];
+
+    const response = await axios.post(url, body, {
       headers,
+      params: { provider: 'default', collisionPolicy: 'o' },
       timeout: 30000
     });
 
