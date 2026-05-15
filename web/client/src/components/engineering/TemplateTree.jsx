@@ -31,6 +31,7 @@ export default function TemplateTree({ selected, onSelect }) {
   const [importModalTemplate, setImportModalTemplate] = useState(null);
   const [importAttributesModalTemplate, setImportAttributesModalTemplate] = useState(null);
   const [dragOver, setDragOver] = useState(null);
+  const importTemplateRef = useRef(null);
 
   const renameInputRef = useRef(null);
 
@@ -346,6 +347,49 @@ export default function TemplateTree({ selected, onSelect }) {
     setContextMenu(null);
   };
 
+  // Export all templates as JSON
+  const exportTemplatesJSON = () => {
+    const data = JSON.stringify(templates, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project?.name || 'templates'}_templates.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${templates.length} template(s)`);
+    setContextMenu(null);
+  };
+
+  // Import template from JSON file
+  const handleImportTemplateJSON = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        let data = JSON.parse(e.target.result);
+        const now = new Date().toISOString();
+        const incoming = Array.isArray(data) ? data : [data];
+        updateProject(p => {
+          let nextTmplId = nextId(p.templates || []);
+          const added = incoming.map(tmpl => ({
+            ...tmpl,
+            id: nextTmplId++,
+            name: tmpl.name || `Imported_${nextTmplId}`,
+            lastModification: now,
+            instances: (tmpl.instances || []).map((inst, i) => ({ ...inst, id: i + 1 })),
+          }));
+          return { ...p, templates: [...(p.templates || []), ...added] };
+        });
+        toast.success(`Imported ${incoming.length} template(s)`);
+      } catch {
+        toast.error('Invalid JSON file');
+      }
+    };
+    reader.readAsText(file);
+    setContextMenu(null);
+  };
+
   // Filter & search
   const filteredTemplates = templates.map(t => {
     let instances = t.instances || [];
@@ -434,8 +478,20 @@ export default function TemplateTree({ selected, onSelect }) {
         </button>
       </div>
 
+      {/* Hidden file input for template JSON import */}
+      <input
+        ref={importTemplateRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={e => { handleImportTemplateJSON(e.target.files[0]); e.target.value = ''; }}
+      />
+
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        className="flex-1 overflow-y-auto"
+        onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, type: 'blank', templateId: null, instanceId: null }); }}
+      >
         {filteredTemplates.length === 0 && (
           <div className="text-center py-8 text-text-muted text-xs">
             <Folder size={28} className="mx-auto mb-2 opacity-30" />
@@ -560,7 +616,20 @@ export default function TemplateTree({ selected, onSelect }) {
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={e => e.stopPropagation()}
         >
-          {contextMenu.type === 'template' ? (
+          {contextMenu.type === 'blank' ? (
+            <>
+              <div className="context-menu-item" onClick={() => { setNewName(''); setShowAddTemplate(true); setContextMenu(null); }}>
+                <Plus size={14} /> Add New Template
+              </div>
+              <div className="context-menu-separator" />
+              <div className="context-menu-item" onClick={() => { setContextMenu(null); importTemplateRef.current?.click(); }}>
+                <Upload size={14} /> Import Template
+              </div>
+              <div className="context-menu-item" onClick={exportTemplatesJSON} style={{ opacity: templates.length === 0 ? 0.4 : 1, pointerEvents: templates.length === 0 ? 'none' : 'auto' }}>
+                <Download size={14} /> Export All Templates
+              </div>
+            </>
+          ) : contextMenu.type === 'template' ? (
             <>
               <div className="context-menu-item" onClick={() => { setNewName(''); setShowAddInstance(contextMenu.templateId); setContextMenu(null); }}>
                 <Plus size={14} /> Add Instance
