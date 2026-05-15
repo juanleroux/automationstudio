@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Trash2, Download, Edit2, Check, X } from 'lucide-react';
+import { Trash2, Download, Edit2, Check, X } from 'lucide-react';
 import ProfileAttributeGrid from './ProfileAttributeGrid';
 import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
@@ -54,10 +54,8 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
   const toast = useToast();
   const profiles = template.profiles || [];
   const [activeProfile, setActiveProfile] = useState(0);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [newProfile, setNewProfile] = useState({ name: '', description: '', exportType: 0, formatType: 0, tabularExportDelimiter: ',', structuralExportTemplate: '' });
   const [editProfile, setEditProfile] = useState(null);
 
   const profile = profiles[activeProfile];
@@ -71,20 +69,6 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
       return { ...t, profiles: profs };
     });
   }, [activeProfile, onUpdateTemplate]);
-
-  const addProfile = () => {
-    onUpdateTemplate(t => ({
-      ...t,
-      profiles: [...(t.profiles || []), {
-        ...newProfile,
-        attributes: []
-      }]
-    }));
-    setActiveProfile(profiles.length);
-    setShowAddModal(false);
-    setNewProfile({ name: '', description: '', exportType: 0, formatType: 0, tabularExportDelimiter: ',', structuralExportTemplate: '' });
-    toast.success('Profile added');
-  };
 
   const saveEditProfile = () => {
     onUpdateTemplate(t => {
@@ -146,9 +130,6 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
           ))}
         </div>
         <div className="flex items-center gap-1 px-2 flex-shrink-0">
-          <button className="btn btn-secondary text-xs" style={{ padding: '3px 8px' }} onClick={() => setShowAddModal(true)}>
-            <Plus size={12} /> Add Profile
-          </button>
           {profile && (
             <>
               <button className="btn btn-ghost btn-icon" title="Edit profile" onClick={() => { setEditProfile({ ...profile }); setShowEditModal(true); }}>
@@ -225,23 +206,6 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
           </div>
         )}
       </div>
-
-      {/* Add Profile Modal */}
-      {showAddModal && (
-        <Modal
-          title="Add Profile"
-          onClose={() => setShowAddModal(false)}
-          width={460}
-          footer={
-            <>
-              <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={addProfile} disabled={!newProfile.name.trim()}>Add</button>
-            </>
-          }
-        >
-          <ProfileForm profile={newProfile} onChange={setNewProfile} />
-        </Modal>
-      )}
 
       {/* Edit Profile Modal */}
       {showEditModal && editProfile && (
