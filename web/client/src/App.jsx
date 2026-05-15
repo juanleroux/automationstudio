@@ -4,7 +4,6 @@ import { ToastProvider } from './components/shared/Toast';
 import Layout from './components/layout/Layout';
 import EngineeringView from './components/engineering/EngineeringView';
 import AreasView from './components/areas/AreasView';
-import ProposalView from './components/proposal/ProposalView';
 import SettingsModal from './components/settings/SettingsModal';
 
 function AppInner() {
@@ -23,7 +22,6 @@ function AppInner() {
     <Layout activeView={activeView} onChangeView={handleChangeView}>
       {activeView === 'engineering' && <EngineeringView />}
       {activeView === 'areas' && <AreasView />}
-      {activeView === 'proposal' && <ProposalView />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </Layout>
   );

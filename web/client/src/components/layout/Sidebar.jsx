@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Cpu, Map, FileText, Settings, ChevronLeft, ChevronRight,
+  Cpu, Map, Settings, ChevronLeft, ChevronRight,
   FilePlus, FolderOpen, Save, Zap
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
@@ -11,7 +11,6 @@ import Modal from '../shared/Modal';
 const NAV_ITEMS = [
   { id: 'engineering', label: 'Engineering', icon: Cpu },
   { id: 'areas', label: 'Areas', icon: Map },
-  { id: 'proposal', label: 'Proposal', icon: FileText },
 ];
 
 export default function Sidebar({ activeView, onChangeView }) {
