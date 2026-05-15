@@ -264,8 +264,25 @@ export default function TemplateTree({ selected, onSelect }) {
     reader.readAsText(file);
   };
 
-  // Export template as CSV
-  const exportTemplateCSV = (template) => {
+  // Export attributes as CSV
+  const exportAttributesCSV = (template) => {
+    const attrs = template.attributes || [];
+    const header = ['Name', 'Description', 'DataType', 'Value', 'Parameter'];
+    const rows = attrs.map(a => [a.name, a.description || '', a.dataType, a.value || '', a.parameter ? 'true' : 'false']);
+    const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${template.name}_attributes.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${attrs.length} attributes`);
+    setContextMenu(null);
+  };
+
+  // Export instances as CSV
+  const exportInstancesCSV = (template) => {
     const attrs = template.attributes || [];
     const header = ['Name', 'Description', ...attrs.map(a => a.name)];
     const rows = (template.instances || []).map(inst => {
@@ -280,7 +297,7 @@ export default function TemplateTree({ selected, onSelect }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${template.name}.csv`;
+    a.download = `${template.name}_instances.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`Exported ${template.instances?.length || 0} instances`);
@@ -518,9 +535,15 @@ export default function TemplateTree({ selected, onSelect }) {
               <div className="context-menu-separator" />
               <div className="context-menu-item" onClick={() => {
                 const t = templates.find(x => x.id === contextMenu.templateId);
-                if (t) exportTemplateCSV(t);
+                if (t) exportAttributesCSV(t);
               }}>
-                <Download size={14} /> Export CSV
+                <Download size={14} /> Export Attributes
+              </div>
+              <div className="context-menu-item" onClick={() => {
+                const t = templates.find(x => x.id === contextMenu.templateId);
+                if (t) exportInstancesCSV(t);
+              }}>
+                <Download size={14} /> Export Instances
               </div>
               <div className="context-menu-item" onClick={() => { setImportModalTemplate(contextMenu.templateId); setContextMenu(null); }}>
                 <Upload size={14} /> Import CSV
