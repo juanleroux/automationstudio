@@ -138,7 +138,7 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
               <button className="btn btn-ghost btn-icon" title="Delete profile" style={{ color: '#e55353' }} onClick={() => setConfirmDelete(activeProfile)}>
                 <Trash2 size={13} />
               </button>
-              <button className="btn btn-primary btn-icon" title="Export" onClick={handleExport}>
+              <button className="btn btn-ghost btn-icon" title="Export" onClick={handleExport}>
                 <Download size={13} />
               </button>
             </>
