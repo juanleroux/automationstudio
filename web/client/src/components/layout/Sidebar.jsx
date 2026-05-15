@@ -82,8 +82,7 @@ export default function Sidebar({ activeView, onChangeView }) {
       >
         {/* Logo */}
         <div
-          className="flex items-center gap-3 px-3 py-4 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--border)' }}
+          className="flex items-center gap-3 px-3 py-3 flex-shrink-0"
         >
           <div
             className="flex items-center justify-center rounded-md flex-shrink-0"
@@ -96,7 +95,6 @@ export default function Sidebar({ activeView, onChangeView }) {
               <div className="font-bold text-text-primary text-sm leading-tight truncate">
                 Automation Studio
               </div>
-              <div className="text-xs text-text-muted truncate">SCADA Tag Manager</div>
             </div>
           )}
         </div>
