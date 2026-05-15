@@ -1,0 +1,17 @@
+{
+  "proposal": {
+    "companyName": "",
+    "contactName": "",
+    "phoneNumber": "",
+    "emailAddress": "",
+    "address": "",
+    "taxNumber": "",
+    "currencySymbol": "$",
+    "taxAmount": "0",
+    "logoFilePath": "",
+    "previewBodyColor": "#FFFFFF",
+    "previewHeaderColor": "#528ED2",
+    "previewFooterColor": "#DDDDDD",
+    "previewSummaryColor": "#AAAAAA"
+  }
+}
