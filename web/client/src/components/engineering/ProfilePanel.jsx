@@ -17,27 +17,37 @@ const FORMAT_TYPES = [
   { value: 3, label: 'Custom' },
 ];
 
+function csvCell(value, delimiter) {
+  const str = value == null ? '' : String(value);
+  if (str.includes(delimiter) || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function resolveRule(rule, attr, inst, template) {
+  if (!rule) return '';
+  if (rule === 'Instance.Name') return inst.name || '';
+  if (rule === 'Instance.Description') return inst.description || '';
+  if (rule === 'Template.Name') return template.name || '';
+  if (rule === 'Instance.Area') return '';
+  if (rule === 'Attribute.Name') return attr.name || '';
+  const ta = (template.attributes || []).find(a => a.name === rule);
+  if (ta) {
+    const ia = (inst.attributes || []).find(a => a.id === ta.id);
+    return ia != null ? ia.value : (ta.value || '');
+  }
+  return '';
+}
+
 function buildTabularCSV(profile, template) {
   const delimiter = profile.tabularExportDelimiter || ',';
-  const header = profile.attributes.map(a => a.name).join(delimiter);
-  const rows = (template.instances || []).map(inst => {
-    return profile.attributes.map(attr => {
-      const rule = attr.rule || '';
-      if (rule === 'Instance.Name') return inst.name;
-      if (rule === 'Instance.Description') return inst.description;
-      if (rule === 'Template.Name') return template.name;
-      if (rule === 'Instance.Area') return '';
-      if (rule === 'Attribute.Name') return attr.name;
-      // Check if rule matches an attribute id
-      const ta = template.attributes.find(a => a.name === rule);
-      if (ta) {
-        const ia = (inst.attributes || []).find(a => a.id === ta.id);
-        return ia ? ia.value : ta.value;
-      }
-      return '';
-    }).join(delimiter);
-  });
-  return [header, ...rows].join('\n');
+  const cols = profile.attributes || [];
+  const header = cols.map(a => csvCell(a.name, delimiter)).join(delimiter);
+  const rows = (template.instances || []).map(inst =>
+    cols.map(attr => csvCell(resolveRule(attr.rule || '', attr, inst, template), delimiter)).join(delimiter)
+  );
+  return [header, ...rows].join('\r\n');
 }
 
 function buildStructuralText(profile, template) {
@@ -92,6 +102,8 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
 
   const handleExport = () => {
     if (!profile) return;
+    if (!(template.instances?.length)) { toast.error('No instances to export'); return; }
+    if (profile.exportType === 0 && !(profile.attributes?.length)) { toast.error('No columns configured for this profile'); return; }
     let content = '';
     let ext = 'txt';
     if (profile.exportType === 0) {
