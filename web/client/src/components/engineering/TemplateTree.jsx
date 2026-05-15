@@ -29,6 +29,7 @@ export default function TemplateTree({ selected, onSelect }) {
   const [showAddInstance, setShowAddInstance] = useState(null); // templateId
   const [newName, setNewName] = useState('');
   const [importModalTemplate, setImportModalTemplate] = useState(null);
+  const [importAttributesModalTemplate, setImportAttributesModalTemplate] = useState(null);
   const [dragOver, setDragOver] = useState(null);
 
   const renameInputRef = useRef(null);
@@ -260,6 +261,47 @@ export default function TemplateTree({ selected, onSelect }) {
       }));
       toast.success(`Imported ${lines.length - 1} instances`);
       setImportModalTemplate(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportAttributesCSV = (templateId, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) { toast.error('CSV must have header + data rows'); return; }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const nameIdx = headers.indexOf('name');
+      const descIdx = headers.indexOf('description');
+      const typeIdx = headers.indexOf('datatype');
+      const valIdx = headers.indexOf('value');
+      const paramIdx = headers.indexOf('parameter');
+      if (nameIdx < 0) { toast.error('CSV must have a "Name" column'); return; }
+      const now = new Date().toISOString();
+      updateProject(p => ({
+        ...p,
+        templates: p.templates.map(t => {
+          if (t.id !== templateId) return t;
+          let nextAttrId = nextId(t.attributes || []);
+          const newAttrs = lines.slice(1).map(line => {
+            const cells = line.split(',').map(c => c.trim());
+            return {
+              id: nextAttrId++,
+              name: cells[nameIdx] || `Attr_${nextAttrId}`,
+              description: descIdx >= 0 ? (cells[descIdx] || '') : '',
+              dataType: typeIdx >= 0 ? (cells[typeIdx] || 'String') : 'String',
+              value: valIdx >= 0 ? (cells[valIdx] || '') : '',
+              parameter: paramIdx >= 0 ? cells[paramIdx]?.toLowerCase() === 'true' : false,
+              lastModification: now,
+            };
+          });
+          return { ...t, lastModification: now, attributes: [...(t.attributes || []), ...newAttrs] };
+        })
+      }));
+      toast.success(`Imported ${lines.length - 1} attributes`);
+      setImportAttributesModalTemplate(null);
     };
     reader.readAsText(file);
   };
@@ -559,8 +601,11 @@ export default function TemplateTree({ selected, onSelect }) {
                   <ChevronRight size={12} style={{ opacity: 0.6 }} />
                 </div>
                 <div className="context-menu-submenu-panel">
+                  <div className="context-menu-item" onClick={() => { setImportAttributesModalTemplate(contextMenu.templateId); setContextMenu(null); }}>
+                    <Upload size={14} /> Import Attributes
+                  </div>
                   <div className="context-menu-item" onClick={() => { setImportModalTemplate(contextMenu.templateId); setContextMenu(null); }}>
-                    <Upload size={14} /> Import CSV
+                    <Upload size={14} /> Import Instances
                   </div>
                 </div>
               </div>
@@ -673,7 +718,31 @@ export default function TemplateTree({ selected, onSelect }) {
         </Modal>
       )}
 
-      {/* Import CSV Modal */}
+      {/* Import Attributes Modal */}
+      {importAttributesModalTemplate !== null && (
+        <Modal
+          title="Import Attributes from CSV"
+          onClose={() => setImportAttributesModalTemplate(null)}
+          width={440}
+        >
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-text-secondary">
+              CSV must have a header row with columns: Name, Description, DataType, Value, Parameter.
+            </p>
+            <div>
+              <label className="block text-xs text-text-muted mb-2">Select CSV File</label>
+              <input
+                type="file"
+                accept=".csv,.txt"
+                onChange={e => handleImportAttributesCSV(importAttributesModalTemplate, e.target.files[0])}
+                style={{ background: 'transparent', border: 'none', padding: 0 }}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Import Instances Modal */}
       {importModalTemplate !== null && (
         <Modal
           title="Import Instances from CSV"
