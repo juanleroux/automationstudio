@@ -27,15 +27,16 @@ function csvCell(value, delimiter) {
 
 function resolveRule(rule, attr, inst, template) {
   if (!rule) return '';
-  if (rule === 'Instance.Name') return inst.name || '';
-  if (rule === 'Instance.Description') return inst.description || '';
-  if (rule === 'Template.Name') return template.name || '';
-  if (rule === 'Instance.Area') return '';
-  if (rule === 'Attribute.Name') return attr.name || '';
-  const ta = (template.attributes || []).find(a => a.name === rule);
+  const r = rule.trim().toLowerCase();
+  if (r === 'instance.name') return inst.name || '';
+  if (r === 'instance.description') return inst.description || '';
+  if (r === 'template.name') return template.name || '';
+  if (r === 'instance.area') return '';
+  if (r === 'attribute.name') return attr.name || '';
+  const ta = (template.attributes || []).find(a => a.name.toLowerCase() === r);
   if (ta) {
     const ia = (inst.attributes || []).find(a => a.id === ta.id);
-    return ia != null ? ia.value : (ta.value || '');
+    return ia != null && ia.value != null ? ia.value : (ta.value || '');
   }
   return '';
 }
@@ -193,6 +194,7 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
         ) : profile.exportType === 0 ? (
           <ProfileAttributeGrid
             attributes={profile.attributes || []}
+            templateAttributes={template.attributes || []}
             onChange={updateProfileAttrs}
           />
         ) : (

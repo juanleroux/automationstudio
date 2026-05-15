@@ -77,7 +77,7 @@ function EditCell({ value, onChange, suggestions, placeholder }) {
   );
 }
 
-export default function ProfileAttributeGrid({ attributes, onChange }) {
+export default function ProfileAttributeGrid({ attributes, templateAttributes = [], onChange }) {
   const updateAttr = useCallback((id, field, value) => {
     onChange(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
   }, [onChange]);
@@ -144,7 +144,7 @@ export default function ProfileAttributeGrid({ attributes, onChange }) {
                   <EditCell
                     value={attr.rule}
                     onChange={v => updateAttr(attr.id, 'rule', v)}
-                    suggestions={RULE_SUGGESTIONS}
+                    suggestions={[...RULE_SUGGESTIONS, ...templateAttributes.map(a => a.name)]}
                     placeholder="e.g. Instance.Name"
                   />
                 </td>
