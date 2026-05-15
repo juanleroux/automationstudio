@@ -146,7 +146,7 @@ export default function AreasView() {
         style={{ borderBottom: '1px solid #333', background: '#242424' }}
       >
         <div>
-          <h2 className="text-sm font-semibold text-text-primary">Areas</h2>
+          <h2 className="text-sm font-semibold text-text-primary">Model</h2>
           <p className="text-xs text-text-muted">{areas.length} areas, {templates.reduce((s, t) => s + (t.instances?.length || 0), 0)} total instances</p>
         </div>
         <button className="btn btn-primary text-sm" onClick={() => { setNewArea({ name: '', description: '' }); setShowAddArea(true); }}>
@@ -296,7 +296,7 @@ export default function AreasView() {
                     <tr style={{ background: '#1a1a1a' }}>
                       <td></td>
                       <td colSpan={4} style={{ paddingLeft: 36, color: '#555', fontSize: 11, fontStyle: 'italic', paddingTop: 6, paddingBottom: 6 }}>
-                        No instances — drag instances here or assign from Engineering view
+                        No instances — drag instances here or assign from Assets view
                       </td>
                     </tr>
                   )}

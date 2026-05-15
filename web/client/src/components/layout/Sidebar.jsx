@@ -9,8 +9,8 @@ import { listProjects, createProject } from '../../api/client';
 import Modal from '../shared/Modal';
 
 const NAV_ITEMS = [
-  { id: 'engineering', label: 'Engineering', icon: Cpu },
-  { id: 'areas', label: 'Areas', icon: Map },
+  { id: 'engineering', label: 'Assets', icon: Cpu },
+  { id: 'areas', label: 'Model', icon: Map },
 ];
 
 export default function Sidebar({ activeView, onChangeView }) {
