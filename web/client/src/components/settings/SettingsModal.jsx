@@ -4,10 +4,10 @@ import Modal from '../shared/Modal';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, testIgnitionConnection } from '../../api/client';
+import { loadConfig, saveConfig, saveProject, testIgnitionConnection } from '../../api/client';
 
 export default function SettingsModal({ onClose }) {
-  const { project, updateProject } = useProject();
+  const { project, filename, updateProject } = useProject();
   const { theme, setTheme } = useTheme();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('general');
@@ -42,11 +42,11 @@ export default function SettingsModal({ onClose }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Save engineering settings to project
-      if (project) {
-        updateProject(p => ({ ...p, engineering }));
+      if (project && filename) {
+        const updatedProject = { ...project, engineering };
+        updateProject(updatedProject);
+        await saveProject(filename, updatedProject);
       }
-      // Save company config
       if (config) {
         await saveConfig(config);
       }
