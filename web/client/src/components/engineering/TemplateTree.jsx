@@ -533,17 +533,25 @@ export default function TemplateTree({ selected, onSelect }) {
                 <Copy size={14} /> Duplicate
               </div>
               <div className="context-menu-separator" />
-              <div className="context-menu-item" onClick={() => {
-                const t = templates.find(x => x.id === contextMenu.templateId);
-                if (t) exportAttributesCSV(t);
-              }}>
-                <Download size={14} /> Export Attributes
-              </div>
-              <div className="context-menu-item" onClick={() => {
-                const t = templates.find(x => x.id === contextMenu.templateId);
-                if (t) exportInstancesCSV(t);
-              }}>
-                <Download size={14} /> Export Instances
+              <div className="context-menu-submenu">
+                <div className="context-menu-item">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Download size={14} /> Export</span>
+                  <ChevronRight size={12} style={{ opacity: 0.6 }} />
+                </div>
+                <div className="context-menu-submenu-panel">
+                  <div className="context-menu-item" onClick={() => {
+                    const t = templates.find(x => x.id === contextMenu.templateId);
+                    if (t) exportAttributesCSV(t);
+                  }}>
+                    <Download size={14} /> Export Attributes
+                  </div>
+                  <div className="context-menu-item" onClick={() => {
+                    const t = templates.find(x => x.id === contextMenu.templateId);
+                    if (t) exportInstancesCSV(t);
+                  }}>
+                    <Download size={14} /> Export Instances
+                  </div>
+                </div>
               </div>
               <div className="context-menu-item" onClick={() => { setImportModalTemplate(contextMenu.templateId); setContextMenu(null); }}>
                 <Upload size={14} /> Import CSV
