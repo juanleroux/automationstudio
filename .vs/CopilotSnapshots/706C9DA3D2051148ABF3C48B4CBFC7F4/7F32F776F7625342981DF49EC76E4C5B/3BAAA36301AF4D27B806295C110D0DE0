@@ -1,0 +1,2128 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+using System.Windows.Threading;
+using gTools.Log;
+using Newtonsoft.Json;
+
+namespace TagCreator
+{
+    /// <summary>
+    /// Interaction logic for EngineeringViewControl.xaml
+    /// </summary>
+    public partial class ModelViewControl : UserControl, INotifyPropertyChanged
+    {
+        #region Initialization
+        
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private MainWindow _mainWindow;
+        private Project _project = null;
+        private string _searchFilter;
+        private Point _dragDropStartPosition;
+        private string _areaName;
+        private bool _isAreaSelected;
+        private bool _isInstanceSelected;        
+        private bool _isTreeViewEditMode;
+        private Area _currentArea;
+        private Template _currentTemplate;
+        private Instance _currentInstance;
+        private Profile _currentProfile;        
+        private string _oldName; //treeview renaming        
+        private TextBox _editNameTextBox; //treeview renaming    
+        private DispatcherTimer _treeViewTimer = new DispatcherTimer();
+        private TreeViewItem _renameTreeViewItem;
+        public const int TabPageAreaControl = 0;
+        public const int TabPageAttributesControl = 1;
+        private EngineeringParentProxy _parentProxy = new EngineeringParentProxy();
+		private List<Instance> _selectedInstances = new List<Instance>();
+		private Instance _lastSelectedInstance = null;
+		private Area _lastSelectedArea = null;
+
+		public ModelViewControl()
+        {
+            InitializeComponent();
+
+            //set wpf data context
+            this.DataContext = this;
+
+            _parentProxy.ModelViewControl = this;
+            _areaControl.ParentProxy = _parentProxy;
+            _templateAttributesControl.ParentProxy = _parentProxy;
+
+            _treeViewTimer.Interval = TimeSpan.FromMilliseconds(1000);
+            _treeViewTimer.Tick += _treeViewTimer_Tick;
+        }
+
+        private bool ConfirmIgnitionOverwrite()
+        {
+            var result = MessageBox.Show(
+                "Are you sure you want to overwrite tag(s) in Ignition?",
+                "Confirm Overwrite",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
+
+            return result == MessageBoxResult.Yes;
+        }
+
+        private List<string> GetUploadPathsForInstances(IEnumerable<Instance> instances)
+        {
+            return instances != null
+                ? instances.Where(i => i != null && string.IsNullOrWhiteSpace(i.Name) == false).Select(i => i.Name).ToList()
+                : new List<string>();
+        }
+
+        private List<string> GetUploadPathsForArea(Area area)
+        {
+            var paths = new List<string>();
+            if (area == null || area.Instances == null)
+                return paths;
+
+            bool isUnassigned = area.Id == 0 || area.Name.Equals("Unassigned", StringComparison.OrdinalIgnoreCase);
+            if (isUnassigned)
+                return GetUploadPathsForInstances(area.Instances.Items);
+
+            if (string.IsNullOrWhiteSpace(area.Name) == false)
+                paths.Add(area.Name);
+
+            foreach (var instance in area.Instances.Items.Where(i => i != null && string.IsNullOrWhiteSpace(i.Name) == false))
+                paths.Add(area.Name + "/" + instance.Name);
+
+            return paths;
+        }
+
+        private List<string> GetUploadPathsForAllAreas()
+        {
+            var paths = new List<string>();
+            if (_project?.Areas?.Items == null)
+                return paths;
+
+            foreach (var area in _project.Areas.Items)
+                paths.AddRange(GetUploadPathsForArea(area));
+
+            return paths.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private async Task<bool> ConfirmIgnitionOverwriteIfNeededAsync(IEnumerable<string> candidatePaths)
+        {
+            try
+            {
+                var gatewayUrl = _project?.Engineering?.IgnitionGateway;
+                var apiKey = _project?.Engineering?.APIKey;
+
+                var api = new IgnitionAPI();
+                bool willOverwrite = await api.WillOverwriteTagPaths(gatewayUrl, apiKey, candidatePaths);
+
+                if (!willOverwrite)
+                    return true;
+
+                return ConfirmIgnitionOverwrite();
+            }
+            catch
+            {
+                return ConfirmIgnitionOverwrite();
+            }
+        }
+
+        // Export a profile for all instances under an area (stitch rows together)
+        private void ExportAreaProfile(Profile profile, Area area)
+        {
+            try
+            {
+                if (area == null || profile == null)
+                    return;
+
+                var instances = area.Instances.Items.ToList();
+                if (!instances.Any())
+                    return;
+
+                // delegate to ProfileAttributesControl which already supports exporting multiple instances
+                var ctrl = new ProfileAttributesControl() { ParentProxy = _parentProxy, MainWindow = MainWindow, Project = _project };
+
+                // create file dialog extension filter (use same logic as EngineeringViewControl)
+                StringBuilder filter = new StringBuilder();
+                foreach (ProfileFormatType format in new ProfileFormatTypes())
+                    filter.Append(format.FileDialogFilter).Append("|");
+
+                filter.Replace("*.xxx", string.IsNullOrEmpty(profile.CustomFormat) ? "*.*" : string.Format("*.{0}", profile.CustomFormat));
+
+                Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog();
+                saveFileDialog.Filter = filter.ToString().TrimEnd(new char[] { '|' });
+                saveFileDialog.FilterIndex = profile.FormatType + 1;
+
+                if (saveFileDialog.ShowDialog(MainWindow) != true)
+                    return;
+
+                // Group instances by their parent template
+                var groups = instances.GroupBy(inst => _project.Templates.Items.Where(t => t.Instances.Items.Contains(inst)).Single()).ToList();
+
+                // Verify each template has a compatible profile (by name and export settings)
+                foreach (var g in groups)
+                {
+                    var tmpl = g.Key;
+                    bool has = tmpl.Profiles.Items.Any(p => p.Name == profile.Name && p.ExportType == profile.ExportType && p.FormatType == profile.FormatType && p.CustomFormat == profile.CustomFormat && p.TabularExportDelimiter == profile.TabularExportDelimiter);
+                    if (!has)
+                    {
+                        MessageBox.Show("All instances under the area must have a compatible profile to export.");
+                        return;
+                    }
+                }
+
+                var originalTemplate = _currentTemplate;
+                try
+                {
+                    if (profile.ExportType == ProfileExportTypes.Tabular)
+                    {
+                        List<string> tempFiles = new List<string>();
+                        try
+                        {
+                            foreach (var g in groups)
+                            {
+                                var tmpl = g.Key;
+                                _currentTemplate = tmpl;
+
+                                var localProfile = tmpl.Profiles.Items.Where(p => p.Name == profile.Name && p.ExportType == profile.ExportType && p.FormatType == profile.FormatType && p.CustomFormat == profile.CustomFormat && p.TabularExportDelimiter == profile.TabularExportDelimiter).SingleOrDefault();
+                                if (localProfile == null)
+                                {
+                                    MessageBox.Show("Profile not found on template " + tmpl.Name);
+                                    return;
+                                }
+
+                                string temp = System.IO.Path.GetTempFileName();
+                                ctrl.ExportTabularProfile(localProfile, g.ToList(), temp);
+                                tempFiles.Add(temp);
+                            }
+
+                            // combine temp files: write first file entirely, then append others skipping their header line
+                            using (var outStream = new System.IO.StreamWriter(saveFileDialog.FileName, false))
+                            {
+                                bool first = true;
+                                foreach (var tf in tempFiles)
+                                {
+                                    var lines = System.IO.File.ReadAllLines(tf);
+                                    if (first)
+                                    {
+                                        foreach (var l in lines)
+                                            outStream.WriteLine(l);
+                                        first = false;
+                                    }
+                                    else
+                                    {
+                                        // skip header
+                                        for (int i = 1; i < lines.Length; i++)
+                                            outStream.WriteLine(lines[i]);
+                                    }
+                                }
+                            }
+
+                            // cleanup temp files
+                            foreach (var tf in tempFiles)
+                            {
+                                try { System.IO.File.Delete(tf); } catch { }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            gLog.Error(ex.ToString());
+                        }
+                    }
+                    else
+                    {
+                        // Structural: produce per-instance outputs and concatenate
+                        List<string> outputs = new List<string>();
+                        foreach (var g in groups)
+                        {
+                            var tmpl = g.Key;
+                            _currentTemplate = tmpl;
+
+                            var localProfile = tmpl.Profiles.Items.Where(p => p.Name == profile.Name && p.ExportType == profile.ExportType && p.FormatType == profile.FormatType && p.CustomFormat == profile.CustomFormat && p.TabularExportDelimiter == profile.TabularExportDelimiter).SingleOrDefault();
+                            if (localProfile == null)
+                            {
+                                MessageBox.Show("Profile not found on template " + tmpl.Name);
+                                return;
+                            }
+
+                            foreach (var inst in g)
+                            {
+                                string temp = System.IO.Path.GetTempFileName();
+                                ctrl.ExportStructuralProfile(localProfile, inst, temp);
+                                outputs.Add(System.IO.File.ReadAllText(temp));
+                                try { System.IO.File.Delete(temp); } catch { }
+                            }
+                        }
+
+                        System.IO.File.WriteAllText(saveFileDialog.FileName, string.Join(Environment.NewLine, outputs));
+                    }
+                }
+                finally
+                {
+                    _currentTemplate = originalTemplate;
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        // Export a profile for all instances in all areas (shared profiles only)
+        private void ExportAllAreasProfile(Profile profile)
+        {
+            try
+            {
+                if (profile == null || _project == null)
+                    return;
+
+                // Gather all instances in all areas (excluding unassigned area if desired)
+                var allInstances = _project.Areas.Items.SelectMany(a => a.Instances.Items).ToList();
+                if (!allInstances.Any())
+                    return;
+
+                var ctrl = new ProfileAttributesControl() { ParentProxy = _parentProxy, MainWindow = MainWindow, Project = _project };
+
+                // create file dialog extension filter (use same logic as EngineeringViewControl)
+                StringBuilder filter = new StringBuilder();
+                foreach (ProfileFormatType format in new ProfileFormatTypes())
+                    filter.Append(format.FileDialogFilter).Append("|");
+
+                filter.Replace("*.xxx", string.IsNullOrEmpty(profile.CustomFormat) ? "*.*" : string.Format("*.{0}", profile.CustomFormat));
+
+                Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog();
+                saveFileDialog.Filter = filter.ToString().TrimEnd(new char[] { '|' });
+                saveFileDialog.FilterIndex = profile.FormatType + 1;
+
+                if (saveFileDialog.ShowDialog(MainWindow) != true)
+                    return;
+
+                // Group instances by their parent template
+                var groups = allInstances.GroupBy(inst => _project.Templates.Items.Where(t => t.Instances.Items.Contains(inst)).Single()).ToList();
+
+                // Verify each template has a compatible profile (by name and export settings)
+                foreach (var g in groups)
+                {
+                    var tmpl = g.Key;
+                    bool has = tmpl.Profiles.Items.Any(p => p.Name == profile.Name && p.ExportType == profile.ExportType && p.FormatType == profile.FormatType && p.CustomFormat == profile.CustomFormat && p.TabularExportDelimiter == profile.TabularExportDelimiter);
+                    if (!has)
+                    {
+                        MessageBox.Show("All instances must have a compatible profile to export.");
+                        return;
+                    }
+                }
+
+                var originalTemplate = _currentTemplate;
+                try
+                {
+                    if (profile.ExportType == ProfileExportTypes.Tabular)
+                    {
+                        List<string> tempFiles = new List<string>();
+                        try
+                        {
+                            foreach (var g in groups)
+                            {
+                                var tmpl = g.Key;
+                                _currentTemplate = tmpl;
+
+                                var localProfile = tmpl.Profiles.Items.Where(p => p.Name == profile.Name && p.ExportType == profile.ExportType && p.FormatType == profile.FormatType && p.CustomFormat == profile.CustomFormat && p.TabularExportDelimiter == profile.TabularExportDelimiter).SingleOrDefault();
+                                if (localProfile == null)
+                                {
+                                    MessageBox.Show("Profile not found on template " + tmpl.Name);
+                                    return;
+                                }
+
+                                string temp = System.IO.Path.GetTempFileName();
+                                ctrl.ExportTabularProfile(localProfile, g.ToList(), temp);
+                                tempFiles.Add(temp);
+                            }
+
+                            // combine temp files: write first file entirely, then append others skipping their header line
+                            using (var outStream = new System.IO.StreamWriter(saveFileDialog.FileName, false))
+                            {
+                                bool first = true;
+                                foreach (var tf in tempFiles)
+                                {
+                                    var lines = System.IO.File.ReadAllLines(tf);
+                                    if (first)
+                                    {
+                                        foreach (var l in lines)
+                                            outStream.WriteLine(l);
+                                        first = false;
+                                    }
+                                    else
+                                    {
+                                        // skip header
+                                        for (int i = 1; i < lines.Length; i++)
+                                            outStream.WriteLine(lines[i]);
+                                    }
+                                }
+                            }
+
+                            // cleanup temp files
+                            foreach (var tf in tempFiles)
+                            {
+                                try { System.IO.File.Delete(tf); } catch { }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            gLog.Error(ex.ToString());
+                        }
+                    }
+                    else
+                    {
+                        // Structural: produce per-instance outputs and concatenate
+                        List<string> outputs = new List<string>();
+                        foreach (var g in groups)
+                        {
+                            var tmpl = g.Key;
+                            _currentTemplate = tmpl;
+
+                            var localProfile = tmpl.Profiles.Items.Where(p => p.Name == profile.Name && p.ExportType == profile.ExportType && p.FormatType == profile.FormatType && p.CustomFormat == profile.CustomFormat && p.TabularExportDelimiter == profile.TabularExportDelimiter).SingleOrDefault();
+                            if (localProfile == null)
+                            {
+                                MessageBox.Show("Profile not found on template " + tmpl.Name);
+                                return;
+                            }
+
+                            foreach (var inst in g)
+                            {
+                                string temp = System.IO.Path.GetTempFileName();
+                                ctrl.ExportStructuralProfile(localProfile, inst, temp);
+                                outputs.Add(System.IO.File.ReadAllText(temp));
+                                try { System.IO.File.Delete(temp); } catch { }
+                            }
+                        }
+
+                        System.IO.File.WriteAllText(saveFileDialog.FileName, string.Join(Environment.NewLine, outputs));
+                    }
+                }
+                finally
+                {
+                    _currentTemplate = originalTemplate;
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+        
+        #endregion
+
+        #region Properties
+
+        public MainWindow MainWindow
+        {
+            get
+            {
+                return _mainWindow;
+            }
+            set
+            {
+                _mainWindow = value;
+                _templateAttributesControl.MainWindow = _mainWindow;
+            }
+        }
+
+        public Project Project
+        {
+            get
+            {
+                return _project;
+            }
+            set
+            {
+                _project = value;                
+            }
+        }
+
+        public Area CurrentArea
+        {
+            get
+            {
+                return _currentArea;
+            }            
+        }
+
+        public Template CurrentTemplate
+        {
+            get
+            {
+                return _currentTemplate;
+            }            
+        }
+
+        public Instance CurrentInstance
+        {
+            get
+            {
+                return _currentInstance;
+            }            
+        }
+
+        public Profile CurrentProfile
+        {
+            get
+            {
+                return _currentProfile;
+            }
+        }
+
+        #endregion
+
+        #region Data Binding
+
+        public string ProjectName
+        {
+            get
+            {
+                return _project != null ? _project.Name : string.Empty;
+            }
+        }
+
+        public bool IsProjectLoaded
+        {
+            get
+            {
+                return _project != null;
+            }
+        }
+
+        public bool IsTreeViewEditMode
+        {
+            get
+            {
+                return _isTreeViewEditMode;
+            }
+            set
+            {
+                _isTreeViewEditMode = value;
+                NotifyPropertyChanged("IsTreeViewEditMode");
+            }
+        }
+
+        public string TemplateName
+        {
+            get
+            {
+                return _areaName;
+            }
+            set
+            {
+                _areaName = value;
+                NotifyPropertyChanged("TemplateName");
+                _parentProxy.NotifyPropertyChanged("TemplateName");                
+            }
+        }
+
+        public string TemplateDescription
+        {
+            get
+            {
+                if (_currentInstance != null)
+                    return _currentInstance.Description;
+
+                if (_currentArea != null)
+                    return _currentArea.Description;
+
+                return string.Empty;
+            }
+            set
+            {
+                if (_currentInstance != null)
+                {
+                    _currentInstance.Description = value;
+                    _currentInstance.UpdateLastModification();
+                }
+                else if (_currentArea != null)
+                {
+                    _currentArea.Description = value;
+                    _currentArea.UpdateLastModification();
+                }
+
+                NotifyPropertyChanged("TemplateDescription");
+                NotifyPropertyChanged("TemplateLastModification");
+
+                _parentProxy.NotifyPropertyChanged("TemplateDescription");
+                _parentProxy.NotifyPropertyChanged("TemplateLastModification");
+            }
+        }
+
+        public string TemplateLastModification
+        {
+            get
+            {
+                if (_currentInstance != null)
+                    return string.Format("Last modification: {0}", _currentInstance.LastModification.ToString("dd/MM/yyyy"));
+
+                if (_currentArea != null)
+                    return string.Format("Last modification: {0}", _currentArea.LastModification.ToString("dd/MM/yyyy"));
+
+                return string.Empty;
+            }
+        }
+
+        public bool IsAreaSelected
+        {
+            get
+            {
+                return _isAreaSelected;
+            }
+            set
+            {
+                _isAreaSelected = value;
+                NotifyPropertyChanged("IsAreaSelected");
+                NotifyPropertyChanged("IsTreeViewSelection");
+                NotifyPropertyChanged("IsUserAreaSelected");
+                NotifyPropertyChanged("IsUserAreaOrInstanceSelected");
+
+                _parentProxy.NotifyPropertyChanged("IsTemplateSelected");
+                _parentProxy.NotifyPropertyChanged("TemplateDescription");
+                _parentProxy.NotifyPropertyChanged("TemplateLastModification");
+            }
+        }
+
+        public bool IsInstanceSelected
+        {
+            get
+            {
+                return _isInstanceSelected;
+            }
+            set
+            {
+                _isInstanceSelected = value;
+                NotifyPropertyChanged("IsInstanceSelected");
+                NotifyPropertyChanged("IsTreeViewSelection");
+                NotifyPropertyChanged("IsUserAreaSelected");
+                NotifyPropertyChanged("IsUserAreaOrInstanceSelected");
+                NotifyPropertyChanged("IsInstanceFlagged");
+
+                _parentProxy.NotifyPropertyChanged("IsInstanceSelected");
+                _parentProxy.NotifyPropertyChanged("TemplateDescription");
+                _parentProxy.NotifyPropertyChanged("TemplateLastModification");
+            }
+        }
+
+        public bool IsInstanceFlagged
+        {
+            get
+            {
+                return _currentInstance != null ? _currentInstance.IsFlagged : false;
+            }
+        }
+
+        public bool IsTreeViewSelection
+        {
+            get
+            {
+                return _isAreaSelected || _isInstanceSelected;
+            }
+        }
+
+        public bool IsUserAreaSelected
+        {
+            get
+            {
+                return _isAreaSelected && _currentArea.Id != 0;
+            }            
+        }
+
+        public bool IsUserAreaOrInstanceSelected
+        {
+            get
+            {
+                return (_isAreaSelected && _currentArea.Id != 0) || _isInstanceSelected;
+            }
+        }
+
+        public bool IsFolderSet
+        {
+            get
+            {
+                return _project != null && string.IsNullOrEmpty(_project.Engineering.FolderPath) == false && Directory.Exists(_project.Engineering.FolderPath);
+            }
+        }
+
+        public bool IsProfileSelected
+        {
+            get
+            {
+                return _currentProfile != null;
+            }
+        }
+
+        public bool HasTemplateAttributes
+        {
+            get
+            {
+                return _currentTemplate != null ? _currentTemplate.Attributes.Items.Count > 0 : false;
+            }
+        }
+
+        public bool HasAnyInstances
+        {
+            get
+            {
+                return _project != null && _project.Areas != null && _project.Areas.Items.SelectMany(a => a.Instances.Items).Any();
+            }
+        }
+        
+		#endregion
+
+		#region Events
+
+		private async void UploadAllAreasToIgnition_Click(object sender, RoutedEventArgs e)
+		{
+           try
+            {
+               if (_project == null)
+                {
+                    MessageBox.Show("No project loaded. Open a project before uploading areas to Ignition.");
+                    return;
+                }
+
+               if (_project.Engineering == null)
+                {
+                    MessageBox.Show("Project engineering settings are missing.");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(_project.Engineering.IgnitionGateway) || string.IsNullOrWhiteSpace(_project.Engineering.APIKey))
+                {
+                    MessageBox.Show("Ignition Gateway URL and API Key must be set in the project engineering settings.");
+                    return;
+                }
+
+                if (!await ConfirmIgnitionOverwriteIfNeededAsync(GetUploadPathsForAllAreas()))
+                    return;
+
+                var api = new IgnitionAPI();
+
+                await api.UploadAllAreasAsFolders(
+                    _project.Engineering.IgnitionGateway,
+                    _project.Engineering.APIKey,
+                    _project
+                );
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error uploading all areas to Ignition:\n{ex}", "Upload Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+		}
+
+		private async void UploadAreaToIgnition_Click(object sender, RoutedEventArgs e)
+		{
+            try
+            {
+                // Prefer last right-clicked area but fall back to the currently selected area
+                var areaToUpload = _lastSelectedArea ?? _currentArea;
+                if (areaToUpload == null)
+                {
+                    MessageBox.Show("Please select an area to upload.");
+                    return;
+                }
+
+                if (_project == null)
+                {
+                    MessageBox.Show("No project loaded. Open a project before uploading to Ignition.");
+                    return;
+                }
+
+                if (_project.Engineering == null)
+                {
+                    MessageBox.Show("Project engineering settings are missing.");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(_project.Engineering.IgnitionGateway) || string.IsNullOrWhiteSpace(_project.Engineering.APIKey))
+                {
+                    MessageBox.Show("Ignition Gateway URL and API Key must be set in the project engineering settings.");
+                    return;
+                }
+
+                if (!await ConfirmIgnitionOverwriteIfNeededAsync(GetUploadPathsForArea(areaToUpload)))
+                    return;
+
+                var api = new IgnitionAPI();
+                await api.UploadAreaAsFolder(
+                    _project.Engineering.IgnitionGateway,
+                    _project.Engineering.APIKey,
+                    _project,
+                    areaToUpload
+                );
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error uploading area to Ignition:\n{ex}", "Upload Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+		}
+
+		private void _treeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+			var selectedItem = _treeView.SelectedItem;
+
+            try
+            {
+                RemoveProfileTabPages();
+
+                //remove previous profile export menu items
+                if (_treeViewExportProfileMenuItem.Items.Count > 1)
+                {
+                    int count = _treeViewExportProfileMenuItem.Items.Count;
+                    for (int i = 1; i < count; i++)
+                        _treeViewExportProfileMenuItem.Items.RemoveAt(1);
+                }
+
+                if (selectedItem == null)
+                {
+                    _currentArea = null;
+                    _currentInstance = null;
+                    _currentTemplate = null;
+                    _templateAttributesControl.DataGridItemsSource = null;
+                    TemplateName = string.Empty;
+                }
+
+                //get selected area, set datagrid source
+                if (selectedItem != null && selectedItem.GetType() == typeof(Area))
+                {
+                    _currentArea = _project.Areas.Items.Where(u => u == (Area)selectedItem).Single();
+                    _currentInstance = null;
+                    _currentTemplate = null;
+                    TemplateName = string.Format(@"\\{0}", _currentArea.Name);
+
+                    // Keep track of last area for context menu actions (helps after reloads)
+                    _lastSelectedArea = _currentArea;
+
+                    _tabControl.SelectedIndex = TabPageAreaControl;
+                    _templateAttributesControl.DataGridItemsSource = null;
+                }
+
+                //get instance and it's parent area, set datagrid source
+                if (selectedItem != null && selectedItem.GetType() == typeof(Instance))
+                {
+                    _currentTemplate = _project.Templates.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)selectedItem) > 0).SingleOrDefault();
+                    _currentArea = _project.Areas.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)selectedItem) > 0).SingleOrDefault();
+                    _currentInstance = _currentArea.Instances.Items.Where(u => u == (Instance)selectedItem).Single();
+                    TemplateName = String.Format(@"\\{0}\{1}", _currentArea.Name, _currentInstance.Name);
+
+                    // Also remember the area in case context menu actions rely on it
+                    _lastSelectedArea = _currentArea;
+
+                    //copy properties from template to instance (name, desc, data type)
+                    foreach (AttributeBase attribute in _currentTemplate.Attributes.Items)
+                        _currentInstance.Attributes.Items.Where(u => u.Id == attribute.Id).Single().GetParentsProperties(attribute);
+
+                    _tabControl.SelectedIndex = TabPageAttributesControl;
+                    _templateAttributesControl.DataGridItemsSource = _currentInstance.Attributes.Items;
+                }
+
+                _templateAttributesControl.ApplyDataGridSorting();
+                _templateAttributesControl.MakeDataGridSelection();
+
+                // Build Export menu in requested order:
+                // Instance (static, disabled)
+                // Separator
+                // Profiles
+                // Upload to Ignition / Upload Area to Ignition
+                // Separator
+                // Export All (profiles + Upload ALL Areas to Ignition)
+                _treeViewExportProfileMenuItem.Items.Add(new Separator());
+
+                // profiles for current selection (instance/template context)
+                if (_currentTemplate != null && _currentTemplate.Profiles != null && _currentTemplate.Profiles.Items.Count > 0)
+                {
+                    foreach (Profile profile in _currentTemplate.Profiles.Items)
+                        AddProfileTabPage(profile);
+                }
+
+                // profiles for area context: only common profiles across child instance templates
+                if (selectedItem != null && selectedItem.GetType() == typeof(Area))
+                {
+                    var area = (Area)selectedItem;
+                    var instanceTemplates = area.Instances.Items
+                        .Select(inst => _project?.Templates?.Items?.FirstOrDefault(t => t.Instances.Items.Contains(inst)))
+                        .Where(t => t != null)
+                        .Distinct()
+                        .ToList();
+
+                    if (instanceTemplates.Any())
+                    {
+                        HashSet<string> common = null;
+                        foreach (var tmpl in instanceTemplates)
+                        {
+                            var names = new HashSet<string>(tmpl.Profiles.Items.Select(p => p.Name));
+                            if (common == null)
+                                common = names;
+                            else
+                                common.IntersectWith(names);
+                        }
+
+                        if (common != null && common.Count > 0)
+                        {
+                            foreach (var profileName in common.OrderBy(n => n))
+                            {
+                                var profileTemplate = instanceTemplates.First(t => t.Profiles.Items.Any(p => p.Name == profileName));
+                                var profileObj = profileTemplate.Profiles.Items.First(p => p.Name == profileName);
+
+                                MenuItem menuItem = new MenuItem() { Header = profileName, Tag = profileObj };
+                                menuItem.Click += (s, ee) =>
+                                {
+                                    try
+                                    {
+                                        ExportAreaProfile(profileObj, area);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        gLog.Error(ex.ToString());
+                                    }
+                                };
+
+                                _treeViewExportProfileMenuItem.Items.Add(menuItem);
+                            }
+                        }
+                    }
+                }
+
+                // Upload action in primary section
+                if (_project.Engineering.EnableIgnitionMenuItems && selectedItem != null && selectedItem.GetType() == typeof(Instance))
+                {
+                    MenuItem uploadToIgnition = new MenuItem() { Header = "Upload to Ignition" };
+                    uploadToIgnition.Click += (s, ee) =>
+                    {
+                        if (!_selectedInstances.Any())
+                        {
+                            MessageBox.Show("No instances selected.");
+                            return;
+                        }
+
+                        if (!ConfirmIgnitionOverwrite())
+                            return;
+
+                        foreach (var instance in _selectedInstances)
+                        {
+                            var clickApi = new IgnitionAPI();
+                            clickApi.UploadTag_Click(instance, _project, s, ee);
+                        }
+
+                        MessageBox.Show("Upload Complete.");
+                    };
+
+                    _treeViewExportProfileMenuItem.Items.Add(uploadToIgnition);
+                }
+                else if (_project.Engineering.EnableIgnitionMenuItems && selectedItem != null && selectedItem.GetType() == typeof(Area))
+                {
+                    MenuItem uploadAreaToIgnition = new MenuItem() { Header = "Upload Area to Ignition" };
+                    uploadAreaToIgnition.Click += UploadAreaToIgnition_Click;
+                    _treeViewExportProfileMenuItem.Items.Add(uploadAreaToIgnition);
+                }
+
+                // Export All section (available whenever there are instances)
+                var allInstances = _project?.Areas?.Items?.SelectMany(a => a.Instances.Items).ToList();
+                if (allInstances != null && allInstances.Count > 0)
+                {
+                    _treeViewExportProfileMenuItem.Items.Add(new Separator());
+
+                    var allTemplates = allInstances
+                        .Select(inst => _project?.Templates?.Items?.FirstOrDefault(t => t.Instances.Items.Contains(inst)))
+                        .Where(t => t != null)
+                        .Distinct()
+                        .ToList();
+
+                    var exportAllMenu = new MenuItem() { Header = "Export All" };
+
+                    HashSet<string> allCommon = null;
+                    foreach (var tmpl in allTemplates)
+                    {
+                        var names = new HashSet<string>(tmpl.Profiles.Items.Select(p => p.Name));
+                        if (allCommon == null)
+                            allCommon = names;
+                        else
+                            allCommon.IntersectWith(names);
+                    }
+
+                    if (allCommon != null && allCommon.Count > 0)
+                    {
+                        foreach (var profileName in allCommon.OrderBy(n => n))
+                        {
+                            var profileTemplate = allTemplates.First(t => t.Profiles.Items.Any(p => p.Name == profileName));
+                            var profileObj = profileTemplate.Profiles.Items.First(p => p.Name == profileName);
+
+                            MenuItem menuItem = new MenuItem() { Header = profileName, Tag = profileObj };
+                            menuItem.Click += (s, ee) =>
+                            {
+                                try
+                                {
+                                    ExportAllAreasProfile(profileObj);
+                                }
+                                catch (Exception ex)
+                                {
+                                    gLog.Error(ex.ToString());
+                                }
+                            };
+                            exportAllMenu.Items.Add(menuItem);
+                        }
+                    }
+
+                    if (_project.Engineering.EnableIgnitionMenuItems)
+                    {
+                        MenuItem uploadAllAreas = new MenuItem() { Header = "Upload ALL Areas to Ignition" };
+                        uploadAllAreas.Click += UploadAllAreasToIgnition_Click;
+                        exportAllMenu.Items.Add(uploadAllAreas);
+                    }
+
+                    _treeViewExportProfileMenuItem.Items.Add(exportAllMenu);
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+            finally
+            {
+                IsAreaSelected = selectedItem != null && selectedItem.GetType() == typeof(Area);
+                IsInstanceSelected = selectedItem != null && selectedItem.GetType() == typeof(Instance);
+                IsTreeViewEditMode = false;
+                NotifyPropertyChanged("HasAnyInstances");
+            }
+        }
+
+        private void _treeView_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                //get TreeViewItem object
+                DependencyObject obj = (DependencyObject)e.OriginalSource;
+                while (obj != null && (obj is TreeViewItem) == false)
+                    obj = VisualTreeHelper.GetParent(obj);
+
+                if (obj == null)
+				{
+					// Right-clicked empty area of the tree
+					var args1 = new RoutedPropertyChangedEventArgs<object>(null, null);
+					_treeView_SelectedItemChanged(sender, args1);
+					return;
+				}
+
+				TreeViewItem clickedItem = obj as TreeViewItem;
+				clickedItem.Focus();  // set focus on right-click
+				clickedItem.IsSelected = true; // optionally select it
+
+                // Store the clicked item: remember the area context for uploads
+                var item = clickedItem.DataContext;
+                if (item is Instance instance)
+                {
+                    // find parent area for this instance
+                    var parentArea = _project?.Areas?.Items?.FirstOrDefault(a => a.Instances.Items.Contains(instance));
+                    _lastSelectedArea = parentArea;
+                    _lastSelectedInstance = instance;
+                }
+                else if (item is Area area)
+                {
+                    _lastSelectedArea = area; // store area
+                    _lastSelectedInstance = null; // clear instance
+                }
+
+				e.Handled = true;
+
+				// Call your selection changed logic manually
+				var args = new RoutedPropertyChangedEventArgs<object>(null, _treeView.SelectedItem);
+				_treeView_SelectedItemChanged(sender, args);
+			}
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void _treeView_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _treeViewTimer.Stop();
+        }
+
+        private void _treeView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            //set long press renamed item
+            _renameTreeViewItem = GetNearestTreeViewItem(e.OriginalSource as UIElement);
+            if (_renameTreeViewItem == null)
+                return;
+
+            _treeViewTimer.Start();
+            _dragDropStartPosition = e.GetPosition(null);
+
+            // MULTI SELECT (Model view ordering: Areas then Instances)
+            try
+            {
+                DependencyObject obj = (DependencyObject)e.OriginalSource;
+                while (obj != null && !(obj is TreeViewItem))
+                    obj = VisualTreeHelper.GetParent(obj);
+
+                if (obj == null)
+                    return;
+
+                TreeViewItem clickedItem = obj as TreeViewItem;
+                clickedItem.Focus();
+
+                var item = clickedItem.DataContext;
+
+                bool isCtrl = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
+                bool isShift = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+
+                // ------------------ INSTANCE ------------------
+                if (item is Instance instance)
+                {
+                    _lastSelectedArea = null;
+
+                    if (isCtrl)
+                    {
+                        instance.IsSelected = !instance.IsSelected;
+
+                        if (instance.IsSelected)
+                            _selectedInstances.Add(instance);
+                        else
+                            _selectedInstances.Remove(instance);
+
+                        _lastSelectedInstance = instance;
+
+                        foreach (var a in _project.Areas.Items)
+                            a.IsSelected = false;
+
+                        e.Handled = true;
+                    }
+                    else if (isShift && _lastSelectedInstance != null)
+                    {
+                        var allInstances = GetAllInstances();
+
+                        int start = allInstances.IndexOf(_lastSelectedInstance);
+                        int end = allInstances.IndexOf(instance);
+
+                        if (start > end)
+                        {
+                            int temp = start;
+                            start = end;
+                            end = temp;
+                        }
+
+                        foreach (var inst in allInstances.Skip(start).Take(end - start + 1))
+                        {
+                            inst.IsSelected = true;
+                            if (!_selectedInstances.Contains(inst))
+                                _selectedInstances.Add(inst);
+                        }
+                    }
+                    else
+                    {
+                        ClearAllSelections();
+
+                        instance.IsSelected = true;
+                        _selectedInstances.Add(instance);
+                        _lastSelectedInstance = instance;
+                    }
+                }
+
+                // ------------------ AREA ------------------
+                else if (item is Area area)
+                {
+                    _lastSelectedArea = area;
+                    _lastSelectedInstance = null;
+
+                    // Clear ALL selections (instances + areas)
+                    ClearAllSelections();
+
+                    foreach (var a in _project.Areas.Items)
+                        a.IsSelected = false;
+
+                    area.IsSelected = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void DuplicateMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItem = _treeView.SelectedItem;
+
+            try
+            {
+                if (selectedItem == null)
+                    return;
+
+                //get selected template
+                if (selectedItem.GetType() == typeof(Template))
+                {
+                    var template = _project.Templates.Items.Where(u => u == (Template)selectedItem).Single();
+                    var newTemplate = new Template(template as Template);
+
+                    //find number at end of name
+                    Match m = Regex.Match(template.Name, @"\d+$");
+                    if (m.Success)
+                    {
+                        int num = Convert.ToInt32(m.Value);
+
+                        //increment number, search for unique name in template's list
+                        do
+                        {
+                            //add leading zeroes
+                            string sNum = (++num).ToString();
+                            while (m.Value.Length > sNum.Length)
+                                sNum = sNum.Insert(0, "0");
+
+                            newTemplate.Name = string.Format("{0}{1}", template.Name.Substring(0, template.Name.Length - m.Value.Length), sNum);
+                        }
+                        while (_project.Templates.Items.Count(u => u.Name.Equals(newTemplate.Name, StringComparison.OrdinalIgnoreCase)) > 0);
+                    }
+
+                    _project.Templates.AddTemplate(newTemplate);
+
+                    //select treeView item and put in edit mode
+                    newTemplate.IsSelected = true;
+                    IsTreeViewEditMode = true;
+                }
+
+                //get selected instance
+                if (selectedItem.GetType() == typeof(Instance))
+                {
+                    var template = _project.Templates.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)selectedItem) > 0).Single();
+                    var instance = template.Instances.Items.Where(u => u == (Instance)selectedItem).Single();
+                    var newInstance = new Instance(instance as Instance);
+
+                    //find number at end of name
+                    Match m = Regex.Match(instance.Name, @"\d+$");
+                    if (m.Success)
+                    {
+                        int num = Convert.ToInt32(m.Value);
+
+                        //increment number, search for unique name in instances list
+                        do
+                        {
+                            //add leading zeroes
+                            string sNum = (++num).ToString();
+                            while (m.Value.Length > sNum.Length)
+                                sNum = sNum.Insert(0, "0");
+
+                            newInstance.Name = string.Format("{0}{1}", instance.Name.Substring(0, instance.Name.Length - m.Value.Length), sNum);
+                        }
+                        while (template.Instances.Items.Count(u => u.Name.Equals(newInstance.Name, StringComparison.OrdinalIgnoreCase)) > 0);
+                    }
+
+                    //add to template
+                    template.AddInstance(newInstance);
+
+                    //add to area
+                    _project.Areas.Items.Where(u => u.Id == newInstance.AreaId).Single().AddInstance(newInstance);
+
+                    //select treeView item and put in edit mode
+                    template.IsExpanded = true;
+                    newInstance.IsSelected = true;
+
+                    _treeView.UpdateLayout();
+                    IsTreeViewEditMode = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void DeleteMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItem = _treeView.SelectedItem;
+
+            try
+            {
+                if (selectedItem == null)
+                    return;
+
+                //get selected area
+                if (selectedItem.GetType() == typeof(Area))
+                {
+                    var area = _project.Areas.Items.Where(u => u == (Area)selectedItem).Single();
+
+                    if (MainWindow.Confirm("Are you sure that you want to delete area {0}?", area.Name) == true)
+                    {
+                        foreach (Instance instance in area.Instances.Items)
+                        {
+                            instance.AreaId = 0;
+                            _project.Areas.Items.Where(u => u.Id == 0).Single().AddInstance(instance);
+                        }
+
+                        _project.Areas.Items.Remove(area);
+                    }
+
+                    return;
+                }
+
+                //get selected instance
+                if (selectedItem.GetType() == typeof(Instance))
+                {
+                    var template = _project.Templates.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)selectedItem) > 0).Single();
+                    var instance = template.Instances.Items.Where(u => u == (Instance)selectedItem).Single();
+
+                    if (MainWindow.Confirm("Are you sure that you want to delete instance {0}?", instance.Name) == true)
+                    {
+                        template.RemoveInstance(instance);
+                        _project.Areas.Items.Where(u => u.Id == instance.AreaId).Single().RemoveInstance(instance);
+                    }
+
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void SetFlagMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItem = _treeView.SelectedItem;
+
+            try
+            {
+                if (selectedItem == null)
+                    return;
+
+                //get selected instance
+                if (selectedItem.GetType() != typeof(Instance))
+                    return;
+
+                var template = _project.Templates.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)selectedItem) > 0).Single();
+                var instance = template.Instances.Items.Where(u => u == (Instance)selectedItem).Single();
+
+                instance.IsFlagged = !instance.IsFlagged;
+                NotifyPropertyChanged("IsInstanceFlagged");
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void DerivationButton_Click(object sender, RoutedEventArgs e)
+        {
+            MainWindow.SetTabControlTabPage(MainWindow.TabPageEngineeringView);
+        }
+
+        private void ModelViewButton_Click(object sender, RoutedEventArgs e)
+        {
+            MainWindow.SetTabControlTabPage(MainWindow.TabPageModelView);            
+        }
+
+        private void RenameMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            IsTreeViewEditMode = true;
+        }
+
+        private void editNameTextBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox.IsVisible == false)
+                return;
+
+            textBox.Focus();
+            textBox.SelectAll();
+
+            _editNameTextBox = textBox;
+            _oldName = textBox.Text; // back up - for possible cancelling
+        }
+
+        private void editNameTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                if (VerifyTreeViewName())
+                    IsTreeViewEditMode = false;
+            }
+
+            if (e.Key == Key.Escape)
+            {
+                var textBox = sender as TextBox;
+                textBox.Text = _oldName;
+
+                IsTreeViewEditMode = false;
+            }
+        }
+
+        private void editNameTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (VerifyTreeViewName())
+            {
+                IsTreeViewEditMode = false;
+                TemplateName = _isInstanceSelected ? _currentInstance.Name : _currentArea.Name;
+            }
+            else
+            {
+                if (_isInstanceSelected)
+                    _currentInstance.Name = _oldName;
+                else
+                    _currentArea.Name = _oldName;
+            }
+        }
+
+        private void ExportInstanceMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItem = _treeView.SelectedItem;
+
+            try
+            {
+                if (selectedItem == null)
+                    return;
+
+                if (selectedItem.GetType() == typeof(Area))
+                    return;
+
+                Area area = null;
+                Template template = null;
+                Instance selectedInstance = null;
+               
+                //get area from selected instance
+                if (selectedItem.GetType() == typeof(Instance))
+                {
+                    area = _project.Areas.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)selectedItem) > 0).Single();
+                    template = _project.Templates.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)selectedItem) > 0).Single();
+                    selectedInstance = area.Instances.Items.Where(u => u == (Instance)selectedItem).Single();
+                }
+
+                Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog();
+                saveFileDialog.Filter = "CSV Files (*.csv)|*.csv";
+
+                //saveFileDialog.FileName = "test.csv";
+                if (saveFileDialog.ShowDialog(MainWindow) != true)
+                    return;
+
+                using (StreamWriter writer = new StreamWriter(saveFileDialog.FileName))
+                {
+                    StringBuilder line = new StringBuilder();
+
+                    //write type
+                    writer.WriteLine("Type: Instance");
+
+                    //write header
+                    line.Append("Name,Description,");
+                    foreach (TemplateAttribute attribute in template.Attributes.Items.OrderBy(u => u.Id))
+                        line.Append(attribute.Name).Append(",");
+
+                    writer.WriteLine(line);
+
+                    //write rows
+                    line.Clear();
+                    line.Append(string.IsNullOrEmpty(selectedInstance.Name) ? "NULL" : selectedInstance.Name).Append(",");
+                    line.Append(string.IsNullOrEmpty(selectedInstance.Description) ? "NULL" : selectedInstance.Description).Append(",");
+
+                    foreach (InstanceAttribute attribute in selectedInstance.Attributes.Items.OrderBy(u => u.Id))
+                        line.Append(attribute.Value).Append(",");
+
+                    writer.WriteLine(line);
+                    
+                    writer.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void ViewAttributesButton_Click(object sender, RoutedEventArgs e)
+        {
+            _tabControl.SelectedIndex = TabPageAttributesControl;
+        }
+
+        private void ProfileContextMenuButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                //create context menu
+                ContextMenu menu = new ContextMenu();
+                MenuItem menuItem = new MenuItem() { Header = "Add profile" };
+                menuItem.Click += AddProfileMenuItem_Click;
+                menu.Items.Add(menuItem);
+
+                menuItem = new MenuItem() { Header = "Edit profile" };
+                menuItem.Click += EditProfileMenuItem_Click;
+                Binding binding = new Binding();
+                binding.Path = new PropertyPath("IsProfileSelected");
+                binding.Source = this;
+                BindingOperations.SetBinding(menuItem, MenuItem.IsEnabledProperty, binding);
+                menu.Items.Add(menuItem);
+
+                menuItem = new MenuItem() { Header = "Delete profile" };
+                menuItem.Click += DeleteProfileMenuItem_Click;
+                BindingOperations.SetBinding(menuItem, MenuItem.IsEnabledProperty, binding);
+                menu.Items.Add(menuItem);
+
+                menu.IsOpen = true;
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        void AddProfileMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ProfileWindow window = new ProfileWindow();
+                window.Owner = MainWindow;
+                window.Profile = new Profile();
+
+                window.ShowDialog();
+
+                //create new profile                
+                _currentTemplate.AddProfile(window.Profile);
+
+                AddProfileTabPage(window.Profile);
+
+                _tabControl.SelectedIndex = _tabControl.Items.Count - 1;
+                _tabControl.Focus();
+
+                NotifyPropertyChanged("TemplateLastModification");
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        void EditProfileMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            EditProfile(_currentProfile);
+        }
+
+        void DeleteProfileMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            DeleteProfile(_currentProfile);
+        }
+
+
+        private void _searchTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (_project == null)
+                return;
+
+            try
+            {
+                if (e.Key == Key.Enter)
+                {
+                    foreach (Area area in _project.Areas.Items)
+                    {
+                        //check if area name meets condition
+                        if (area.Name.IndexOf(_searchTextBox.Text, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            area.IsSelected = true;
+                            return;
+                        }
+
+                        //search for instance
+                        var instance = area.Instances.Items.Where(u => u.Name.IndexOf(_searchTextBox.Text, StringComparison.OrdinalIgnoreCase) >= 0).FirstOrDefault();
+                        if (instance != null)
+                        {
+                            area.IsExpanded = true;
+                            instance.IsSelected = true;
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void _treeViewComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (_project == null)
+                    return;
+
+                foreach (Template template in _project.Templates.Items)
+                {
+                    foreach (Instance instance in template.Instances.Items)                    
+                        instance.IsFlaggedHidden = _treeViewComboBox.SelectedIndex != 1 ? false : !instance.IsFlagged;                    
+                }                                             
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+	   
+
+		private void ClearAllSelections()
+		{
+			foreach (var inst in _selectedInstances)
+				inst.IsSelected = false;
+
+			_selectedInstances.Clear();
+
+			foreach (var t in _project.Areas.Items)
+				t.IsSelected = false;
+		}
+
+		private List<Instance> GetAllInstances()
+		{
+			return _project.Areas.Items
+				.SelectMany(t => t.Instances.Items)
+				.ToList();
+		}
+
+		void _treeViewTimer_Tick(object sender, EventArgs e)
+        {
+            _treeViewTimer.Stop();
+
+            if (_renameTreeViewItem != null)
+                IsTreeViewEditMode = true;
+        }
+
+        private void _treeView_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                Vector difference = _dragDropStartPosition - e.GetPosition(null);
+
+                if (e.LeftButton == MouseButtonState.Released)
+                    return;
+
+                if (Math.Abs(difference.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(difference.Y) < SystemParameters.MinimumVerticalDragDistance)
+                    return;
+
+                if (IsMouseOverScrollbar(sender, e.GetPosition(sender as IInputElement)))
+                    return;
+
+                //disable renaming timer if item changed
+                TreeViewItem item = GetNearestTreeViewItem(e.OriginalSource as UIElement);
+                if (item == null || item != _renameTreeViewItem)
+                    _treeViewTimer.Stop();
+
+                //Initialize drag & drop object
+                if (_isInstanceSelected)
+                {
+                    _treeViewTimer.Stop();
+
+                    DataObject dragData = new DataObject("Instance", _currentInstance);
+                    DragDrop.DoDragDrop(_treeView, dragData, DragDropEffects.Move);
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void _treeView_DragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent("Instance") == false)
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+            }
+        }
+
+        private void _treeView_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent("Instance") == false)
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+            }
+        }
+
+        private void _treeView_Drop(object sender, DragEventArgs e)
+        {
+            try
+            {
+                //get TreeViewItem object
+                TreeViewItem item = GetNearestTreeViewItem(e.OriginalSource as UIElement);
+                if (item == null)
+                    return;
+
+                if (e.Data.GetDataPresent("Instance"))
+                {
+                    //get target Area
+                    Area area = null;
+                    if (item.DataContext.GetType() == typeof(Area))
+                        area = (Area)item.DataContext;
+
+                    if (item.DataContext.GetType() == typeof(Instance))
+                        area = _project.Areas.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)item.DataContext) > 0).SingleOrDefault();
+
+                    //get dragged object
+                    Instance movedInstance = e.Data.GetData("Instance") as Instance;
+                    Area movedInstanceArea = _project.Areas.Items.Where(u => u.Instances.Items.Count(x => x == movedInstance) > 0).SingleOrDefault();
+
+                    if (area == movedInstanceArea)
+                        return;
+
+                    //remove from old area
+                    movedInstanceArea.RemoveInstance(movedInstance);                   
+
+                    //add instance to area
+                    area.AddInstance(movedInstance);
+                    movedInstance.AreaId = area.Id;
+                    
+                    //select treeView item 
+                    area.IsExpanded = true;
+                    movedInstance.IsSelected = true;
+                   
+                    _treeView.UpdateLayout();
+
+                    NotifyPropertyChanged("TemplateLastModification");
+                    _parentProxy.NotifyPropertyChanged("TemplateLastModification");
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private TreeViewItem GetNearestTreeViewItem(UIElement element)
+        {
+            try
+            {
+                TreeViewItem item = (element as UIElement) as TreeViewItem;
+                while (item == null && element != null)
+                {
+                    element = VisualTreeHelper.GetParent(element) as UIElement;
+                    item = element as TreeViewItem;
+                }
+
+                return item;
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+
+            return null;
+        }        
+
+        private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (Directory.Exists(_project.Engineering.FolderPath))
+                    Process.Start(_project.Engineering.FolderPath);
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void ExportProfileMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                //get TreeViewItem object
+                DependencyObject obj = (DependencyObject)e.OriginalSource;
+                while (obj != null && (obj is MenuItem) == false)
+                    obj = VisualTreeHelper.GetParent(obj);
+
+                if (obj == null)
+                    return;
+
+                ExportProfile((obj as MenuItem).Tag as Profile);
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        void ViewProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Button button = e.OriginalSource as Button;
+                var item = _tabControl.Items.Cast<TabItem>().Where(u => u.Tag == button.Tag as Profile).Single();
+
+                if (item == null)
+                    return;
+
+                _tabControl.SelectedItem = item;
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void AddAreaMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var area = new Area() { Name = "New Area", Description = "<No Description>" };
+                _project.Areas.AddArea(area);
+
+                //select treeView item and put in edit mode
+                area.IsSelected = true;
+                IsTreeViewEditMode = true;
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if ((e.Source is TabControl) == false)
+                return;
+
+            try
+            {
+                if (_tabControl.SelectedItem == null)
+                {
+                    _currentProfile = null;
+                    return;
+                }
+
+                //set current profile
+                _currentProfile = ((TabItem)_tabControl.SelectedItem).Tag as Profile;
+
+                //apply sorting by name
+                if (_currentProfile != null)
+                {
+                    var tabItem = _tabControl.Items.Cast<TabItem>().Where(u => u.Tag == _currentProfile).FirstOrDefault();
+                    if (tabItem != null && tabItem.Content != null)
+                    {
+                        ((ProfileAttributesControl)tabItem.Content).ApplyDataGridSorting();
+                        ((ProfileAttributesControl)tabItem.Content).MakeDataGridSelection();
+                    }
+                }
+
+                NotifyPropertyChanged("IsProfileSelected");
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private void _tabControl_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                //get TabItem object
+                DependencyObject obj = (DependencyObject)e.OriginalSource;
+                if (obj.GetType().Namespace.Equals("System.Windows.Documents", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                while (obj != null && (obj is TabItem) == false)
+                    obj = VisualTreeHelper.GetParent(obj);
+
+                if (obj == null)
+                    return;
+
+                (obj as TabItem).Focus();
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        #endregion
+
+        #region Methods
+
+        /// <summary>
+        /// WPF data change notification
+        /// </summary>
+        /// <param name="property"></param>
+        public void NotifyPropertyChanged(String property)
+        {
+            if (PropertyChanged != null)
+            {
+                PropertyChanged(this, new PropertyChangedEventArgs(property));
+            }
+        }        
+
+        public void ResetDataBinding()
+        {
+            _currentArea = null;
+            _currentTemplate = null;
+            _currentInstance = null;
+            
+            _treeView.ItemsSource = _project != null ? _project.Areas.Items : null;
+            _treeView.Items.SortDescriptions.Clear();
+            _treeView.Items.SortDescriptions.Add(new SortDescription("Id", ListSortDirection.Ascending));
+
+            if (_project == null)
+            {
+                TemplateName = string.Empty;
+                IsAreaSelected = false;
+                IsInstanceSelected = false;
+            }
+
+            NotifyPropertyChanged("ProjectName");
+            NotifyPropertyChanged("IsProjectLoaded");
+            MainWindow.NotifyPropertyChanged("IsProjectLoaded");
+        }
+
+        private bool VerifyTreeViewName()
+        {
+            try
+            {
+                string name = _editNameTextBox.Text;
+                if (_isInstanceSelected)
+                {
+                    //get instances count with new name
+                    int count = _currentArea.Instances.Items.Count(u => u.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                    if (count > 1 || (count > 0 && _currentInstance.Name.Equals(name, StringComparison.OrdinalIgnoreCase) == false))
+                    {
+                        MainWindow.ShowAutoMessage(1000, "Name {0} already exists", name);
+                        return false;
+                    }
+
+                }
+                else
+                {
+                    //get templates count with new name
+                    int count = _project.Areas.Items.Count(u => u.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                    if (count > 1 || (count > 0 && _currentArea.Name.Equals(name, StringComparison.OrdinalIgnoreCase) == false))
+                    {
+                        MainWindow.ShowAutoMessage(1000, "Name {0} already exists", name);
+                        return false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+
+
+            return true;
+        }
+
+        public int GetAttributeIndex(AttributeBase attribute)
+        {
+            int index = -1;
+            
+            if (_isInstanceSelected)
+                index = _currentInstance.Attributes.Items.IndexOf((InstanceAttribute)attribute);
+
+            return index;
+        }
+
+        private void AddProfileTabPage(Profile profile)
+        {
+            //add navigation button
+            Button button = new Button();
+            button.Width = 50;
+            button.Style = (Style)FindResource("ThemeIconButtonStyle");
+            button.Content = profile.ExportType == ProfileExportTypes.Tabular ? "/Images/Grid.png" : "/Images/HtmlCoding.png";
+            button.ToolTip = profile.Name;
+            button.Tag = profile;
+            button.Click += ViewProfileButton_Click;
+
+            _profilesNavigationPanel.Children.Insert(_profilesNavigationPanel.Children.Count - 1, button);
+
+            //add tab page            
+            TabItem tabItem = new TabItem() { Tag = profile };
+            tabItem.Content = new ProfileAttributesControl() { ParentProxy = _parentProxy, MainWindow = MainWindow, Profile = profile, Margin = new Thickness(-4, -4, -4, -4), Project = _project };
+            tabItem.Visibility = System.Windows.Visibility.Collapsed;
+
+            _tabControl.Items.Add(tabItem);
+
+            //add export profile menu items      
+            MenuItem menuItem = new MenuItem() { Header = profile.Name, Tag = profile };
+            menuItem.Click += ExportProfileMenuItem_Click;
+            _treeViewExportProfileMenuItem.Items.Add(menuItem);
+        }
+
+        public void RemoveProfileTabPages()
+        {
+            try
+            {
+                if (_currentTemplate == null)
+                    return;
+
+                foreach (Profile profile in _currentTemplate.Profiles.Items)
+                {
+                    if (_tabControl.Items.Count == 0)
+                        continue;
+
+                    var item = _tabControl.Items.Cast<TabItem>().Where(u => u.Tag == profile).Single();
+                    _tabControl.Items.Remove(item);
+
+                    Button button = _profilesNavigationPanel.Children.Cast<Button>().Where(u => u.Tag == profile).Single();
+                    _profilesNavigationPanel.Children.Remove(button);
+                }
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        public void ExportProfile(Profile profile)
+        {
+            try
+            {
+                var selectedItem = _treeView.SelectedItem;
+                if (selectedItem == null)
+                    return;
+
+                Instance selectedInstance = null;
+                if (selectedItem.GetType() == typeof(Instance))
+                {
+                    var template = _project.Templates.Items.Where(u => u.Instances.Items.Count(x => x == (Instance)selectedItem) > 0).Single();
+                    selectedInstance = template.Instances.Items.Where(u => u == (Instance)selectedItem).Single();
+                }
+
+                //create file dialog extension filter 
+                StringBuilder filter = new StringBuilder();
+                foreach (ProfileFormatType format in new ProfileFormatTypes())
+                    filter.Append(format.FileDialogFilter).Append("|");
+
+                filter.Replace("*.xxx", string.IsNullOrEmpty(profile.CustomFormat) ? "*.*" : string.Format("*.{0}", profile.CustomFormat));
+
+                Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog();
+                saveFileDialog.Filter = filter.ToString().TrimEnd(new char[] { '|' });
+                saveFileDialog.FilterIndex = profile.FormatType + 1;
+
+                //saveFileDialog.FileName = "test.csv";
+                if (saveFileDialog.ShowDialog(MainWindow) != true)
+                    return;
+
+                var tabItem = _tabControl.Items.Cast<TabItem>().Where(u => u.Content != null && u.Content.GetType() == typeof(ProfileAttributesControl)).FirstOrDefault();
+                if (tabItem == null)
+                    return;
+
+                if (profile.ExportType == ProfileExportTypes.Tabular)
+                    ((ProfileAttributesControl)tabItem.Content).ExportTabularProfile(profile, selectedInstance, saveFileDialog.FileName);
+                else
+                    ((ProfileAttributesControl)tabItem.Content).ExportStructuralProfile(profile, selectedInstance, saveFileDialog.FileName);
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        public void EditProfile(Profile profile)
+        {
+            try
+            {
+                ProfileWindow window = new ProfileWindow();
+                window.Owner = MainWindow;
+                window.Profile = new Profile(profile);
+
+                if (window.ShowDialog() != true)
+                    return;
+
+                //copy public properties from window 
+                profile.GetProperties(window.Profile);
+
+                //set button properties
+                Button button = _profilesNavigationPanel.Children.Cast<Button>().Where(u => u.Tag == profile).Single();
+                button.Content = profile.ExportType == ProfileExportTypes.Tabular ? "/Images/Grid.png" : "/Images/HtmlCoding.png";
+                button.ToolTip = profile.Name;
+
+                //notify controls
+                if (_tabControl.SelectedItem != null)
+                {
+                    var tabItem = (TabItem)_tabControl.SelectedItem;
+                    tabItem.Header = profile.Name;
+                    if (tabItem != null && tabItem.Content != null)
+                        ((ProfileAttributesControl)tabItem.Content).LoadRichTextBoxDocument();
+                }
+
+                _currentTemplate.UpdateLastModification();
+                NotifyPropertyChanged("TemplateLastModification");
+                profile.NotifyPropertiesChanged();
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        public void DeleteProfile(Profile profile)
+        {
+            if (MainWindow.Confirm("Are you sure that you want to delete profile {0}?", profile.Name) != true)
+                return;
+
+            try
+            {
+                //remove profile and tab page
+                _currentTemplate.RemoveProfile(profile);
+                var tabItem = _tabControl.Items.Cast<TabItem>().Where(u => u.Tag == profile).Single();
+                _tabControl.Items.Remove(tabItem);
+
+                //show attributes tab page
+                _tabControl.SelectedIndex = 0;
+
+                //remove Export profile menu items
+                var treeViewItem = _treeViewExportProfileMenuItem.Items.Cast<Control>().Where(u => u.Tag == profile).Single();
+                _treeViewExportProfileMenuItem.Items.Remove(treeViewItem);
+
+                //remove separator
+                if (_currentTemplate.Profiles.Items.Count == 0)
+                {
+                    treeViewItem = _treeViewExportProfileMenuItem.Items.Cast<Control>().Where(u => u.GetType() == typeof(Separator)).FirstOrDefault();
+                    _treeViewExportProfileMenuItem.Items.Remove(treeViewItem);
+                }
+
+                //remove navigation button
+                Button button = _profilesNavigationPanel.Children.Cast<Button>().Where(u => u.Tag == profile).Single();
+                _profilesNavigationPanel.Children.Remove(button);
+
+                NotifyPropertyChanged("TemplateLastModification");
+            }
+            catch (Exception ex)
+            {
+                gLog.Error(ex.ToString());
+            }
+        }
+
+        private bool IsMouseOverScrollbar(object sender, Point position)
+        {
+            if ((sender is Visual) == false)
+                return false;
+
+            HitTestResult result = VisualTreeHelper.HitTest(sender as Visual, position);
+            if (result == null)
+                return false;
+
+            DependencyObject obj = result.VisualHit;
+            while (obj != null)
+            {
+                if (obj is Microsoft.Windows.Themes.ScrollChrome)
+                    return true;
+
+                if (obj is Visual)
+                    obj = VisualTreeHelper.GetParent(obj);
+            }
+
+            return false;
+        }
+
+        #endregion                
+    }
+}

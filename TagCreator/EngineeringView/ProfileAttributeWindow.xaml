@@ -1,0 +1,93 @@
+﻿<mc:WindowBase 
+    x:Class="TagCreator.ProfileAttributeWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="clr-namespace:MyControls"
+    Style="{StaticResource {x:Type Window}}"
+    Title="Attribute Details" Height="300" Width="500" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="NoResize" 
+    FocusManager.FocusedElement="{Binding ElementName=_nameTextBox}" WindowStyle="None">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="150"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Control Panel for Navigation -->
+        <Grid Grid.Column="1" Grid.Row="0" Margin="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Content="Previous" IsEnabled="{Binding IsFirstItem}" Height="25" Click="PreviousButton_Click"/>
+            <Button Grid.Column="1" Content="Next" Margin="5,0,0,0" IsEnabled="{Binding IsLastItem}" Height="25" Click="NextButton_Click"/>
+        </Grid>
+
+        <!-- Control Panel for Add, Duplicate, and Delete -->
+        <StackPanel Grid.Column="1" Grid.Row="1" Margin="0,10,0,0">
+            <Button Content="Add" Click="AddAttributeButton_Click" Margin="5,0"/>
+            <Button Content="Duplicate" IsEnabled="{Binding IsCurrentAttribute}" Click="DuplicateAttributeButton_Click" Height="25" Margin="5,5,5,0"/>
+            <Button Content="Delete" IsEnabled="{Binding IsCurrentAttribute}" Click="DeleteAttributeButton_Click" Height="25" Margin="5,5,5,0"/>
+        </StackPanel>
+
+        <!-- Close Button -->
+        <StackPanel Grid.Column="1" Grid.Row="2" VerticalAlignment="Bottom">
+            <Button Grid.Row="2" Content="Close" VerticalAlignment="Bottom" IsCancel="True" Margin="5" Height="25" />
+        </StackPanel>
+
+        <!-- Attribute Form -->
+        <Grid Grid.Column="0" Grid.RowSpan="3" Margin="0,5,5,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="auto"/>
+                <RowDefinition Height="auto"/>
+                <RowDefinition Height="auto"/>
+                <RowDefinition Height="auto"/>
+                <RowDefinition Height="auto"/>
+                <RowDefinition Height="auto"/>
+                <RowDefinition Height="auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Name -->
+            <TextBlock Grid.Column="0" Grid.Row="0" Text="Name" Margin="5,0,5,0" VerticalAlignment="Center"/>
+            <TextBox x:Name="_nameTextBox" Grid.Column="1" Grid.Row="0" Text="{Binding CurrentAttribute.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsCurrentAttribute}"/>
+
+            <!-- Description -->
+            <TextBlock Grid.Column="0" Grid.Row="1" Text="Description" Margin="5,5,5,0" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="1" Grid.Row="1" Text="{Binding CurrentAttribute.Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" IsEnabled="{Binding IsCurrentAttribute}"/>
+
+            <!-- Data Type -->
+            <TextBlock Grid.Column="0" Grid.Row="2" Text="Data type" Margin="5,5,5,0" VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="1" Grid.Row="2" 
+                      ItemsSource="{Binding ParentProxy.DataTypes}" 
+                      SelectedValuePath="Id" 
+                      DisplayMemberPath="Name" 
+                      SelectedValue="{Binding CurrentAttribute.DataType}" 
+                      Margin="0,5,0,0" 
+                      IsEnabled="{Binding IsCurrentAttribute}" />
+
+            <!-- Rule -->
+            <TextBlock Grid.Column="0" Grid.Row="3" Text="Rule" VerticalAlignment="Top" Margin="5,5,5,0"/>
+            <TextBox x:Name="_ruleTextBox" Grid.Column="1" Grid.Row="3" Text="{Binding CurrentAttribute.Rule, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,0" Height="75" IsEnabled="{Binding IsCurrentAttribute}" TextChanged="_ruleTextBox_TextChanged" TextWrapping="Wrap"/>
+
+            <!-- Verify Rule Button -->
+            <Button Grid.Column="1" Grid.Row="4" Content="Verify Rule" IsEnabled="{Binding IsRule}" Click="VerifyRuleButton_Click" Height="25" Width="120" Margin="0,5,0,0" HorizontalAlignment="Right"/>
+
+            <!-- Input Attribute -->
+            <TextBlock Grid.Column="0" Grid.Row="5" Text="Input attr." VerticalAlignment="Center" Margin="5,5,5,0"/>
+            <ComboBox Grid.Column="1" Grid.Row="5" ItemsSource="{Binding ViewControl.CurrentTemplate.Attributes.Items}" SelectedValuePath="Id" DisplayMemberPath="Name" SelectedValue="{Binding CurrentInputAttributeId}" Margin="0,5,0,0" IsEnabled="{Binding IsCurrentAttribute}" />
+
+            <!-- Insert Attribute Button -->
+            <Button Grid.Column="1" Grid.Row="6" Content="Insert attribute" IsEnabled="{Binding IsCurrentInputAttribute}" Click="InsertAttributeButton_Click" Height="25" Width="120" Margin="0,5,0,0" HorizontalAlignment="Right"/>
+        </Grid>
+    </Grid>
+</mc:WindowBase>

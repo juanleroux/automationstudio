@@ -1,0 +1,40 @@
+﻿<UserControl 
+    x:Class="TagCreator.AreaControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+    mc:Ignorable="d" 
+    d:DesignHeight="400" d:DesignWidth="800">        
+    <Grid>       
+        <Grid.RowDefinitions>
+            <RowDefinition Height="80"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <!--Name & buttons panel-->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="auto"/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Column="0" Grid.RowSpan="2" VerticalAlignment="Center" >
+                <TextBlock Text="{Binding ParentProxy.TemplateName, FallbackValue='TemplateName'}" Margin="20,0,0,0" FontSize="22" FontWeight="Bold"/>
+                <Grid>
+                    <TextBlock Grid.Row="1" Text="{Binding ParentProxy.TemplateDescription, FallbackValue='TemplateDescription'}" Margin="20,0,0,0" FontSize="14" MouseLeftButtonDown="DescriptionTextBlock_MouseLeftButtonDown"/>
+                    <TextBox x:Name="_descriptionEditTextBox" Text="{Binding ParentProxy.TemplateDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="20,0,0,0" Visibility="Hidden" KeyDown="_descriptionEditTextBox_KeyDown" LostFocus="_descriptionEditTextBox_LostFocus" />
+                </Grid>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0">
+                <Button Style="{StaticResource ThemeCircleButtonStyle}" Content="/Images/Plus.png" IsEnabled="False"/>
+                <Button Style="{StaticResource ThemeCircleButtonStyle}" Content="/Images/Minus_1.png" Margin="10,0,0,0" IsEnabled="False"/>
+                <Button Style="{StaticResource ThemeCircleButtonStyle}" Content="/Images/Copy.png" Margin="10,0,0,0" IsEnabled="False"/>
+            </StackPanel>
+            <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding ParentProxy.TemplateLastModification, FallbackValue='TemplateLastModification'}" Margin="0,0,10,10" HorizontalAlignment="Right"/>
+        </Grid>
+    </Grid>
+</UserControl>

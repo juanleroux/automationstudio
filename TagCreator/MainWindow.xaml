@@ -1,0 +1,59 @@
+﻿<mc:WindowBase  
+    x:Name="Window" 
+    x:Class="TagCreator.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:a="clr-namespace:TagCreator"
+    xmlns:mc="clr-namespace:MyControls"
+    Style="{StaticResource {x:Type Window}}"       
+    Title="Automation Studio" Height="700" Width="1200" WindowStyle="None" WindowStartupLocation="CenterScreen" Icon="Images/Application.png" MinWidth="800" MinHeight="570" PreviewMouseDown="Window_PreviewMouseDown">    
+    <Grid>                        
+        <!--Workspace-->
+        <TabControl x:Name="_tabControl" SelectedIndex="0" Margin="50,0,0,0" PreviewMouseRightButtonDown="_tabControl_PreviewMouseRightButtonDown" BorderThickness="0" Background="White" SelectionChanged="_tabControl_SelectionChanged" >
+			<TabItem Visibility="Collapsed">
+				<a:EngineeringViewControl x:Name="_engineeringViewControl" Margin="-4,-4,-4,-4" />
+			</TabItem>
+			<TabItem Visibility="Collapsed">
+                <a:ModelViewControl x:Name="_modelViewControl" Margin="-4,-4,-4,-4" />
+            </TabItem>
+        </TabControl>        
+        <!--Navigation Pane-->
+        <Grid x:Name="_navigationGrid" Background="{StaticResource ThemeMainBrush}" HorizontalAlignment="Left" >    
+            <Grid.Style>                
+                <Style TargetType="{x:Type Grid}">
+                    <Setter Property="Width" Value="50"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsNavigationPanelExpanded}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Width" From="50"  To="250" Duration="0:00:00.025"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Width" From="250" To="50" Duration="0:00:00.250"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>                        
+                    </Style.Triggers>
+                </Style>                    
+            </Grid.Style>
+            <StackPanel >
+                <Button Style="{StaticResource NavigationBarButtonStyle}" Content="/Images/Menu.png" Click="NavigationPanelVisibilityButton_Click"/>                
+                <Button Style="{StaticResource NavigationBarButtonStyle}" Content="/Images/Database.png" Tag="Engineering view" IsEnabled="{Binding IsProjectLoaded}" Click="EngineeringViewMenuItem_Click" />
+                <Button Style="{StaticResource NavigationBarButtonStyle}" Content="/Images/AddNewDocument.png" Tag="New project" Click="FileNewProjectMenuItem_Click" />
+                <Button Style="{StaticResource NavigationBarButtonStyle}" Content="/Images/Open.png" Tag="Open project" Click="FileOpenMenuItem_Click" />
+                <Button Style="{StaticResource NavigationBarButtonStyle}" Content="/Images/Save.png" Tag="Save project" IsEnabled="{Binding IsProjectLoaded}" Click="FileSaveMenuItem_Click" />                
+            </StackPanel>            
+            <StackPanel VerticalAlignment="Bottom">
+                <Separator Margin="5,0,5,0" Background="White" Opacity="0.3"/>
+                <Button Style="{StaticResource NavigationBarButtonStyle}" Tag="Settings" Content="/Images/Settings.png" Click="SettingsMenuItem_Click"/>
+                <Button Style="{StaticResource NavigationBarButtonStyle}" Tag="About" Content="/Images/Information.png" Click="AboutMenuItem_Click" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</mc:WindowBase>

@@ -1,0 +1,44 @@
+﻿<UserControl 
+    x:Class="TagCreator.APISettingsControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+    mc:Ignorable="d" 
+    d:DesignHeight="500" d:DesignWidth="800" Unloaded="UserControl_Unloaded" FocusManager.FocusedElement="{Binding ElementName=_folderLocationTextBox}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="45"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <!--Name panel-->
+        <TextBlock Text="API Settings" Margin="15,5,0,0" FontSize="22" FontWeight="Bold"/>            
+        <!--Details-->
+        <Grid Grid.Row="1">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="auto"/>
+				<RowDefinition Height="auto"/>
+				<RowDefinition Height="auto"/>
+				<RowDefinition Height="auto"/>
+			</Grid.RowDefinitions>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="auto"/>
+				<ColumnDefinition Width="*" MaxWidth="400"/>
+			</Grid.ColumnDefinitions>
+
+			<!-- Ignition gateway Text Box -->
+			<TextBlock Grid.Column="0" Grid.Row="0" Text="Ignition Gateway" Margin="15,5,5,0" VerticalAlignment="Center"/>
+			<TextBox x:Name="_ignitionGatewayTextBox" Grid.Column="1" Grid.Row="0" Margin="0,5,5,0" Text="{Binding IgnitionGateway, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<!-- API Key Text Box-->
+			<TextBlock Grid.Column="0" Grid.Row="1" Text="API Key" Margin="15,5,5,0" VerticalAlignment="Center"/>
+			<TextBox x:Name="_apiKeyTextBox" Grid.Column="1" Grid.Row="1" Margin="0,5,5,0" Text="{Binding APIKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+			<!-- Check Gateway Connection Button -->
+			<Button Grid.Column="1" Grid.Row="2" Content="Check Gateway Connection" Margin="0,5,5,0" Click="CheckGatewayConnection_Click" />
+
+			<!-- Checkbox to enable Ignition menu items -->
+			<CheckBox Content="Enable Ignition Menu Items" IsChecked="{Binding EnableIgnitionMenuItems}" Grid.Column="1" Grid.Row="3" Margin="0,5,5,0"/>
+		</Grid>
+    </Grid>    
+</UserControl>

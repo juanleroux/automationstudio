@@ -1,0 +1,11 @@
+﻿<mc:WindowBase 
+    x:Class="TagCreator.AutoMessageWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="clr-namespace:MyControls"
+    Style="{StaticResource {x:Type Window}}"
+    Title="Message" Height="120" Width="400" WindowStartupLocation="CenterOwner" WindowStyle="None" ShowInTaskbar="False" ResizeMode="NoResize" Loaded="Window_Loaded">
+    <Grid>
+        <TextBlock HorizontalAlignment="Left" Margin="10,10,0,0" TextWrapping="Wrap" Text="{Binding Message}" VerticalAlignment="Top" Height="70" Width="374"/>              
+    </Grid>
+</mc:WindowBase>
