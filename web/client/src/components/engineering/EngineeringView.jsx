@@ -245,7 +245,9 @@ export default function EngineeringView() {
       await uploadToIgnition({ gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey, payload });
       toast.success(`Uploaded "${selectedTemplate.name}" to Ignition`);
     } catch (err) {
-      toast.error('Upload failed: ' + (err.response?.data?.error || err.message));
+      const detail = err.response?.data?.error || err.message;
+      const usedUrl = err.response?.data?.url;
+      toast.error('Upload failed: ' + detail + (usedUrl ? ` [${usedUrl}]` : ''));
     }
   };
 
