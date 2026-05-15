@@ -157,13 +157,15 @@ export default function ProfileAttributeGrid({ attributes, onChange }) {
                 </td>
               </tr>
             ))}
+            <tr onClick={addAttr} style={{ cursor: 'pointer' }} className="add-row">
+              <td colSpan={5} style={{ padding: '6px 12px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#555', fontSize: 12 }}>
+                  <Plus size={13} /> Add Column
+                </span>
+              </td>
+            </tr>
           </tbody>
         </table>
-      </div>
-      <div className="flex-shrink-0 px-3 py-2" style={{ borderTop: '1px solid #2a2a2a' }}>
-        <button className="btn btn-secondary text-xs" style={{ padding: '4px 10px' }} onClick={addAttr}>
-          <Plus size={13} /> Add Column
-        </button>
       </div>
     </div>
   );
