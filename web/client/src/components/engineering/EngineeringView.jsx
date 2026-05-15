@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Cpu } from 'lucide-react';
+import { Upload, Cpu, Plus } from 'lucide-react';
 import TemplateTree from './TemplateTree';
 import AttributeGrid from './AttributeGrid';
 import ProfilePanel, { ProfileForm } from './ProfilePanel';
@@ -84,11 +84,13 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
           ))}
           {mode === 'template' && (
             <button
-              className="tab-item"
-              style={{ marginLeft: 'auto' }}
+              className="tab-item add-profile-tab"
               onClick={() => { setNewProfileDraft(BLANK_PROFILE); setShowAddProfileModal(true); }}
+              style={{ color: 'var(--text-disabled)', display: 'flex', alignItems: 'center', gap: 4 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-disabled)'}
             >
-              + Profile
+              <Plus size={13} /> Add Profile
             </button>
           )}
         </div>
