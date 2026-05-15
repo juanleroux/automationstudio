@@ -172,7 +172,6 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                       if (isTemplate) {
                         updateAttr(attr.id, 'value', v);
                       } else {
-                        // Update instance attribute value
                         onChange(prev => {
                           const exists = prev.find(a => a.id === attr.id);
                           if (exists) return prev.map(a => a.id === attr.id ? { ...a, value: v } : a);
@@ -204,17 +203,22 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                 )}
               </tr>
             ))}
+            {isTemplate && (
+              <tr
+                onClick={addAttr}
+                style={{ cursor: 'pointer' }}
+                className="add-row"
+              >
+                <td colSpan={6} style={{ padding: '6px 12px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#555', fontSize: 12 }}>
+                    <Plus size={13} /> Add Attribute
+                  </span>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-
-      {isTemplate && (
-        <div className="flex-shrink-0 px-3 py-2" style={{ borderTop: '1px solid #2a2a2a' }}>
-          <button className="btn btn-secondary text-xs" style={{ padding: '4px 10px' }} onClick={addAttr}>
-            <Plus size={13} /> Add Attribute
-          </button>
-        </div>
-      )}
     </div>
   );
 }
