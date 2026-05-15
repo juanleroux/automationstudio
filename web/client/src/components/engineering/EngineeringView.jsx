@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Upload, Cpu } from 'lucide-react';
 import TemplateTree from './TemplateTree';
 import AttributeGrid from './AttributeGrid';
-import ProfilePanel from './ProfilePanel';
+import ProfilePanel, { ProfileForm } from './ProfilePanel';
+import Modal from '../shared/Modal';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
@@ -11,9 +12,13 @@ const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 260;
 
+const BLANK_PROFILE = { name: '', description: '', exportType: 0, formatType: 0, tabularExportDelimiter: ',', structuralExportTemplate: '', customFormat: '' };
+
 // Extracted as a proper top-level component so React doesn't remount it every render
 function RightPanel({ selected, selectedTemplate, selectedInstance, project, onUpdateTemplateAttrs, onUpdateInstanceAttrs, onUpdateTemplate, onIgnitionUpload }) {
   const [activeTab, setActiveTab] = useState(0);
+  const [showAddProfileModal, setShowAddProfileModal] = useState(false);
+  const [newProfileDraft, setNewProfileDraft] = useState(BLANK_PROFILE);
   const mode = selected?.type === 'instance' ? 'instance' : 'template';
 
   useEffect(() => { setActiveTab(0); }, [selected?.templateId, selected?.instanceId]);
@@ -36,25 +41,35 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
 
   const showIgnitionBtn = mode === 'template' && project?.engineering?.enableIgnitionMenuItems;
 
-  const handleAddProfile = () => {
+  const handleConfirmAddProfile = () => {
     onUpdateTemplate(t => ({
       ...t,
-      profiles: [...(t.profiles || []), {
-        name: `Profile ${(t.profiles || []).length + 1}`,
-        description: '',
-        exportType: 0,
-        formatType: 0,
-        tabularExportDelimiter: ',',
-        structuralExportTemplate: '',
-        customFormat: '',
-        attributes: []
-      }]
+      profiles: [...(t.profiles || []), { ...newProfileDraft, attributes: [] }]
     }));
     setActiveTab(tabs.length);
+    setShowAddProfileModal(false);
+    setNewProfileDraft(BLANK_PROFILE);
   };
 
   return (
     <div className="flex flex-col h-full">
+      {/* Add Profile Modal */}
+      {showAddProfileModal && (
+        <Modal
+          title="Add Profile"
+          onClose={() => { setShowAddProfileModal(false); setNewProfileDraft(BLANK_PROFILE); }}
+          width={460}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => { setShowAddProfileModal(false); setNewProfileDraft(BLANK_PROFILE); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleConfirmAddProfile} disabled={!newProfileDraft.name.trim()}>Add</button>
+            </>
+          }
+        >
+          <ProfileForm profile={newProfileDraft} onChange={setNewProfileDraft} />
+        </Modal>
+      )}
+
       {/* Tab bar */}
       <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid #333', background: '#1c1c1c' }}>
         <div className="flex-1 flex overflow-x-auto" style={{ border: 'none' }}>
@@ -71,7 +86,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             <button
               className="tab-item"
               style={{ marginLeft: 'auto' }}
-              onClick={handleAddProfile}
+              onClick={() => { setNewProfileDraft(BLANK_PROFILE); setShowAddProfileModal(true); }}
             >
               + Profile
             </button>

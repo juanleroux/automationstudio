@@ -274,7 +274,7 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
   );
 }
 
-function ProfileForm({ profile, onChange }) {
+export function ProfileForm({ profile, onChange }) {
   const set = (field, value) => onChange(p => ({ ...p, [field]: value }));
 
   return (
