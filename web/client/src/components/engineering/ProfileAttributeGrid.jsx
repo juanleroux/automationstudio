@@ -121,7 +121,7 @@ export default function ProfileAttributeGrid({ attributes, onChange }) {
             {attributes.length === 0 && (
               <tr>
                 <td colSpan={5} className="text-center py-8 text-text-muted text-xs">
-                  No columns. Click "+ Add" to create one.
+                  No columns. Click "+ Add Column" to create one.
                 </td>
               </tr>
             )}
