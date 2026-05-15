@@ -553,8 +553,16 @@ export default function TemplateTree({ selected, onSelect }) {
                   </div>
                 </div>
               </div>
-              <div className="context-menu-item" onClick={() => { setImportModalTemplate(contextMenu.templateId); setContextMenu(null); }}>
-                <Upload size={14} /> Import CSV
+              <div className="context-menu-submenu">
+                <div className="context-menu-item">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Upload size={14} /> Import</span>
+                  <ChevronRight size={12} style={{ opacity: 0.6 }} />
+                </div>
+                <div className="context-menu-submenu-panel">
+                  <div className="context-menu-item" onClick={() => { setImportModalTemplate(contextMenu.templateId); setContextMenu(null); }}>
+                    <Upload size={14} /> Import CSV
+                  </div>
+                </div>
               </div>
               <div className="context-menu-separator" />
               <div className="context-menu-item danger" onClick={() => {
