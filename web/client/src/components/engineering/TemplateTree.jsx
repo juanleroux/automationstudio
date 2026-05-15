@@ -347,6 +347,40 @@ export default function TemplateTree({ selected, onSelect }) {
     setContextMenu(null);
   };
 
+  // Export template in Ignition JSON format
+  const exportIgnitionJSON = (template) => {
+    const eng = project?.engineering || {};
+    const payload = {
+      tagType: 'UdtType',
+      name: template.name,
+      parameters: (template.attributes || [])
+        .filter(a => a.parameter)
+        .map(a => ({ name: a.name, dataType: a.dataType, value: a.value })),
+      tags: (template.attributes || [])
+        .filter(a => !a.parameter)
+        .map(a => ({ name: a.name, tagType: 'AtomicTag', dataType: a.dataType, value: a.value })),
+      instances: (template.instances || []).map(inst => ({
+        name: inst.name,
+        tagType: 'UdtInstance',
+        typeId: template.name,
+        parameters: (inst.attributes || []).reduce((acc, ia) => {
+          const ta = (template.attributes || []).find(a => a.id === ia.id);
+          if (ta?.parameter) acc[ta.name] = ia.value;
+          return acc;
+        }, {})
+      }))
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${template.name}_ignition.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported "${template.name}" as Ignition JSON`);
+    setContextMenu(null);
+  };
+
   // Export all templates as JSON
   const exportTemplatesJSON = () => {
     const data = JSON.stringify(templates, null, 2);
@@ -664,6 +698,14 @@ export default function TemplateTree({ selected, onSelect }) {
                   }}>
                     <Download size={14} /> Export Instances
                   </div>
+                  {project?.engineering?.enableIgnitionMenuItems && (
+                    <div className="context-menu-item" onClick={() => {
+                      const t = templates.find(x => x.id === contextMenu.templateId);
+                      if (t) exportIgnitionJSON(t);
+                    }}>
+                      <Download size={14} /> Export Ignition
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="context-menu-submenu">
