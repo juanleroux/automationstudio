@@ -490,7 +490,7 @@ export default function TemplateTree({ selected, onSelect }) {
       {/* Tree */}
       <div
         className="flex-1 overflow-y-auto"
-        onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, type: 'blank', templateId: null, instanceId: null }); }}
+        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, type: 'blank', templateId: null, instanceId: null }); }}
       >
         {filteredTemplates.length === 0 && (
           <div className="text-center py-8 text-text-muted text-xs">
