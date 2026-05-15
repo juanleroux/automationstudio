@@ -1,9 +1,55 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const http = require('http');
+const https = require('https');
 
 function normalizeUrl(gatewayUrl) {
   return gatewayUrl.trim().replace(/\/+$/, '');
+}
+
+/**
+ * Make an HTTP/HTTPS request using Node's built-in modules so we can set
+ * Content-Length explicitly. Ignition's Jetty rejects chunked transfer
+ * encoding (which axios uses when it can't pre-compute the body size),
+ * returning a 400 "Bad Request / badURI" error.
+ */
+function rawPost(urlStr, bodyObj, headers) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = JSON.stringify(bodyObj);
+    const bodyBuf = Buffer.from(bodyStr, 'utf8');
+    const parsed = new URL(urlStr);
+    const lib = parsed.protocol === 'https:' ? https : http;
+
+    const options = {
+      hostname: parsed.hostname,
+      port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+      path: parsed.pathname + (parsed.search || ''),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': bodyBuf.length,
+        ...headers,
+      },
+    };
+
+    const req = lib.request(options, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        resolve({ status: res.statusCode, raw });
+      });
+    });
+
+    req.on('error', reject);
+    req.write(bodyBuf);
+    req.end();
+  });
+}
+
+function stripHtml(str) {
+  return str.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 // POST /api/ignition/upload - proxy upload to Ignition gateway
@@ -17,31 +63,30 @@ router.post('/upload', async (req, res) => {
   const base = normalizeUrl(gatewayUrl);
   const url = `${base}/data/tag-cicd/tags`;
 
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = {};
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-  // Ignition Tag CI/CD API expects an array of tag objects
-  const body = Array.isArray(payload) ? payload : [payload];
+  // Send payload as-is (already in native Ignition export format)
+  const body = payload;
 
   console.log('[Ignition upload] POST', url);
   console.log('[Ignition upload] body', JSON.stringify(body, null, 2));
 
   try {
-    const response = await axios.post(url, body, { headers, timeout: 30000 });
-    res.json({ success: true, data: response.data, status: response.status });
-  } catch (err) {
-    if (err.response) {
-      const errData = err.response.data;
-      // Strip HTML from Ignition/Jetty error pages so the toast is readable
-      const message = typeof errData === 'string'
-        ? errData.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-        : (errData?.error || err.message);
-      console.error('[Ignition upload] error', err.response.status, message);
-      res.status(err.response.status).json({ error: message, status: err.response.status, url });
-    } else {
-      console.error('[Ignition upload] network error', err.message);
-      res.status(502).json({ error: err.message, url });
+    const { status, raw } = await rawPost(url, body, headers);
+    console.log('[Ignition upload] response', status, raw.slice(0, 200));
+
+    if (status >= 200 && status < 300) {
+      let data;
+      try { data = JSON.parse(raw); } catch { data = raw; }
+      return res.json({ success: true, data, status });
     }
+
+    const message = raw.includes('<html') ? stripHtml(raw) : raw;
+    return res.status(status).json({ error: message, status, url });
+  } catch (err) {
+    console.error('[Ignition upload] network error', err.message);
+    res.status(502).json({ error: err.message, url });
   }
 });
 
@@ -90,7 +135,6 @@ router.post('/test', async (req, res) => {
     res.json({ success: true, status: response.status });
   } catch (err) {
     if (err.response) {
-      // Even a 4xx means we reached the server
       res.json({ success: true, status: err.response.status });
     } else {
       res.status(502).json({ error: err.message });

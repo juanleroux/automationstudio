@@ -18,10 +18,9 @@ function ignitionDataType(val) {
 }
 
 /**
- * Builds the Ignition Tag CI/CD import payload for a template (UDT type + instances).
- * Returns a JSON array ready to POST to /data/tag-cicd/tags.
+ * Builds an Ignition UDT type tag object for the given template.
  */
-export function buildIgnitionPayload(template, folderPath) {
+function buildUdtType(template) {
   const udtType = {
     name: template.name,
     tagType: 'UdtType',
@@ -37,6 +36,17 @@ export function buildIgnitionPayload(template, folderPath) {
       udtType.tags.push({ name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' });
     }
   });
+
+  return udtType;
+}
+
+/**
+ * Builds the Ignition Tag CI/CD import payload for a template.
+ * Returns the native Ignition tag export format:
+ *   { version, tagGroup, tags: [ Folder containing UdtType + instances ] }
+ */
+export function buildIgnitionPayload(template, folderPath) {
+  const udtType = buildUdtType(template);
 
   const instances = (template.instances || []).map(inst => {
     const overrides = {};
@@ -54,11 +64,10 @@ export function buildIgnitionPayload(template, folderPath) {
     };
   });
 
-  const folder = {
-    name: folderPath || template.name,
-    tagType: 'Folder',
-    tags: [udtType, ...instances],
-  };
+  const tags = folderPath
+    ? [{ name: folderPath, tagType: 'Folder', tags: [udtType, ...instances] }]
+    : [udtType, ...instances];
 
-  return [folder];
+  // Native Ignition tag export format (same structure the gateway exports)
+  return { version: '8.1.0', tagGroup: 'default', tags };
 }
