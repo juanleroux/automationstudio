@@ -5,8 +5,13 @@ const fs = require('fs');
 
 const projectsDir = path.join(__dirname, '..', 'projects');
 
+function ensureProjectsDir() {
+  if (!fs.existsSync(projectsDir)) {
+    fs.mkdirSync(projectsDir, { recursive: true });
+  }
+}
+
 function getProjectPath(filename) {
-  // Sanitize filename
   const safe = path.basename(filename);
   return path.join(projectsDir, safe);
 }
@@ -14,6 +19,7 @@ function getProjectPath(filename) {
 // GET /api/projects - list all project files
 router.get('/', (req, res) => {
   try {
+    ensureProjectsDir();
     const files = fs.readdirSync(projectsDir)
       .filter(f => f.endsWith('.atsproj.json'))
       .map(f => {
@@ -40,6 +46,7 @@ router.get('/', (req, res) => {
 // POST /api/projects - create new project
 router.post('/', (req, res) => {
   try {
+    ensureProjectsDir();
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'Name required' });
 
@@ -83,7 +90,8 @@ router.post('/', (req, res) => {
     fs.writeFileSync(filePath, JSON.stringify(project, null, 2));
     res.status(201).json({ filename, project });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('POST /api/projects error:', err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
