@@ -101,19 +101,6 @@ export default function Sidebar({ activeView, onChangeView }) {
           )}
         </div>
 
-        {/* Project info */}
-        {!collapsed && (
-          <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid #333' }}>
-            <div className="text-xs text-text-muted mb-1">Project</div>
-            <div className="text-sm text-text-primary font-medium truncate">
-              {project ? (project.name || filename?.replace('.atsproj.json', '')) : 'No project open'}
-            </div>
-            {isDirty && (
-              <div className="text-xs text-yellow-400 mt-0.5">Unsaved changes</div>
-            )}
-          </div>
-        )}
-
         {/* Nav items */}
         <nav className="flex-1 py-2 overflow-y-auto">
           {NAV_ITEMS.map(item => {
