@@ -23,7 +23,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
 
   if (!selected) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ userSelect: 'none', pointerEvents: 'none' }}>
+      <div className="relative flex items-center justify-center h-full" style={{ userSelect: 'none', pointerEvents: 'none' }}>
         <div className="flex flex-col items-center gap-3" style={{ opacity: 0.07 }}>
           <div
             className="flex items-center justify-center rounded-2xl"
@@ -35,6 +35,14 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             Automation Studio
           </span>
         </div>
+        <span
+          style={{
+            position: 'absolute', bottom: 12, right: 16,
+            fontSize: 11, color: 'var(--text-disabled)', opacity: 0.6,
+          }}
+        >
+          One Technology Limited &copy;
+        </span>
       </div>
     );
   }
