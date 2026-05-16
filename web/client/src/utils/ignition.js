@@ -51,9 +51,9 @@ function buildUdtType(template) {
 
 /**
  * Builds the Ignition tag import payload for a template.
- * Returns { tags: [ UdtType, ...UdtInstances ] } — the body expected by
- * POST /data/api/v1/tags/import. Provider and folder path are passed as
- * query parameters by the server, not embedded in the payload.
+ * UDT type definitions must reside under the _types_ folder; instances go
+ * at the root (or under the folder path supplied as a query param).
+ * Returns { tags: [...] } — the body expected by POST /data/api/v1/tags/import.
  */
 export function buildIgnitionPayload(template) {
   const udtType = buildUdtType(template);
@@ -74,7 +74,12 @@ export function buildIgnitionPayload(template) {
     };
   });
 
-  return { tags: [udtType, ...instances] };
+  return {
+    tags: [
+      { name: '_types_', tagType: 'Folder', tags: [udtType] },
+      ...instances,
+    ],
+  };
 }
 
 // ─── Import: Ignition → Templates ───────────────────────────────────────────
