@@ -132,10 +132,11 @@ function collectUdtTypes(tags, bucket = [], currentPath = '') {
 /**
  * Convert one Ignition UdtType (+ its sibling instances) to our template format.
  */
-function convertUdt(udtType, siblingInstances, templateId) {
+function convertUdt(udtType, siblingInstances, templateId, folderPath) {
   const now = new Date().toISOString();
   let attrId = 1;
   const attributes = [];
+  const templateName = folderPath ? `${folderPath}/${udtType.name}` : udtType.name;
 
   // Parameters → parameter: true attributes
   Object.entries(udtType.parameters || {}).forEach(([name, param]) => {
@@ -167,7 +168,7 @@ function convertUdt(udtType, siblingInstances, templateId) {
     return { id: instId++, areaId: 0, name: inst.name, description: '', isFlagged: false, lastModification: now, attributes: instAttrs };
   });
 
-  return { id: templateId, name: udtType.name, description: '', lastModification: now, attributes, instances, profiles: [] };
+  return { id: templateId, name: templateName, description: '', lastModification: now, attributes, instances, profiles: [] };
 }
 
 /**
@@ -185,7 +186,7 @@ export function parseIgnitionResponse(rawData) {
  * startId: next available template id.
  */
 export function convertUdtsToTemplates(udtResults, startId) {
-  return udtResults.map(({ udtType, siblingInstances }, i) =>
-    convertUdt(udtType, siblingInstances, startId + i)
+  return udtResults.map(({ udtType, siblingInstances, folderPath }, i) =>
+    convertUdt(udtType, siblingInstances, startId + i, folderPath)
   );
 }
