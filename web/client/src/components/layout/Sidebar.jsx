@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Cpu, Map, Settings, ChevronLeft, ChevronRight,
-  FilePlus, FolderOpen, Save, Zap
+  FilePlus, FolderOpen, Save, Zap, Trash2, Download, Upload
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
-import { listProjects, createProject } from '../../api/client';
+import { listProjects, createProject, loadProject, saveProject, deleteProject } from '../../api/client';
 import Modal from '../shared/Modal';
+import ConfirmDialog from '../shared/ConfirmDialog';
 
 const NAV_ITEMS = [
   { id: 'engineering', label: 'Assets', icon: Cpu },
@@ -22,6 +23,8 @@ export default function Sidebar({ activeView, onChangeView }) {
   const [projects, setProjects] = useState([]);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(null);
+  const importProjectRef = useRef(null);
 
   const handleNewProject = async () => {
     if (!newName.trim()) return;
@@ -59,6 +62,56 @@ export default function Sidebar({ activeView, onChangeView }) {
     } catch (err) {
       toast.error('Failed to open project: ' + err.message);
     }
+  };
+
+  const handleExportProject = async (proj, e) => {
+    e.stopPropagation();
+    try {
+      const data = await loadProject(proj.filename);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = proj.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported "${proj.name}"`);
+    } catch (err) {
+      toast.error('Export failed: ' + err.message);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    const proj = confirmDeleteProject;
+    try {
+      await deleteProject(proj.filename);
+      setProjects(ps => ps.filter(p => p.filename !== proj.filename));
+      toast.success(`Deleted "${proj.name}"`);
+    } catch (err) {
+      toast.error('Delete failed: ' + err.message);
+    } finally {
+      setConfirmDeleteProject(null);
+    }
+  };
+
+  const handleImportProject = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        const name = data.name || file.name.replace(/\.json$/i, '').replace(/\.atsproj$/i, '');
+        const result = await createProject(name);
+        await saveProject(result.filename, { ...data, name });
+        await openProject(result.filename);
+        setShowOpenDialog(false);
+        toast.success(`Imported "${name}"`);
+        onChangeView('engineering');
+      } catch (err) {
+        toast.error('Import failed: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleSave = async () => {
@@ -247,8 +300,23 @@ export default function Sidebar({ activeView, onChangeView }) {
         <Modal
           title="Open Project"
           onClose={() => setShowOpenDialog(false)}
-          width={480}
+          width={500}
+          footer={
+            <button
+              className="btn btn-secondary flex items-center gap-2"
+              onClick={() => importProjectRef.current?.click()}
+            >
+              <Upload size={13} /> Import Project
+            </button>
+          }
         >
+          <input
+            ref={importProjectRef}
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={e => { handleImportProject(e.target.files[0]); e.target.value = ''; }}
+          />
           {projects.length === 0 ? (
             <div className="text-center py-8 text-text-muted">
               <FolderOpen size={32} className="mx-auto mb-2 opacity-40" />
@@ -258,26 +326,53 @@ export default function Sidebar({ activeView, onChangeView }) {
           ) : (
             <div className="flex flex-col gap-1">
               {projects.map(proj => (
-                <button
+                <div
                   key={proj.filename}
-                  onClick={() => handleOpenProject(proj)}
-                  className="flex items-center justify-between p-3 rounded-md text-left transition-colors"
+                  className="flex items-center gap-2 p-3 rounded-md transition-colors"
                   style={{ background: 'var(--bg-main)', border: '1px solid var(--border)' }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
                 >
-                  <div>
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer"
+                    onClick={() => handleOpenProject(proj)}
+                  >
                     <div className="text-sm font-medium text-text-primary">{proj.name}</div>
                     <div className="text-xs text-text-muted mt-0.5">{proj.filename}</div>
                   </div>
-                  <div className="text-xs text-text-muted">
+                  <div className="text-xs text-text-muted flex-shrink-0">
                     {new Date(proj.modified).toLocaleDateString()}
                   </div>
-                </button>
+                  <button
+                    className="btn btn-ghost btn-icon flex-shrink-0"
+                    title="Export project"
+                    onClick={e => handleExportProject(proj, e)}
+                  >
+                    <Download size={13} />
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-icon flex-shrink-0"
+                    title="Delete project"
+                    style={{ color: '#e55353' }}
+                    onClick={e => { e.stopPropagation(); setConfirmDeleteProject(proj); }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </Modal>
+      )}
+
+      {confirmDeleteProject && (
+        <ConfirmDialog
+          title="Delete Project"
+          message={`Delete "${confirmDeleteProject.name}"? This cannot be undone.`}
+          danger
+          onConfirm={handleDeleteProject}
+          onCancel={() => setConfirmDeleteProject(null)}
+        />
       )}
     </>
   );
