@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -8 116 116">
+  <g transform="rotate(20, 50, 50)" fill="#3ecf8e">
+    <!-- top-left small -->
+    <polygon points="36,22 30,32.4 18,32.4 12,22 18,11.6 30,11.6"/>
+    <!-- top-right large -->
+    <polygon points="85,20 75,37.3 55,37.3 45,20 55,2.7 75,2.7"/>
+    <!-- bottom-left large -->
+    <polygon points="55,72 44.5,90.2 23.5,90.2 13,72 23.5,53.8 44.5,53.8"/>
+    <!-- bottom-right medium -->
+    <polygon points="88,76 81,88.1 67,88.1 60,76 67,63.9 81,63.9"/>
+  </g>
+</svg>
