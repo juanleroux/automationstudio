@@ -16,8 +16,8 @@ export default function TopBar({ activeView }) {
       className="flex items-center justify-between px-5 flex-shrink-0"
       style={{
         height: 48,
-        background: '#1c1c1c',
-        borderBottom: '1px solid #333'
+        background: 'var(--bg-surface)',
+        borderBottom: '1px solid var(--border)'
       }}
     >
       <div className="flex items-center gap-3">
@@ -43,7 +43,7 @@ export default function TopBar({ activeView }) {
       </div>
       <div className="flex items-center gap-2 text-xs text-text-muted">
         <span>Automation Studio</span>
-        <span className="px-1.5 py-0.5 rounded" style={{ background: '#303030', color: '#9e9e9e' }}>v1.0</span>
+        <span className="px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-card)', color: 'var(--text-muted)' }}>v1.0</span>
       </div>
     </div>
   );
