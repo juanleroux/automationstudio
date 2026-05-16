@@ -15,17 +15,44 @@ function lookupAttribute(name, inst, template) {
 
 /**
  * Resolve a single keyword token (no operators).
+ *
+ * Supports:
+ *   Instance.Name | Instance.Description | Template.Name   — built-in
+ *   <AttrName>                                              — attribute value
+ *   <AttrName>.Value                                        — attribute value (explicit)
+ *   <AttrName>.Description                                  — attribute description
+ *   <AttrName>.Name                                         — attribute name
  */
 function resolveKeyword(keyword, attr, inst, template) {
-  const k = keyword.trim().toLowerCase();
+  const k = keyword.trim();
   if (!k) return '';
-  if (k === 'instance.name')        return inst.name || '';
-  if (k === 'instance.description') return inst.description || '';
-  if (k === 'template.name')        return template.name || '';
-  if (k === 'instance.area')        return '';
-  if (k === 'attribute.name')       return attr?.name || '';
-  if (k === 'attribute.value')      return lookupAttribute(attr?.name || '', inst, template);
-  // Treat as a template attribute name
+  const kl = k.toLowerCase();
+
+  // Built-in keywords
+  if (kl === 'instance.name')        return inst.name || '';
+  if (kl === 'instance.description') return inst.description || '';
+  if (kl === 'template.name')        return template.name || '';
+  if (kl === 'instance.area')        return '';
+  if (kl === 'attribute.name')       return attr?.name || '';
+  if (kl === 'attribute.value')      return lookupAttribute(attr?.name || '', inst, template);
+
+  // AttributeName.Property — e.g. "Attribute 1.Description", "Speed.Value"
+  const PROP_SUFFIXES = ['.value', '.description', '.name'];
+  for (const suffix of PROP_SUFFIXES) {
+    if (kl.endsWith(suffix)) {
+      const attrName = k.slice(0, k.length - suffix.length).trim();
+      const ta = (template.attributes || []).find(a => a.name.toLowerCase() === attrName.toLowerCase());
+      if (!ta) return '';
+      if (suffix === '.value') {
+        const ia = (inst.attributes || []).find(a => a.id === ta.id);
+        return (ia != null && ia.value != null) ? ia.value : (ta.value || '');
+      }
+      if (suffix === '.description') return ta.description || '';
+      if (suffix === '.name')        return ta.name || '';
+    }
+  }
+
+  // Bare attribute name — return its value for the current instance
   return lookupAttribute(k, inst, template);
 }
 
