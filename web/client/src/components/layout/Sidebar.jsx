@@ -105,6 +105,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         await saveProject(result.filename, { ...data, name });
         await openProject(result.filename);
         setShowOpenDialog(false);
+        setShowNewDialog(false);
         toast.success(`Imported "${name}"`);
         onChangeView('engineering');
       } catch (err) {
@@ -125,6 +126,13 @@ export default function Sidebar({ activeView, onChangeView }) {
 
   return (
     <>
+      <input
+        ref={importProjectRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={e => { handleImportProject(e.target.files[0]); e.target.value = ''; }}
+      />
       <div
         className="flex flex-col h-full flex-shrink-0 transition-all duration-200"
         style={{
@@ -268,6 +276,13 @@ export default function Sidebar({ activeView, onChangeView }) {
           width={400}
           footer={
             <>
+              <button
+                className="btn btn-secondary flex items-center gap-2"
+                onClick={() => importProjectRef.current?.click()}
+              >
+                <Upload size={13} /> Import
+              </button>
+              <div style={{ flex: 1 }} />
               <button className="btn btn-secondary" onClick={() => { setShowNewDialog(false); setNewName(''); }}>
                 Cancel
               </button>
@@ -310,13 +325,6 @@ export default function Sidebar({ activeView, onChangeView }) {
             </button>
           }
         >
-          <input
-            ref={importProjectRef}
-            type="file"
-            accept=".json"
-            style={{ display: 'none' }}
-            onChange={e => { handleImportProject(e.target.files[0]); e.target.value = ''; }}
-          />
           {projects.length === 0 ? (
             <div className="text-center py-8 text-text-muted">
               <FolderOpen size={32} className="mx-auto mb-2 opacity-40" />
