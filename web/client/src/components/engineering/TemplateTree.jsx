@@ -395,7 +395,7 @@ export default function TemplateTree({ selected, onSelect }) {
       });
       const udts = parseIgnitionResponse(result.data);
       setIgnitionFetch({ loading: false, error: null, udts });
-      setSelectedUdts(new Set(udts.map(r => r.udtType.name)));
+      setSelectedUdts(new Set(udts.map(r => `${r.folderPath}/${r.udtType.name}`)));
     } catch (err) {
       const msg = err.response?.data?.error || err.message;
       setIgnitionFetch({ loading: false, error: msg, udts: [] });
@@ -403,7 +403,7 @@ export default function TemplateTree({ selected, onSelect }) {
   };
 
   const handleImportIgnitionUdts = () => {
-    const toImport = ignitionFetch.udts.filter(r => selectedUdts.has(r.udtType.name));
+    const toImport = ignitionFetch.udts.filter(r => selectedUdts.has(`${r.folderPath}/${r.udtType.name}`));
     if (!toImport.length) return;
     updateProject(p => {
       const startId = nextId(p.templates || []);
@@ -1020,7 +1020,7 @@ export default function TemplateTree({ selected, onSelect }) {
                     <button
                       className="btn btn-ghost"
                       style={{ fontSize: 11, padding: '2px 8px' }}
-                      onClick={() => setSelectedUdts(new Set(ignitionFetch.udts.map(r => r.udtType.name)))}
+                      onClick={() => setSelectedUdts(new Set(ignitionFetch.udts.map(r => `${r.folderPath}/${r.udtType.name}`)))}
                     >
                       All
                     </button>
@@ -1036,13 +1036,14 @@ export default function TemplateTree({ selected, onSelect }) {
                 <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4 }}>
                   {ignitionFetch.udts.map(r => {
                     const name = r.udtType.name;
+                    const udtKey = `${r.folderPath}/${name}`;
                     const paramCount = Object.keys(r.udtType.parameters || {}).length;
                     const tagCount = (r.udtType.tags || []).length;
                     const instCount = r.siblingInstances.length;
-                    const checked = selectedUdts.has(name);
+                    const checked = selectedUdts.has(udtKey);
                     return (
                       <label
-                        key={name}
+                        key={udtKey}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 10,
                           padding: '7px 10px', cursor: 'pointer',
@@ -1056,7 +1057,7 @@ export default function TemplateTree({ selected, onSelect }) {
                           onChange={e => {
                             setSelectedUdts(prev => {
                               const s = new Set(prev);
-                              if (e.target.checked) s.add(name); else s.delete(name);
+                              if (e.target.checked) s.add(udtKey); else s.delete(udtKey);
                               return s;
                             });
                           }}
