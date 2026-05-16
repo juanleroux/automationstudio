@@ -7,7 +7,8 @@ import {
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
-import { buildIgnitionPayload } from '../../utils/ignition';
+import { exportFromIgnition } from '../../api/client';
+import { buildIgnitionPayload, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
@@ -35,6 +36,10 @@ export default function TemplateTree({ selected, onSelect }) {
   const [importAttributesModalTemplate, setImportAttributesModalTemplate] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   const importTemplateRef = useRef(null);
+  const [showImportIgnition, setShowImportIgnition] = useState(false);
+  const [ignitionPath, setIgnitionPath] = useState('');
+  const [ignitionFetch, setIgnitionFetch] = useState({ loading: false, error: null, udts: [] });
+  const [selectedUdts, setSelectedUdts] = useState(new Set());
 
   const renameInputRef = useRef(null);
 
@@ -369,6 +374,40 @@ export default function TemplateTree({ selected, onSelect }) {
     }
   };
 
+  // Import UDTs from Ignition
+  const handleFetchFromIgnition = async () => {
+    const eng = project?.engineering;
+    if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
+    setIgnitionFetch({ loading: true, error: null, udts: [] });
+    try {
+      const result = await exportFromIgnition({
+        gatewayUrl: eng.ignitionGateway,
+        apiKey: eng.apiKey,
+        folderPath: ignitionPath || eng.folderPath || '',
+      });
+      const udts = parseIgnitionResponse(result.data);
+      setIgnitionFetch({ loading: false, error: null, udts });
+      setSelectedUdts(new Set(udts.map(r => r.udtType.name)));
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message;
+      setIgnitionFetch({ loading: false, error: msg, udts: [] });
+    }
+  };
+
+  const handleImportIgnitionUdts = () => {
+    const toImport = ignitionFetch.udts.filter(r => selectedUdts.has(r.udtType.name));
+    if (!toImport.length) return;
+    updateProject(p => {
+      const startId = nextId(p.templates || []);
+      const newTemplates = convertUdtsToTemplates(toImport, startId);
+      return { ...p, templates: [...(p.templates || []), ...newTemplates] };
+    });
+    toast.success(`Imported ${toImport.length} template(s) from Ignition`);
+    setShowImportIgnition(false);
+    setIgnitionFetch({ loading: false, error: null, udts: [] });
+    setSelectedUdts(new Set());
+  };
+
   // Export all templates as JSON
   const exportTemplatesJSON = () => {
     const data = JSON.stringify(templates, null, 2);
@@ -652,6 +691,20 @@ export default function TemplateTree({ selected, onSelect }) {
               <div className="context-menu-item" onClick={exportTemplatesJSON} style={{ opacity: templates.length === 0 ? 0.4 : 1, pointerEvents: templates.length === 0 ? 'none' : 'auto' }}>
                 <Download size={14} /> Export All Templates
               </div>
+              {project?.engineering?.enableIgnitionMenuItems && (
+                <>
+                  <div className="context-menu-separator" />
+                  <div className="context-menu-item" onClick={() => {
+                    setIgnitionPath(project?.engineering?.folderPath || '');
+                    setIgnitionFetch({ loading: false, error: null, udts: [] });
+                    setSelectedUdts(new Set());
+                    setShowImportIgnition(true);
+                    setContextMenu(null);
+                  }}>
+                    <Download size={14} /> Import from Ignition
+                  </div>
+                </>
+              )}
             </>
           ) : contextMenu.type === 'template' ? (
             <>
@@ -888,6 +941,131 @@ export default function TemplateTree({ selected, onSelect }) {
                 style={{ background: 'transparent', border: 'none', padding: 0 }}
               />
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Import from Ignition Modal */}
+      {showImportIgnition && (
+        <Modal
+          title="Import from Ignition"
+          onClose={() => setShowImportIgnition(false)}
+          width={520}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setShowImportIgnition(false)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleImportIgnitionUdts}
+                disabled={selectedUdts.size === 0 || ignitionFetch.loading}
+              >
+                Import Selected ({selectedUdts.size})
+              </button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-xs text-text-muted mb-1">Tag Folder Path (optional)</label>
+                <input
+                  type="text"
+                  value={ignitionPath}
+                  onChange={e => setIgnitionPath(e.target.value)}
+                  placeholder="e.g. Devices or leave blank for root"
+                  onKeyDown={e => e.key === 'Enter' && handleFetchFromIgnition()}
+                />
+              </div>
+              <div style={{ paddingTop: 18 }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleFetchFromIgnition}
+                  disabled={ignitionFetch.loading}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {ignitionFetch.loading ? 'Fetching…' : 'Fetch UDTs'}
+                </button>
+              </div>
+            </div>
+
+            {ignitionFetch.error && (
+              <div style={{ color: '#e55353', fontSize: 12, padding: '6px 10px', background: 'rgba(229,83,83,0.1)', borderRadius: 4 }}>
+                {ignitionFetch.error}
+              </div>
+            )}
+
+            {!ignitionFetch.loading && !ignitionFetch.error && ignitionFetch.udts.length === 0 && (
+              <div className="text-text-muted text-xs text-center py-4">
+                {ignitionFetch.udts.length === 0 && !ignitionFetch.error
+                  ? 'Click "Fetch UDTs" to discover UDT types from Ignition.'
+                  : 'No UDT types found at the specified path.'}
+              </div>
+            )}
+
+            {ignitionFetch.udts.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-text-muted">
+                    Found {ignitionFetch.udts.length} UDT type(s) — select to import:
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: 11, padding: '2px 8px' }}
+                      onClick={() => setSelectedUdts(new Set(ignitionFetch.udts.map(r => r.udtType.name)))}
+                    >
+                      All
+                    </button>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: 11, padding: '2px 8px' }}
+                      onClick={() => setSelectedUdts(new Set())}
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
+                <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4 }}>
+                  {ignitionFetch.udts.map(r => {
+                    const name = r.udtType.name;
+                    const paramCount = Object.keys(r.udtType.parameters || {}).length;
+                    const tagCount = (r.udtType.tags || []).length;
+                    const instCount = r.siblingInstances.length;
+                    const checked = selectedUdts.has(name);
+                    return (
+                      <label
+                        key={name}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '7px 10px', cursor: 'pointer',
+                          borderBottom: '1px solid var(--border-subtle)',
+                          background: checked ? 'var(--bg-hover)' : 'transparent',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={e => {
+                            setSelectedUdts(prev => {
+                              const s = new Set(prev);
+                              if (e.target.checked) s.add(name); else s.delete(name);
+                              return s;
+                            });
+                          }}
+                          style={{ flexShrink: 0 }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-text-primary text-sm truncate">{name}</div>
+                          <div className="text-text-muted" style={{ fontSize: 11 }}>
+                            {paramCount} parameter{paramCount !== 1 ? 's' : ''} · {tagCount} tag{tagCount !== 1 ? 's' : ''} · {instCount} instance{instCount !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}
