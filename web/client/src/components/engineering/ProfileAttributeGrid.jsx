@@ -12,7 +12,6 @@ const RULE_SUGGESTIONS = [
   'Instance.Description',
   'Instance.Area',
   'Template.Name',
-  'Attribute.Value',
   'Attribute.Name',
 ];
 
