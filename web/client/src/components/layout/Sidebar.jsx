@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  Cpu, Map, Settings, ChevronLeft, ChevronRight,
+  Cpu, Map, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
   FilePlus, FolderOpen, Save, Zap, Trash2, Download, Upload
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
@@ -10,8 +10,9 @@ import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
 
 const NAV_ITEMS = [
-  { id: 'engineering', label: 'Assets', icon: Cpu },
-  { id: 'areas', label: 'Model', icon: Map },
+  { id: 'dashboard',   label: 'Dashboard', icon: LayoutDashboard, alwaysEnabled: true },
+  { id: 'engineering', label: 'Assets',    icon: Cpu },
+  { id: 'areas',       label: 'Model',     icon: Map },
 ];
 
 export default function Sidebar({ activeView, onChangeView }) {
@@ -35,7 +36,7 @@ export default function Sidebar({ activeView, onChangeView }) {
       setShowNewDialog(false);
       setNewName('');
       toast.success(`Project "${newName.trim()}" created`);
-      onChangeView('engineering');
+      onChangeView('dashboard');
     } catch (err) {
       toast.error('Failed to create project: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -58,7 +59,7 @@ export default function Sidebar({ activeView, onChangeView }) {
       await openProject(proj.filename);
       setShowOpenDialog(false);
       toast.success(`Opened "${proj.name}"`);
-      onChangeView('engineering');
+      onChangeView('dashboard');
     } catch (err) {
       toast.error('Failed to open project: ' + err.message);
     }
@@ -107,7 +108,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         setShowOpenDialog(false);
         setShowNewDialog(false);
         toast.success(`Imported "${name}"`);
-        onChangeView('engineering');
+        onChangeView('dashboard');
       } catch (err) {
         toast.error('Import failed: ' + err.message);
       }
@@ -165,17 +166,18 @@ export default function Sidebar({ activeView, onChangeView }) {
           {NAV_ITEMS.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
+            const enabled = item.alwaysEnabled || !!project;
             return (
               <button
                 key={item.id}
                 onClick={() => onChangeView(item.id)}
-                disabled={!project && item.id !== 'settings'}
+                disabled={!enabled}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-none transition-colors"
                 style={{
                   background: active ? 'var(--accent-bg)' : 'transparent',
-                  color: active ? 'var(--accent)' : (!project && item.id !== 'settings') ? 'var(--text-disabled)' : 'var(--text-muted)',
+                  color: active ? 'var(--accent)' : !enabled ? 'var(--text-disabled)' : 'var(--text-muted)',
                   borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
-                  cursor: (!project && item.id !== 'settings') ? 'not-allowed' : 'pointer',
+                  cursor: !enabled ? 'not-allowed' : 'pointer',
                 }}
               >
                 <Icon size={16} className="flex-shrink-0" />

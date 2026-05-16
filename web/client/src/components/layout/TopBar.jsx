@@ -2,6 +2,7 @@ import React from 'react';
 import { useProject } from '../../context/ProjectContext';
 
 const VIEW_LABELS = {
+  dashboard: 'Dashboard',
   engineering: 'Assets',
   areas: 'Model',
   proposal: 'Proposal',
