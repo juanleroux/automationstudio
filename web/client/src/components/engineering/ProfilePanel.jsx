@@ -4,6 +4,7 @@ import ProfileAttributeGrid from './ProfileAttributeGrid';
 import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useToast } from '../shared/Toast';
+import { runProfileExport } from '../../utils/profileExport';
 
 const EXPORT_TYPES = [
   { value: 0, label: 'Tabular' },
@@ -16,50 +17,6 @@ const FORMAT_TYPES = [
   { value: 2, label: 'XML' },
   { value: 3, label: 'Custom' },
 ];
-
-function csvCell(value, delimiter) {
-  const str = value == null ? '' : String(value);
-  if (str.includes(delimiter) || str.includes('"') || str.includes('\n')) {
-    return '"' + str.replace(/"/g, '""') + '"';
-  }
-  return str;
-}
-
-function resolveRule(rule, attr, inst, template) {
-  if (!rule) return '';
-  const r = rule.trim().toLowerCase();
-  if (r === 'instance.name') return inst.name || '';
-  if (r === 'instance.description') return inst.description || '';
-  if (r === 'template.name') return template.name || '';
-  if (r === 'instance.area') return '';
-  if (r === 'attribute.name') return attr.name || '';
-  const ta = (template.attributes || []).find(a => a.name.toLowerCase() === r);
-  if (ta) {
-    const ia = (inst.attributes || []).find(a => a.id === ta.id);
-    return ia != null && ia.value != null ? ia.value : (ta.value || '');
-  }
-  return '';
-}
-
-function buildTabularCSV(profile, template) {
-  const delimiter = profile.tabularExportDelimiter || ',';
-  const cols = profile.attributes || [];
-  const header = cols.map(a => csvCell(a.name, delimiter)).join(delimiter);
-  const rows = (template.instances || []).map(inst =>
-    cols.map(attr => csvCell(resolveRule(attr.rule || '', attr, inst, template), delimiter)).join(delimiter)
-  );
-  return [header, ...rows].join('\r\n');
-}
-
-function buildStructuralText(profile, template) {
-  const tmpl = profile.structuralExportTemplate || '';
-  return (template.instances || []).map(inst => {
-    return tmpl
-      .replace(/\{Instance\.Name\}/g, inst.name)
-      .replace(/\{Instance\.Description\}/g, inst.description)
-      .replace(/\{Template\.Name\}/g, template.name);
-  }).join('\n---\n');
-}
 
 export default function ProfilePanel({ template, onUpdateTemplate }) {
   const toast = useToast();
@@ -102,25 +59,8 @@ export default function ProfilePanel({ template, onUpdateTemplate }) {
   };
 
   const handleExport = () => {
-    if (!profile) return;
-    if (!(template.instances?.length)) { toast.error('No instances to export'); return; }
-    if (profile.exportType === 0 && !(profile.attributes?.length)) { toast.error('No columns configured for this profile'); return; }
-    let content = '';
-    let ext = 'txt';
-    if (profile.exportType === 0) {
-      content = buildTabularCSV(profile, template);
-      ext = 'csv';
-    } else {
-      content = buildStructuralText(profile, template);
-      ext = 'txt';
-    }
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${template.name}_${profile.name}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const err = runProfileExport(profile, template);
+    if (err) { toast.error(err); return; }
     toast.success(`Exported ${template.instances?.length || 0} instances`);
   };
 

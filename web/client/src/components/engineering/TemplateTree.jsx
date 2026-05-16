@@ -8,6 +8,7 @@ import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
 import { buildIgnitionPayload } from '../../utils/ignition';
+import { runProfileExport } from '../../utils/profileExport';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
 
@@ -693,6 +694,31 @@ export default function TemplateTree({ selected, onSelect }) {
                       <Upload size={14} /> Upload to Ignition
                     </div>
                   )}
+                  {/* Profile exports */}
+                  {(() => {
+                    const t = templates.find(x => x.id === contextMenu.templateId);
+                    const profiles = t?.profiles || [];
+                    if (!profiles.length) return null;
+                    return (
+                      <>
+                        <div className="context-menu-separator" />
+                        {profiles.map((p, i) => (
+                          <div
+                            key={i}
+                            className="context-menu-item"
+                            onClick={() => {
+                              const err = runProfileExport(p, t);
+                              if (err) toast.error(err);
+                              else toast.success(`Exported "${p.name}"`);
+                              setContextMenu(null);
+                            }}
+                          >
+                            <Download size={14} /> {p.name || `Profile ${i + 1}`}
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="context-menu-submenu">
