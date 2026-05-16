@@ -56,6 +56,7 @@ router.get('/export', async (req, res) => {
   if (folderPath) url += `&path=${encodeURIComponent(folderPath)}`;
 
   console.log('[Ignition export] GET', url);
+  console.log('[Ignition export] API key present:', !!apiKey, apiKey ? `(${apiKey.length} chars, starts: ${apiKey.slice(0,4)}...)` : '(none)');
 
   try {
     const response = await axios.get(url, { headers: ignitionHeaders(apiKey), timeout: 30000 });
