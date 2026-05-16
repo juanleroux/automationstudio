@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Cpu, Plus } from 'lucide-react';
+import { Upload, Cpu, Plus, Zap } from 'lucide-react';
 import TemplateTree from './TemplateTree';
 import AttributeGrid from './AttributeGrid';
 import ProfilePanel, { ProfileForm } from './ProfilePanel';
@@ -26,9 +26,17 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
 
   if (!selected) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-disabled)' }}>
-        <div className="text-center">
-          <p className="text-sm">Select a template or instance from the tree</p>
+      <div className="flex items-center justify-center h-full" style={{ userSelect: 'none', pointerEvents: 'none' }}>
+        <div className="flex flex-col items-center gap-3" style={{ opacity: 0.07 }}>
+          <div
+            className="flex items-center justify-center rounded-2xl"
+            style={{ width: 96, height: 96, background: 'var(--text-primary)' }}
+          >
+            <Zap size={56} color="var(--bg-main)" />
+          </div>
+          <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
+            Automation Studio
+          </span>
         </div>
       </div>
     );
