@@ -18,20 +18,21 @@ function ignitionHeaders(apiKey) {
 
 // POST /api/ignition/upload — import tags into Ignition via standard REST API
 router.post('/upload', async (req, res) => {
-  const { gatewayUrl, apiKey, payload, provider = 'default', collisionPolicy = 'Overwrite', folderPath } = req.body;
+  const { gatewayUrl, apiKey, payload, provider = 'default', collisionPolicy = 'Overwrite' } = req.body;
 
   if (!gatewayUrl) return res.status(400).json({ error: 'Gateway URL required' });
 
   const base = normalizeUrl(gatewayUrl);
-  let url = `${base}/data/api/v1/tags/import?provider=${encodeURIComponent(provider)}&collisionPolicy=${encodeURIComponent(collisionPolicy)}&type=json`;
-  if (folderPath) url += `&path=${encodeURIComponent(folderPath)}`;
+  // Do not send ?path= — the _types_ folder in the payload controls UDT placement.
+  // Mixing path + _types_ wrapper puts the type under the wrong folder.
+  const url = `${base}/data/api/v1/tags/import?provider=${encodeURIComponent(provider)}&collisionPolicy=${encodeURIComponent(collisionPolicy)}&type=json`;
 
   console.log('[Ignition import] POST', url);
   console.log('[Ignition import] body', JSON.stringify(payload, null, 2));
 
   try {
     const response = await axios.post(url, payload, { headers: ignitionHeaders(apiKey), timeout: 30000 });
-    console.log('[Ignition import] response', response.status);
+    console.log('[Ignition import] response', response.status, JSON.stringify(response.data));
     return res.json({ success: true, data: response.data, status: response.status });
   } catch (err) {
     if (err.response) {
