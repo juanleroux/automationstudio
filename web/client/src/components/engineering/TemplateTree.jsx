@@ -467,8 +467,8 @@ export default function TemplateTree({ selected, onSelect }) {
 
   const exportInstancesToJSON = (instanceList) => {
     setContextMenu(null);
-    const data = instanceList.map(({ template, instance }) => ({ templateName: template.name, ...instance }));
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const payload = buildInstancesPayload(instanceList);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
