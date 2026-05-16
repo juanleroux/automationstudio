@@ -1065,6 +1065,7 @@ export default function TemplateTree({ selected, onSelect }) {
                         <div className="flex-1 min-w-0">
                           <div className="text-text-primary text-sm truncate">{name}</div>
                           <div className="text-text-muted" style={{ fontSize: 11 }}>
+                            {r.folderPath && <span className="font-mono" style={{ marginRight: 6 }}>{r.folderPath}/</span>}
                             {paramCount} parameter{paramCount !== 1 ? 's' : ''} · {tagCount} tag{tagCount !== 1 ? 's' : ''} · {instCount} instance{instCount !== 1 ? 's' : ''}
                           </div>
                         </div>

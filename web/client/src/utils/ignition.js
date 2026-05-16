@@ -83,7 +83,7 @@ export function buildIgnitionPayload(template) {
  * Recursively walk Ignition tag trees and collect UdtType entries together
  * with any UdtInstance siblings that reference them.
  */
-function collectUdtTypes(tags, bucket = []) {
+function collectUdtTypes(tags, bucket = [], currentPath = '') {
   if (!Array.isArray(tags)) return bucket;
   const udtTypes  = tags.filter(t => t.tagType === 'UdtType');
   const instances = tags.filter(t => t.tagType === 'UdtInstance');
@@ -91,9 +91,12 @@ function collectUdtTypes(tags, bucket = []) {
     const siblings = instances.filter(i =>
       i.typeId === udt.name || (i.typeId || '').endsWith('/' + udt.name)
     );
-    bucket.push({ udtType: udt, siblingInstances: siblings });
+    bucket.push({ udtType: udt, siblingInstances: siblings, folderPath: currentPath });
   });
-  tags.filter(t => t.tagType === 'Folder').forEach(f => collectUdtTypes(f.tags || [], bucket));
+  tags.filter(t => t.tagType === 'Folder').forEach(f => {
+    const childPath = currentPath ? `${currentPath}/${f.name}` : f.name;
+    collectUdtTypes(f.tags || [], bucket, childPath);
+  });
   return bucket;
 }
 
