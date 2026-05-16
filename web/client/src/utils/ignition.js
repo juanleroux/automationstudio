@@ -82,7 +82,31 @@ export function buildIgnitionPayload(template) {
   };
 }
 
-// ─── Import: Ignition → Templates ───────────────────────────────────────────
+/**
+ * Builds the Ignition import payload for a list of UDT instances.
+ * instanceList: [{ template, instance }]
+ * Returns { tags: [...UdtInstances] } — no _types_ wrapper needed.
+ */
+export function buildInstancesPayload(instanceList) {
+  const tags = instanceList.map(({ template, instance }) => {
+    const overrides = {};
+    (instance.attributes || []).forEach(ia => {
+      const ta = (template.attributes || []).find(a => a.id === ia.id);
+      if (ta?.parameter) {
+        overrides[ta.name] = { dataType: ignitionDataType(ta.dataType), value: ia.value ?? '' };
+      }
+    });
+    return {
+      name: instance.name,
+      tagType: 'UdtInstance',
+      typeId: template.name,
+      parameters: overrides,
+    };
+  });
+  return { tags };
+}
+
+
 
 /**
  * Recursively walk Ignition tag trees and collect UdtType entries together

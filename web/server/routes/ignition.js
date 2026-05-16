@@ -18,14 +18,15 @@ function ignitionHeaders(apiKey) {
 
 // POST /api/ignition/upload — import tags into Ignition via standard REST API
 router.post('/upload', async (req, res) => {
-  const { gatewayUrl, apiKey, payload, provider = 'default', collisionPolicy = 'Overwrite' } = req.body;
+  const { gatewayUrl, apiKey, payload, provider = 'default', collisionPolicy = 'Overwrite', folderPath } = req.body;
 
   if (!gatewayUrl) return res.status(400).json({ error: 'Gateway URL required' });
 
   const base = normalizeUrl(gatewayUrl);
-  // Do not send ?path= — the _types_ folder in the payload controls UDT placement.
-  // Mixing path + _types_ wrapper puts the type under the wrong folder.
-  const url = `${base}/data/api/v1/tags/import?provider=${encodeURIComponent(provider)}&collisionPolicy=${encodeURIComponent(collisionPolicy)}&type=json`;
+  // UDT type payloads embed _types_ in the body and must NOT use path=.
+  // Instance-only payloads pass folderPath so instances land in the right folder.
+  let url = `${base}/data/api/v1/tags/import?provider=${encodeURIComponent(provider)}&collisionPolicy=${encodeURIComponent(collisionPolicy)}&type=json`;
+  if (folderPath) url += `&path=${encodeURIComponent(folderPath)}`;
 
   console.log('[Ignition import] POST', url);
   console.log('[Ignition import] body', JSON.stringify(payload, null, 2));

@@ -8,7 +8,7 @@ import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
 import { exportFromIgnition } from '../../api/client';
-import { buildIgnitionPayload, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
+import { buildIgnitionPayload, buildInstancesPayload, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
@@ -41,6 +41,7 @@ export default function TemplateTree({ selected, onSelect }) {
   const [ignitionFetch, setIgnitionFetch] = useState({ loading: false, error: null, udts: [] });
   const [selectedUdts, setSelectedUdts] = useState(new Set());
   const [ignitionFilter, setIgnitionFilter] = useState('');
+  const [multiSelected, setMultiSelected] = useState(new Set()); // "templateId:instanceId"
 
   const renameInputRef = useRef(null);
 
@@ -417,6 +418,66 @@ export default function TemplateTree({ selected, onSelect }) {
     setSelectedUdts(new Set());
   };
 
+  // Multi-select helpers
+  const instKey = (templateId, instanceId) => `${templateId}:${instanceId}`;
+
+  const toggleMultiSelect = (e, templateId, instanceId) => {
+    e.stopPropagation();
+    const key = instKey(templateId, instanceId);
+    setMultiSelected(prev => {
+      const s = new Set(prev);
+      if (s.has(key)) s.delete(key); else s.add(key);
+      return s;
+    });
+  };
+
+  const getSelectedInstances = (fallbackTemplateId, fallbackInstanceId) => {
+    const key = instKey(fallbackTemplateId, fallbackInstanceId);
+    const keys = multiSelected.size > 0 && multiSelected.has(key) ? multiSelected : new Set([key]);
+    const result = [];
+    for (const k of keys) {
+      const [tid, iid] = k.split(':').map(Number);
+      const tmpl = templates.find(t => t.id === tid);
+      const inst = tmpl?.instances?.find(i => i.id === iid);
+      if (tmpl && inst) result.push({ template: tmpl, instance: inst });
+    }
+    return result;
+  };
+
+  const exportInstancesToIgnition = async (instanceList) => {
+    setContextMenu(null);
+    const eng = project?.engineering;
+    if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
+    const payload = buildInstancesPayload(instanceList);
+    try {
+      await uploadToIgnition({
+        gatewayUrl: eng.ignitionGateway,
+        apiKey: eng.apiKey,
+        provider: eng.provider || 'default',
+        collisionPolicy: eng.collisionPolicy || 'Overwrite',
+        folderPath: eng.folderPath || '',
+        payload,
+      });
+      toast.success(`Uploaded ${instanceList.length} instance(s) to Ignition`);
+    } catch (err) {
+      const detail = err.response?.data?.error || err.message;
+      toast.error('Upload failed: ' + detail);
+    }
+  };
+
+  const exportInstancesToJSON = (instanceList) => {
+    setContextMenu(null);
+    const data = instanceList.map(({ template, instance }) => ({ templateName: template.name, ...instance }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = instanceList.length === 1 ? `${instanceList[0].instance.name}.json` : 'instances_export.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${instanceList.length} instance(s)`);
+  };
+
   // Export all templates as JSON
   const exportTemplatesJSON = () => {
     const data = JSON.stringify(templates, null, 2);
@@ -616,12 +677,19 @@ export default function TemplateTree({ selected, onSelect }) {
                 return (
                   <div
                     key={inst.id}
-                    className={`tree-node flex items-center gap-1 pl-8 pr-2 py-1 ${isISelected ? 'selected' : ''}`}
+                    className={`tree-node flex items-center gap-1 pl-6 pr-2 py-1 ${isISelected ? 'selected' : ''} ${multiSelected.has(instKey(template.id, inst.id)) ? 'bg-accent-muted' : ''}`}
                     onClick={() => onSelect({ type: 'instance', templateId: template.id, instanceId: inst.id })}
                     onContextMenu={e => handleContextMenu(e, 'instance', template.id, inst.id)}
                     draggable
                     onDragStart={e => handleDragStart(e, template.id, inst.id)}
                   >
+                    <input
+                      type="checkbox"
+                      checked={multiSelected.has(instKey(template.id, inst.id))}
+                      onChange={e => toggleMultiSelect(e, template.id, inst.id)}
+                      onClick={e => e.stopPropagation()}
+                      style={{ flexShrink: 0, width: 12, height: 12, cursor: 'pointer', accentColor: 'var(--accent)' }}
+                    />
                     <Tag size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                     {inst.isFlagged && (
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e55353', flexShrink: 0 }} />
@@ -809,28 +877,67 @@ export default function TemplateTree({ selected, onSelect }) {
             </>
           ) : (
             <>
-              <div className="context-menu-item" onClick={() => {
-                const t = templates.find(x => x.id === contextMenu.templateId);
-                const inst = t?.instances?.find(i => i.id === contextMenu.instanceId);
-                if (inst) startRename('instance', contextMenu.templateId, contextMenu.instanceId, inst.name);
-              }}>
-                <Edit2 size={14} /> Rename
-              </div>
-              <div className="context-menu-item" onClick={() => duplicateInstance(contextMenu.templateId, contextMenu.instanceId)}>
-                <Copy size={14} /> Duplicate
-              </div>
-              <div className="context-menu-item" onClick={() => toggleFlag(contextMenu.templateId, contextMenu.instanceId)}>
-                <Flag size={14} /> Toggle Flag
-              </div>
-              <div className="context-menu-separator" />
-              <div className="context-menu-item danger" onClick={() => {
-                const t = templates.find(x => x.id === contextMenu.templateId);
-                const inst = t?.instances?.find(i => i.id === contextMenu.instanceId);
-                setConfirmDelete({ type: 'instance', templateId: contextMenu.templateId, instanceId: contextMenu.instanceId, name: inst?.name });
-                setContextMenu(null);
-              }}>
-                <Trash2 size={14} /> Delete Instance
-              </div>
+              {(() => {
+                const ctxInsts = getSelectedInstances(contextMenu.templateId, contextMenu.instanceId);
+                const multi = ctxInsts.length > 1;
+                return (
+                  <>
+                    {!multi && (
+                      <>
+                        <div className="context-menu-item" onClick={() => {
+                          const t = templates.find(x => x.id === contextMenu.templateId);
+                          const inst = t?.instances?.find(i => i.id === contextMenu.instanceId);
+                          if (inst) startRename('instance', contextMenu.templateId, contextMenu.instanceId, inst.name);
+                        }}>
+                          <Edit2 size={14} /> Rename
+                        </div>
+                        <div className="context-menu-item" onClick={() => duplicateInstance(contextMenu.templateId, contextMenu.instanceId)}>
+                          <Copy size={14} /> Duplicate
+                        </div>
+                        <div className="context-menu-item" onClick={() => toggleFlag(contextMenu.templateId, contextMenu.instanceId)}>
+                          <Flag size={14} /> Toggle Flag
+                        </div>
+                        <div className="context-menu-separator" />
+                      </>
+                    )}
+                    <div className="context-menu-submenu">
+                      <div className="context-menu-item">
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Upload size={14} /> Export{multi ? ` (${ctxInsts.length})` : ''}
+                        </span>
+                        <ChevronRight size={12} style={{ opacity: 0.6 }} />
+                      </div>
+                      <div className="context-menu-submenu-panel">
+                        {project?.engineering?.enableIgnitionMenuItems && (
+                          <div className="context-menu-item" onClick={() => exportInstancesToIgnition(ctxInsts)}>
+                            <Upload size={14} /> Upload to Ignition
+                          </div>
+                        )}
+                        <div className="context-menu-item" onClick={() => exportInstancesToJSON(ctxInsts)}>
+                          <Download size={14} /> Export to JSON
+                        </div>
+                      </div>
+                    </div>
+                    {multiSelected.size > 0 && (
+                      <>
+                        <div className="context-menu-separator" />
+                        <div className="context-menu-item" onClick={() => { setMultiSelected(new Set()); setContextMenu(null); }}>
+                          <Circle size={14} /> Clear Selection ({multiSelected.size})
+                        </div>
+                      </>
+                    )}
+                    <div className="context-menu-separator" />
+                    <div className="context-menu-item danger" onClick={() => {
+                      const t = templates.find(x => x.id === contextMenu.templateId);
+                      const inst = t?.instances?.find(i => i.id === contextMenu.instanceId);
+                      setConfirmDelete({ type: 'instance', templateId: contextMenu.templateId, instanceId: contextMenu.instanceId, name: inst?.name });
+                      setContextMenu(null);
+                    }}>
+                      <Trash2 size={14} /> Delete Instance
+                    </div>
+                  </>
+                );
+              })()}
             </>
           )}
         </div>
