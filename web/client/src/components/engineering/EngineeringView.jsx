@@ -1,13 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Cpu, Plus, Zap } from 'lucide-react';
+import { Cpu, Plus, Zap } from 'lucide-react';
 import TemplateTree from './TemplateTree';
 import AttributeGrid from './AttributeGrid';
 import ProfilePanel, { ProfileForm } from './ProfilePanel';
 import Modal from '../shared/Modal';
 import { useProject } from '../../context/ProjectContext';
-import { useToast } from '../shared/Toast';
-import { uploadToIgnition } from '../../api/client';
-import { buildIgnitionPayload } from '../../utils/ignition';
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
@@ -16,7 +13,7 @@ const DEFAULT_WIDTH = 260;
 const BLANK_PROFILE = { name: '', description: '', exportType: 0, formatType: 0, tabularExportDelimiter: ',', structuralExportTemplate: '', customFormat: '' };
 
 // Extracted as a proper top-level component so React doesn't remount it every render
-function RightPanel({ selected, selectedTemplate, selectedInstance, project, onUpdateTemplateAttrs, onUpdateInstanceAttrs, onUpdateTemplate, onIgnitionUpload }) {
+function RightPanel({ selected, selectedTemplate, selectedInstance, project, onUpdateTemplateAttrs, onUpdateInstanceAttrs, onUpdateTemplate }) {
   const [activeTab, setActiveTab] = useState(0);
   const [showAddProfileModal, setShowAddProfileModal] = useState(false);
   const [newProfileDraft, setNewProfileDraft] = useState(BLANK_PROFILE);
@@ -47,8 +44,6 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
     { id: 'attrs', label: mode === 'instance' ? `${selectedInstance?.name || 'Instance'} Attributes` : 'Attributes' },
     ...(mode === 'template' ? profiles.map((p, i) => ({ id: `profile_${i}`, label: p.name || `Profile ${i + 1}` })) : [])
   ];
-
-  const showIgnitionBtn = mode === 'template' && project?.engineering?.enableIgnitionMenuItems;
 
   const handleConfirmAddProfile = () => {
     onUpdateTemplate(t => ({
@@ -103,17 +98,6 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             </button>
           )}
         </div>
-        {showIgnitionBtn && (
-          <div className="px-2 flex-shrink-0">
-            <button
-              className="btn btn-primary text-xs"
-              style={{ padding: '3px 10px' }}
-              onClick={onIgnitionUpload}
-            >
-              <Upload size={12} /> Upload to Ignition
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Tab content */}
@@ -159,7 +143,6 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
 
 export default function EngineeringView() {
   const { project, updateProject } = useProject();
-  const toast = useToast();
   const [selected, setSelected] = useState(null);
   const [paneWidth, setPaneWidth] = useState(DEFAULT_WIDTH);
   const dragging = useRef(false);
@@ -242,30 +225,6 @@ export default function EngineeringView() {
     }));
   }, [selectedTemplate, updateProject]);
 
-  const handleIgnitionUpload = async () => {
-    if (!selectedTemplate || !project?.engineering?.ignitionGateway) {
-      toast.error('Configure Ignition gateway in Settings first');
-      return;
-    }
-    const eng = project.engineering;
-    const payload = buildIgnitionPayload(selectedTemplate);
-    try {
-      await uploadToIgnition({
-        gatewayUrl: eng.ignitionGateway,
-        apiKey: eng.apiKey,
-        provider: eng.provider || 'default',
-        collisionPolicy: eng.collisionPolicy || 'Overwrite',
-        folderPath: eng.folderPath || '',
-        payload,
-      });
-      toast.success(`Uploaded "${selectedTemplate.name}" to Ignition`);
-    } catch (err) {
-      const detail = err.response?.data?.error || err.message;
-      const usedUrl = err.response?.data?.url;
-      toast.error('Upload failed: ' + detail + (usedUrl ? ` [${usedUrl}]` : ''));
-    }
-  };
-
   if (!project) {
     return (
       <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-disabled)' }}>
@@ -298,7 +257,6 @@ export default function EngineeringView() {
           onUpdateTemplateAttrs={handleUpdateTemplateAttrs}
           onUpdateInstanceAttrs={handleUpdateInstanceAttrs}
           onUpdateTemplate={handleUpdateTemplate}
-          onIgnitionUpload={handleIgnitionUpload}
         />
       </div>
     </div>
