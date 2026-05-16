@@ -7,38 +7,81 @@ function csvCell(value, delimiter) {
 }
 
 function lookupAttribute(name, inst, template) {
-  const ta = (template.attributes || []).find(a => a.name.toLowerCase() === name);
+  const ta = (template.attributes || []).find(a => a.name.toLowerCase() === name.toLowerCase());
   if (!ta) return '';
   const ia = (inst.attributes || []).find(a => a.id === ta.id);
   return (ia != null && ia.value != null) ? ia.value : (ta.value || '');
 }
 
-function resolveRule(rule, attr, inst, template) {
-  // When no rule is set, fall back to the column name as the expression.
-  // This means a column named "Instance.Name" or an attribute name like "Speed"
-  // will resolve automatically without the user having to type a rule.
-  const expression = (rule && rule.trim()) || (attr?.name?.trim()) || '';
-  if (!expression) return '';
+/**
+ * Resolve a single keyword token (no operators).
+ */
+function resolveKeyword(keyword, attr, inst, template) {
+  const k = keyword.trim().toLowerCase();
+  if (!k) return '';
+  if (k === 'instance.name')        return inst.name || '';
+  if (k === 'instance.description') return inst.description || '';
+  if (k === 'template.name')        return template.name || '';
+  if (k === 'instance.area')        return '';
+  if (k === 'attribute.name')       return attr?.name || '';
+  if (k === 'attribute.value')      return lookupAttribute(attr?.name || '', inst, template);
+  // Treat as a template attribute name
+  return lookupAttribute(k, inst, template);
+}
 
-  const r = expression.toLowerCase();
+/**
+ * Evaluate an expression that may contain:
+ *   - keyword references:  Instance.Name, Instance.Description, Template.Name, <AttributeName>
+ *   - string literals:     "some text"  or  'some text'
+ *   - concatenation:       Instance.Name + " " + Instance.Description
+ */
+function evaluateExpression(expression, attr, inst, template) {
+  if (!expression || !expression.trim()) return '';
 
-  if (r === 'instance.name')        return inst.name || '';
-  if (r === 'instance.description') return inst.description || '';
-  if (r === 'template.name')        return template.name || '';
-  if (r === 'attribute.name')       return attr?.name || '';
+  const parts = [];
+  let i = 0;
+  const expr = expression.trim();
 
-  // "Attribute.Value" — resolve against the template attribute whose name
-  // matches the column name (since there is no single "current attribute" in
-  // tabular context, we use the column name as the attribute lookup key).
-  if (r === 'attribute.value') {
-    return lookupAttribute((attr?.name || '').toLowerCase(), inst, template);
+  while (i < expr.length) {
+    // Skip whitespace
+    while (i < expr.length && expr[i] === ' ') i++;
+    if (i >= expr.length) break;
+
+    const ch = expr[i];
+
+    if (ch === '"' || ch === "'") {
+      // String literal
+      const quote = ch;
+      i++;
+      let str = '';
+      while (i < expr.length && expr[i] !== quote) {
+        str += expr[i++];
+      }
+      i++; // closing quote
+      parts.push(str);
+    } else if (ch === '+') {
+      i++; // concatenation operator — just advance
+    } else {
+      // Keyword / attribute reference — read until +, quote, or end
+      let ref = '';
+      while (i < expr.length && expr[i] !== '+' && expr[i] !== '"' && expr[i] !== "'") {
+        ref += expr[i++];
+      }
+      ref = ref.trim();
+      if (ref) parts.push(resolveKeyword(ref, attr, inst, template));
+    }
   }
 
-  // instance.area — would need project areas; return empty until wired up
-  if (r === 'instance.area') return '';
+  return parts.join('');
+}
 
-  // Otherwise treat the expression as a template attribute name
-  return lookupAttribute(r, inst, template);
+/**
+ * Resolve the rule for one profile column against one instance.
+ * Falls back to the column name as the expression when no rule is set.
+ */
+function resolveRule(rule, attr, inst, template) {
+  const expression = (rule && rule.trim()) || (attr?.name?.trim()) || '';
+  return evaluateExpression(expression, attr, inst, template);
 }
 
 function buildTabularCSV(profile, template) {
@@ -55,9 +98,9 @@ function buildStructuralText(profile, template) {
   const tmpl = profile.structuralExportTemplate || '';
   return (template.instances || []).map(inst =>
     tmpl
-      .replace(/\{Instance\.Name\}/gi, inst.name || '')
+      .replace(/\{Instance\.Name\}/gi,        inst.name || '')
       .replace(/\{Instance\.Description\}/gi, inst.description || '')
-      .replace(/\{Template\.Name\}/gi, template.name || '')
+      .replace(/\{Template\.Name\}/gi,        template.name || '')
   ).join('\n---\n');
 }
 
@@ -65,7 +108,7 @@ const FORMAT_EXT = { 0: 'csv', 1: 'txt', 2: 'xml', 3: 'txt' };
 
 /**
  * Run a profile export and trigger a file download.
- * Returns an error string if validation fails, null on success.
+ * Returns an error string on validation failure, null on success.
  */
 export function runProfileExport(profile, template) {
   if (!profile || !template) return 'No profile or template';
