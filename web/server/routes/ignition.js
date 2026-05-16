@@ -1,128 +1,72 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const http = require('http');
-const https = require('https');
 
 function normalizeUrl(gatewayUrl) {
-  return gatewayUrl.trim().replace(/\/+$/, '');
-}
-
-/**
- * Make an HTTP/HTTPS request using Node's built-in modules so we can set
- * Content-Length explicitly. Ignition's Jetty rejects chunked transfer
- * encoding (which axios uses when it can't pre-compute the body size),
- * returning a 400 "Bad Request / badURI" error.
- */
-function rawPost(urlStr, bodyObj, headers) {
-  return new Promise((resolve, reject) => {
-    const bodyStr = JSON.stringify(bodyObj);
-    const bodyBuf = Buffer.from(bodyStr, 'utf8');
-    const parsed = new URL(urlStr);
-    const lib = parsed.protocol === 'https:' ? https : http;
-
-    const options = {
-      hostname: parsed.hostname,
-      port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
-      path: parsed.pathname + (parsed.search || ''),
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': bodyBuf.length,
-        ...headers,
-      },
-    };
-
-    const req = lib.request(options, (res) => {
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => {
-        const raw = Buffer.concat(chunks).toString('utf8');
-        resolve({ status: res.statusCode, raw });
-      });
-    });
-
-    req.on('error', reject);
-    req.write(bodyBuf);
-    req.end();
-  });
+  return (gatewayUrl || '').trim().replace(/\/+$/, '');
 }
 
 function stripHtml(str) {
   return str.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// POST /api/ignition/upload - proxy upload to Ignition gateway
-router.post('/upload', async (req, res) => {
-  const { gatewayUrl, apiKey, payload } = req.body;
+function ignitionHeaders(apiKey) {
+  const h = { 'Content-Type': 'application/json', Accept: 'application/json' };
+  if (apiKey) h['X-Ignition-API-Token'] = apiKey;
+  return h;
+}
 
-  if (!gatewayUrl) {
-    return res.status(400).json({ error: 'Gateway URL required' });
-  }
+// POST /api/ignition/upload — import tags into Ignition via standard REST API
+router.post('/upload', async (req, res) => {
+  const { gatewayUrl, apiKey, payload, provider = 'default', collisionPolicy = 'Overwrite', folderPath } = req.body;
+
+  if (!gatewayUrl) return res.status(400).json({ error: 'Gateway URL required' });
 
   const base = normalizeUrl(gatewayUrl);
-  const url = `${base}/data/tag-cicd/tags`;
+  let url = `${base}/data/api/v1/tags/import?provider=${encodeURIComponent(provider)}&collisionPolicy=${encodeURIComponent(collisionPolicy)}`;
+  if (folderPath) url += `&path=${encodeURIComponent(folderPath)}`;
 
-  const headers = {};
-  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-
-  // Send payload as-is (already in native Ignition export format)
-  const body = payload;
-
-  console.log('[Ignition upload] POST', url);
-  console.log('[Ignition upload] body', JSON.stringify(body, null, 2));
+  console.log('[Ignition import] POST', url);
+  console.log('[Ignition import] body', JSON.stringify(payload, null, 2));
 
   try {
-    const { status, raw } = await rawPost(url, body, headers);
-    console.log('[Ignition upload] response', status, raw.slice(0, 200));
-
-    if (status >= 200 && status < 300) {
-      let data;
-      try { data = JSON.parse(raw); } catch { data = raw; }
-      return res.json({ success: true, data, status });
-    }
-
-    const message = raw.includes('<html') ? stripHtml(raw) : raw;
-    const hint = status === 400 && raw.includes('badURI')
-      ? ' — The Tag CI/CD module may not be installed on this Ignition gateway.'
-      : '';
-    return res.status(status).json({ error: message + hint, status, url });
+    const response = await axios.post(url, payload, { headers: ignitionHeaders(apiKey), timeout: 30000 });
+    console.log('[Ignition import] response', response.status);
+    return res.json({ success: true, data: response.data, status: response.status });
   } catch (err) {
-    console.error('[Ignition upload] network error', err.message);
+    if (err.response) {
+      const raw = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
+      const message = raw.includes('<html') ? stripHtml(raw) : raw;
+      console.error('[Ignition import] error', err.response.status, message.slice(0, 300));
+      return res.status(err.response.status).json({ error: message, status: err.response.status, url });
+    }
+    console.error('[Ignition import] network error', err.message);
     res.status(502).json({ error: err.message, url });
   }
 });
 
-// GET /api/ignition/export - proxy export from Ignition gateway
+// GET /api/ignition/export — export tags from Ignition via standard REST API
 router.get('/export', async (req, res) => {
-  const { gatewayUrl, apiKey, folderPath } = req.query;
+  const { gatewayUrl, apiKey, provider = 'default', folderPath } = req.query;
 
-  if (!gatewayUrl) {
-    return res.status(400).json({ error: 'Gateway URL required' });
-  }
+  if (!gatewayUrl) return res.status(400).json({ error: 'Gateway URL required' });
 
   const base = normalizeUrl(gatewayUrl);
-  const path = folderPath ? `/data/tag-cicd/tags?path=${encodeURIComponent(folderPath)}` : '/data/tag-cicd/tags';
-  const url = `${base}${path}`;
-
-  const headers = { Accept: 'application/json' };
-  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+  let url = `${base}/data/api/v1/tags/export?provider=${encodeURIComponent(provider)}&type=json`;
+  if (folderPath) url += `&path=${encodeURIComponent(folderPath)}`;
 
   console.log('[Ignition export] GET', url);
 
   try {
-    const response = await axios.get(url, { headers, timeout: 30000 });
+    const response = await axios.get(url, { headers: ignitionHeaders(apiKey), timeout: 30000 });
     console.log('[Ignition export] response', response.status);
     res.json({ success: true, data: response.data });
   } catch (err) {
     if (err.response) {
       const raw = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
       const message = raw.includes('<html') ? stripHtml(raw) : raw;
-      const hint = err.response.status === 400 && raw.includes('badURI')
-        ? ' — The Tag CI/CD module may not be installed on this Ignition gateway.'
-        : '';
-      console.error('[Ignition export] error', err.response.status, message.slice(0, 200));
-      res.status(err.response.status).json({ error: message + hint, url });
+      console.error('[Ignition export] error', err.response.status, message.slice(0, 300));
+      res.status(err.response.status).json({ error: message, url });
     } else {
       console.error('[Ignition export] network error', err.message);
       res.status(502).json({ error: err.message, url });
@@ -130,25 +74,21 @@ router.get('/export', async (req, res) => {
   }
 });
 
-// POST /api/ignition/test - test connection to gateway
+// POST /api/ignition/test — verify gateway connectivity
 router.post('/test', async (req, res) => {
-  const { gatewayUrl, apiKey } = req.body;
+  const { gatewayUrl, apiKey, provider = 'default' } = req.body;
 
-  if (!gatewayUrl) {
-    return res.status(400).json({ error: 'Gateway URL required' });
-  }
+  if (!gatewayUrl) return res.status(400).json({ error: 'Gateway URL required' });
 
   const base = normalizeUrl(gatewayUrl);
-  const url = `${base}/data/tag-cicd/tags`;
-
-  const headers = {};
-  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+  const url = `${base}/data/api/v1/tags/export?provider=${encodeURIComponent(provider)}&type=json`;
 
   try {
-    const response = await axios.get(url, { headers, timeout: 10000 });
+    const response = await axios.get(url, { headers: ignitionHeaders(apiKey), timeout: 10000 });
     res.json({ success: true, status: response.status });
   } catch (err) {
     if (err.response) {
+      // Any HTTP response means the gateway is reachable
       res.json({ success: true, status: err.response.status });
     } else {
       res.status(502).json({ error: err.message });

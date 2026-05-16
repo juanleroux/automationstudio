@@ -363,9 +363,16 @@ export default function TemplateTree({ selected, onSelect }) {
       toast.error('Configure Ignition gateway in Settings first');
       return;
     }
-    const payload = buildIgnitionPayload(template, eng.folderPath);
+    const payload = buildIgnitionPayload(template);
     try {
-      await uploadToIgnition({ gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey, payload });
+      await uploadToIgnition({
+        gatewayUrl: eng.ignitionGateway,
+        apiKey: eng.apiKey,
+        provider: eng.provider || 'default',
+        collisionPolicy: eng.collisionPolicy || 'Overwrite',
+        folderPath: eng.folderPath || '',
+        payload,
+      });
       toast.success(`Uploaded "${template.name}" to Ignition`);
     } catch (err) {
       const detail = err.response?.data?.error || err.message;
@@ -383,6 +390,7 @@ export default function TemplateTree({ selected, onSelect }) {
       const result = await exportFromIgnition({
         gatewayUrl: eng.ignitionGateway,
         apiKey: eng.apiKey,
+        provider: eng.provider || 'default',
         folderPath: ignitionPath || eng.folderPath || '',
       });
       const udts = parseIgnitionResponse(result.data);

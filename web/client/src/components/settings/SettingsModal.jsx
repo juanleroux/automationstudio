@@ -16,7 +16,9 @@ export default function SettingsModal({ onClose }) {
     project?.engineering || {
       ignitionGateway: '',
       apiKey: '',
+      provider: 'default',
       folderPath: '',
+      collisionPolicy: 'Overwrite',
       enableIgnitionMenuItems: true
     }
   );
@@ -69,7 +71,8 @@ export default function SettingsModal({ onClose }) {
     try {
       const result = await testIgnitionConnection({
         gatewayUrl: engineering.ignitionGateway,
-        apiKey: engineering.apiKey
+        apiKey: engineering.apiKey,
+        provider: engineering.provider || 'default',
       });
       setTestResult({ success: true, message: `Connected (HTTP ${result.status})` });
     } catch (err) {
@@ -169,25 +172,50 @@ export default function SettingsModal({ onClose }) {
             />
           </div>
           <div>
-            <label className="block text-xs text-text-muted mb-1">API Key</label>
+            <label className="block text-xs text-text-muted mb-1">API Key (X-Ignition-API-Token)</label>
             <input
               type="password"
               value={engineering.apiKey}
               onChange={e => setEngineering(p => ({ ...p, apiKey: e.target.value }))}
-              placeholder="Bearer token or API key"
+              placeholder="Generate in Gateway → Platform → Security → API Keys"
               disabled={!project}
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Tag Provider</label>
+              <input
+                type="text"
+                value={engineering.provider || 'default'}
+                onChange={e => setEngineering(p => ({ ...p, provider: e.target.value }))}
+                placeholder="default"
+                disabled={!project}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Collision Policy</label>
+              <select
+                value={engineering.collisionPolicy || 'Overwrite'}
+                onChange={e => setEngineering(p => ({ ...p, collisionPolicy: e.target.value }))}
+                disabled={!project}
+              >
+                <option value="Overwrite">Overwrite</option>
+                <option value="MergeOverwrite">Merge Overwrite</option>
+                <option value="Ignore">Ignore</option>
+                <option value="Abort">Abort</option>
+              </select>
+            </div>
+          </div>
           <div>
-            <label className="block text-xs text-text-muted mb-1">Tag Folder Path</label>
+            <label className="block text-xs text-text-muted mb-1">Tag Folder Path (optional)</label>
             <input
               type="text"
               value={engineering.folderPath}
               onChange={e => setEngineering(p => ({ ...p, folderPath: e.target.value }))}
-              placeholder="[default]Devices/Motors"
+              placeholder="Devices/Motors"
               disabled={!project}
             />
-            <p className="text-xs text-text-muted mt-1">Path in Ignition tag browser where UDTs will be created</p>
+            <p className="text-xs text-text-muted mt-1">Sub-folder within the provider to import/export (leave blank for root)</p>
           </div>
 
           {/* Test connection */}

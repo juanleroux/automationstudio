@@ -50,11 +50,12 @@ function buildUdtType(template) {
 }
 
 /**
- * Builds the Ignition Tag CI/CD import payload for a template.
- * Returns the native Ignition tag export format:
- *   { version, tagGroup, tags: [ Folder containing UdtType + instances ] }
+ * Builds the Ignition tag import payload for a template.
+ * Returns { tags: [ UdtType, ...UdtInstances ] } — the body expected by
+ * POST /data/api/v1/tags/import. Provider and folder path are passed as
+ * query parameters by the server, not embedded in the payload.
  */
-export function buildIgnitionPayload(template, folderPath) {
+export function buildIgnitionPayload(template) {
   const udtType = buildUdtType(template);
 
   const instances = (template.instances || []).map(inst => {
@@ -73,12 +74,7 @@ export function buildIgnitionPayload(template, folderPath) {
     };
   });
 
-  const tags = folderPath
-    ? [{ name: folderPath, tagType: 'Folder', tags: [udtType, ...instances] }]
-    : [udtType, ...instances];
-
-  // Native Ignition tag export format (same structure the gateway exports)
-  return { version: '8.1.0', tagGroup: 'default', tags };
+  return { tags: [udtType, ...instances] };
 }
 
 // ─── Import: Ignition → Templates ───────────────────────────────────────────
