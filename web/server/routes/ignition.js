@@ -83,7 +83,10 @@ router.post('/upload', async (req, res) => {
     }
 
     const message = raw.includes('<html') ? stripHtml(raw) : raw;
-    return res.status(status).json({ error: message, status, url });
+    const hint = status === 400 && raw.includes('badURI')
+      ? ' — The Tag CI/CD module may not be installed on this Ignition gateway.'
+      : '';
+    return res.status(status).json({ error: message + hint, status, url });
   } catch (err) {
     console.error('[Ignition upload] network error', err.message);
     res.status(502).json({ error: err.message, url });
@@ -99,19 +102,30 @@ router.get('/export', async (req, res) => {
   }
 
   const base = normalizeUrl(gatewayUrl);
-  const url = `${base}/data/tag-cicd/tags`;
+  const path = folderPath ? `/data/tag-cicd/tags?path=${encodeURIComponent(folderPath)}` : '/data/tag-cicd/tags';
+  const url = `${base}${path}`;
 
-  const headers = {};
+  const headers = { Accept: 'application/json' };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
+  console.log('[Ignition export] GET', url);
+
   try {
-    const response = await axios.get(url, { headers, params: { path: folderPath }, timeout: 30000 });
+    const response = await axios.get(url, { headers, timeout: 30000 });
+    console.log('[Ignition export] response', response.status);
     res.json({ success: true, data: response.data });
   } catch (err) {
     if (err.response) {
-      res.status(err.response.status).json({ error: err.response.data || err.message });
+      const raw = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
+      const message = raw.includes('<html') ? stripHtml(raw) : raw;
+      const hint = err.response.status === 400 && raw.includes('badURI')
+        ? ' — The Tag CI/CD module may not be installed on this Ignition gateway.'
+        : '';
+      console.error('[Ignition export] error', err.response.status, message.slice(0, 200));
+      res.status(err.response.status).json({ error: message + hint, url });
     } else {
-      res.status(502).json({ error: err.message });
+      console.error('[Ignition export] network error', err.message);
+      res.status(502).json({ error: err.message, url });
     }
   }
 });
