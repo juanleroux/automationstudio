@@ -1,25 +1,25 @@
-// Maps our internal numeric dataType to Ignition string data type names
+// Maps our internal numeric dataType to Ignition DataType enum names
 const DATA_TYPE_MAP = {
-  0: 'String', 1: 'Boolean', 2: 'Byte', 3: 'Short', 4: 'Integer',
-  5: 'Byte', 6: 'Short', 7: 'Integer', 8: 'Float', 9: 'String', 10: 'Integer',
+  0: 'String', 1: 'Boolean', 2: 'Int1', 3: 'Int2', 4: 'Int4',
+  5: 'Int1', 6: 'Int2', 7: 'Int4', 8: 'Float4', 9: 'String', 10: 'Int4',
 };
 
 function ignitionDataType(val) {
   return DATA_TYPE_MAP[Number(val)] || 'String';
 }
 
-// Reverse map: Ignition string type → our numeric dataType
+// Reverse map: Ignition DataType enum → our numeric dataType
 const IGNITION_TYPE_MAP = {
   'boolean': 1, 'bool': 1,
-  'byte': 2,
-  'short': 3, 'int16': 3,
-  'integer': 4, 'int': 4, 'int32': 4,
-  'uint8': 5, 'int8': 2,
+  'int1': 2, 'byte': 2,
+  'int2': 3, 'short': 3, 'int16': 3,
+  'int4': 4, 'integer': 4, 'int': 4, 'int32': 4,
+  'int8': 4,
+  'uint8': 5,
   'uint16': 6,
   'uint32': 7,
-  'float': 8, 'float4': 8, 'float8': 8, 'double': 8,
+  'float4': 8, 'float': 8, 'float8': 8, 'double': 8,
   'string': 9,
-  'int4': 10,
 };
 
 function internalDataType(ignType) {
