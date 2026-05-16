@@ -40,6 +40,7 @@ export default function TemplateTree({ selected, onSelect }) {
   const [ignitionPath, setIgnitionPath] = useState('');
   const [ignitionFetch, setIgnitionFetch] = useState({ loading: false, error: null, udts: [] });
   const [selectedUdts, setSelectedUdts] = useState(new Set());
+  const [ignitionFilter, setIgnitionFilter] = useState('');
 
   const renameInputRef = useRef(null);
 
@@ -706,6 +707,7 @@ export default function TemplateTree({ selected, onSelect }) {
                     setIgnitionPath(project?.engineering?.folderPath || '');
                     setIgnitionFetch({ loading: false, error: null, udts: [] });
                     setSelectedUdts(new Set());
+                    setIgnitionFilter('');
                     setShowImportIgnition(true);
                     setContextMenu(null);
                   }}>
@@ -1033,8 +1035,22 @@ export default function TemplateTree({ selected, onSelect }) {
                     </button>
                   </div>
                 </div>
+                <div className="relative mb-1">
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input
+                    type="text"
+                    value={ignitionFilter}
+                    onChange={e => setIgnitionFilter(e.target.value)}
+                    placeholder="Filter by name or folder…"
+                    style={{ paddingLeft: 24, fontSize: 12, padding: '4px 4px 4px 24px' }}
+                  />
+                </div>
                 <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4 }}>
-                  {ignitionFetch.udts.map(r => {
+                  {ignitionFetch.udts.filter(r => {
+                    if (!ignitionFilter.trim()) return true;
+                    const q = ignitionFilter.toLowerCase();
+                    return r.udtType.name.toLowerCase().includes(q) || r.folderPath.toLowerCase().includes(q);
+                  }).map(r => {
                     const name = r.udtType.name;
                     const udtKey = `${r.folderPath}/${name}`;
                     const paramCount = Object.keys(r.udtType.parameters || {}).length;
