@@ -136,7 +136,8 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
   const now = new Date().toISOString();
   let attrId = 1;
   const attributes = [];
-  const templateName = folderPath ? `${folderPath}/${udtType.name}` : udtType.name;
+  const cleanPath = (folderPath || '').replace(/^_types_\/?/i, '');
+  const templateName = cleanPath ? `${cleanPath}/${udtType.name}` : udtType.name;
 
   // Parameters → parameter: true attributes
   Object.entries(udtType.parameters || {}).forEach(([name, param]) => {
