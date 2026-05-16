@@ -23,7 +23,7 @@ router.post('/upload', async (req, res) => {
   if (!gatewayUrl) return res.status(400).json({ error: 'Gateway URL required' });
 
   const base = normalizeUrl(gatewayUrl);
-  let url = `${base}/data/api/v1/tags/import?provider=${encodeURIComponent(provider)}&collisionPolicy=${encodeURIComponent(collisionPolicy)}`;
+  let url = `${base}/data/api/v1/tags/import?provider=${encodeURIComponent(provider)}&collisionPolicy=${encodeURIComponent(collisionPolicy)}&type=json`;
   if (folderPath) url += `&path=${encodeURIComponent(folderPath)}`;
 
   console.log('[Ignition import] POST', url);
