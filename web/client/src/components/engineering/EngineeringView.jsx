@@ -240,9 +240,16 @@ export default function EngineeringView() {
       return;
     }
     const eng = project.engineering;
-    const payload = buildIgnitionPayload(selectedTemplate, eng.folderPath);
+    const payload = buildIgnitionPayload(selectedTemplate);
     try {
-      await uploadToIgnition({ gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey, payload });
+      await uploadToIgnition({
+        gatewayUrl: eng.ignitionGateway,
+        apiKey: eng.apiKey,
+        provider: eng.provider || 'default',
+        collisionPolicy: eng.collisionPolicy || 'Overwrite',
+        folderPath: eng.folderPath || '',
+        payload,
+      });
       toast.success(`Uploaded "${selectedTemplate.name}" to Ignition`);
     } catch (err) {
       const detail = err.response?.data?.error || err.message;
