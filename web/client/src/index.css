@@ -33,11 +33,11 @@
   --text-secondary:#333333;
   --text-muted:    #4a4a4a;
   --text-disabled: #6e6e6e;
-  --accent:        #3ecf8e;
-  --accent-dim:    #2db87a;
-  --accent-bg:     rgba(62,207,142,0.12);
-  --danger:        #e55353;
-  --danger-bg:     rgba(229,83,83,0.12);
+  --accent:        #0f8a5f;
+  --accent-dim:    #0a7050;
+  --accent-bg:     rgba(15,138,95,0.10);
+  --danger:        #c0392b;
+  --danger-bg:     rgba(192,57,43,0.10);
   --scrollbar-thumb: #bbb;
 }
 
