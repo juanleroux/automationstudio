@@ -1,0 +1,4 @@
+**/node_modules
+client/dist
+server/projects
+server/app.config.json
