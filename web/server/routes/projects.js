@@ -112,11 +112,13 @@ router.get('/:filename', (req, res) => {
 // PUT /api/projects/:filename - save project
 router.put('/:filename', (req, res) => {
   try {
+    ensureProjectsDir();
     const filePath = getProjectPath(req.params.filename);
     const data = req.body;
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
     res.json({ success: true, filename: req.params.filename });
   } catch (err) {
+    console.error('PUT /api/projects error:', err);
     res.status(500).json({ error: err.message });
   }
 });
