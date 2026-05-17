@@ -55,7 +55,8 @@ export default function SettingsModal({ onClose }) {
       toast.success('Settings saved');
       onClose();
     } catch (err) {
-      toast.error('Failed to save: ' + err.message);
+      const detail = err.response?.data?.error || err.message;
+      toast.error('Failed to save: ' + detail);
     } finally {
       setSaving(false);
     }
