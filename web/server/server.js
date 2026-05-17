@@ -50,6 +50,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Serve built React app (production / Docker)
+const distDir = path.join(__dirname, '../client/dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get('*', (req, res) => res.sendFile(path.join(distDir, 'index.html')));
+}
+
 app.listen(PORT, () => {
   console.log(`Automation Studio Server running on http://localhost:${PORT}`);
   console.log(`Projects directory: ${projectsDir}`);
