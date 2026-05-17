@@ -9,6 +9,7 @@ const configRouter = require('./routes/config');
 
 const app = express();
 const PORT = 3001;
+const HOST = '0.0.0.0';
 
 // Ensure projects directory exists
 const projectsDir = path.join(__dirname, 'projects');
@@ -57,7 +58,7 @@ if (fs.existsSync(distDir)) {
   app.get('*', (req, res) => res.sendFile(path.join(distDir, 'index.html')));
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   console.log(`Automation Studio Server running on http://localhost:${PORT}`);
   console.log(`Projects directory: ${projectsDir}`);
   console.log(`Config file: ${configPath}`);
