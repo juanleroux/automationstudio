@@ -17,8 +17,13 @@ if (!fs.existsSync(projectsDir)) {
   fs.mkdirSync(projectsDir, { recursive: true });
 }
 
-// Ensure config file exists
-const configPath = path.join(__dirname, 'app.config.json');
+// Ensure config directory and file exist
+// Named Docker volumes mount as directories, so config lives in a config/ subdir
+const configDir = path.join(__dirname, 'config');
+const configPath = path.join(configDir, 'app.config.json');
+if (!fs.existsSync(configDir)) {
+  fs.mkdirSync(configDir, { recursive: true });
+}
 if (!fs.existsSync(configPath)) {
   const defaultConfig = {
     proposal: {
