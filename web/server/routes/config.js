@@ -30,6 +30,7 @@ router.get('/', (req, res) => {
     const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     res.json(data);
   } catch (err) {
+    console.error('GET /api/config error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -41,6 +42,7 @@ router.put('/', (req, res) => {
     fs.writeFileSync(configPath, JSON.stringify(data, null, 2));
     res.json({ success: true });
   } catch (err) {
+    console.error('PUT /api/config error:', err);
     res.status(500).json({ error: err.message });
   }
 });
