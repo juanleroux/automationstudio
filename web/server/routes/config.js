@@ -3,7 +3,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 
-const configPath = path.join(__dirname, '..', 'app.config.json');
+const configPath = path.join(__dirname, '..', 'config', 'app.config.json');
 
 // GET /api/config
 router.get('/', (req, res) => {
