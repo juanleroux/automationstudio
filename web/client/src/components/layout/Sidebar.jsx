@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   Cpu, Map, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
-  FilePlus, FolderOpen, Save, Zap, Trash2, Download, Upload
+  FilePlus, FolderOpen, FolderX, Save, Zap, Trash2, Download, Upload
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -25,6 +25,7 @@ export default function Sidebar({ activeView, onChangeView }) {
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(null);
+  const [confirmClose, setConfirmClose] = useState(false);
   const importProjectRef = useRef(null);
 
   const handleNewProject = async () => {
@@ -125,6 +126,20 @@ export default function Sidebar({ activeView, onChangeView }) {
     }
   };
 
+  const handleCloseProject = () => {
+    if (isDirty) {
+      setConfirmClose(true);
+    } else {
+      doClose();
+    }
+  };
+
+  const doClose = () => {
+    closeProject();
+    onChangeView('dashboard');
+    setConfirmClose(false);
+  };
+
   return (
     <>
       <input
@@ -215,6 +230,16 @@ export default function Sidebar({ activeView, onChangeView }) {
               >
                 <Save size={16} />
               </button>
+              {project && (
+                <button
+                  className="btn btn-ghost btn-icon w-full flex items-center justify-center"
+                  onClick={handleCloseProject}
+                  title="Close Project"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <FolderX size={16} />
+                </button>
+              )}
               <button
                 className="btn btn-ghost btn-icon w-full flex items-center justify-center"
                 onClick={() => onChangeView('settings')}
@@ -249,6 +274,15 @@ export default function Sidebar({ activeView, onChangeView }) {
               >
                 <Save size={13} /> {isSaving ? 'Saving...' : 'Save Project'}
               </button>
+              {project && (
+                <button
+                  className="btn btn-ghost w-full text-xs"
+                  style={{ padding: '5px 8px', color: 'var(--text-muted)' }}
+                  onClick={handleCloseProject}
+                >
+                  <FolderX size={13} /> Close Project
+                </button>
+              )}
               <button
                 className="btn btn-ghost w-full text-xs"
                 style={{ padding: '5px 8px' }}
@@ -382,6 +416,16 @@ export default function Sidebar({ activeView, onChangeView }) {
           danger
           onConfirm={handleDeleteProject}
           onCancel={() => setConfirmDeleteProject(null)}
+        />
+      )}
+
+      {confirmClose && (
+        <ConfirmDialog
+          title="Close Project"
+          message={`"${project?.name}" has unsaved changes. Close anyway?`}
+          danger
+          onConfirm={doClose}
+          onCancel={() => setConfirmClose(false)}
         />
       )}
     </>
