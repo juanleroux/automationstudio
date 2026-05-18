@@ -68,7 +68,7 @@ export default function ProposalView() {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   if (!project) {
-    return <div className="relative h-full"><NoProjectOpen /></div>;
+    return <NoProjectOpen />;
   }
 
   const proposal = project.proposal || {};

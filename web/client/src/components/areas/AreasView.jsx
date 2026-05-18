@@ -61,7 +61,7 @@ export default function AreasView() {
   const lastClickedKey = useRef(null);
 
   if (!project) {
-    return <div className="relative h-full"><NoProjectOpen /></div>;
+    return <NoProjectOpen />;
   }
 
   const areas = project.areas || [];

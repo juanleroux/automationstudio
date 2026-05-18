@@ -233,7 +233,7 @@ export default function EngineeringView() {
   }, [selectedTemplate, updateProject]);
 
   if (!project) {
-    return <div className="relative h-full"><NoProjectOpen /></div>;
+    return <NoProjectOpen />;
   }
 
   return (

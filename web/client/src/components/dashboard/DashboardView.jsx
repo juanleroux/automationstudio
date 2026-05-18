@@ -107,7 +107,7 @@ export default function DashboardView() {
   }, [project]);
 
   if (!project) {
-    return <div className="relative h-full"><NoProjectOpen /></div>;
+    return <NoProjectOpen />;
   }
 
   return (
