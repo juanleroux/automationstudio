@@ -365,7 +365,7 @@ export default function TemplateTree({ selected, onSelect }) {
       toast.error('Configure Ignition gateway in Settings first');
       return;
     }
-    const payload = buildIgnitionPayload(template);
+    const payload = buildIgnitionPayload(template, project.areas || []);
     try {
       await uploadToIgnition({
         gatewayUrl: eng.ignitionGateway,
@@ -448,7 +448,7 @@ export default function TemplateTree({ selected, onSelect }) {
     setContextMenu(null);
     const eng = project?.engineering;
     if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
-    const payload = buildInstancesPayload(instanceList);
+    const payload = buildInstancesPayload(instanceList, project.areas || []);
     try {
       await uploadToIgnition({
         gatewayUrl: eng.ignitionGateway,
