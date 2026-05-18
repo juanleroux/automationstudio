@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   Cpu, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
-  FilePlus, FolderOpen, FolderX, Save, Zap, Trash2, Download, Upload
+  FilePlus, FolderOpen, FolderX, Save, Zap, Trash2, Download, Upload, Edit2, Check, X
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -25,6 +25,8 @@ export default function Sidebar({ activeView, onChangeView }) {
   const [creating, setCreating] = useState(false);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [editingProject, setEditingProject] = useState(null); // { filename, name, description }
+  const [savingEdit, setSavingEdit] = useState(false);
   const importProjectRef = useRef(null);
 
   const handleNewProject = async () => {
@@ -58,6 +60,7 @@ export default function Sidebar({ activeView, onChangeView }) {
     try {
       await openProject(proj.filename);
       setShowOpenDialog(false);
+      setEditingProject(null);
       toast.success(`Opened "${proj.name}"`);
       onChangeView('dashboard');
     } catch (err) {
@@ -79,6 +82,41 @@ export default function Sidebar({ activeView, onChangeView }) {
       toast.success(`Exported "${proj.name}"`);
     } catch (err) {
       toast.error('Export failed: ' + err.message);
+    }
+  };
+
+  const handleStartEdit = async (proj, e) => {
+    e.stopPropagation();
+    try {
+      const data = await loadProject(proj.filename);
+      setEditingProject({ filename: proj.filename, name: data.name || proj.name, description: data.description || '' });
+    } catch (err) {
+      toast.error('Failed to load project: ' + err.message);
+    }
+  };
+
+  const handleSaveEdit = async (e) => {
+    e?.stopPropagation();
+    if (!editingProject || !editingProject.name.trim()) return;
+    setSavingEdit(true);
+    try {
+      const data = await loadProject(editingProject.filename);
+      await saveProject(editingProject.filename, {
+        ...data,
+        name: editingProject.name.trim(),
+        description: editingProject.description.trim(),
+      });
+      setProjects(ps => ps.map(p =>
+        p.filename === editingProject.filename
+          ? { ...p, name: editingProject.name.trim() }
+          : p
+      ));
+      toast.success('Project renamed');
+      setEditingProject(null);
+    } catch (err) {
+      toast.error('Failed to save: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -205,86 +243,43 @@ export default function Sidebar({ activeView, onChangeView }) {
         <div className="flex-shrink-0 py-2" style={{ borderTop: '1px solid var(--border)' }}>
           {collapsed ? (
             <div className="flex flex-col items-center gap-1 px-2">
-              <button
-                className="btn btn-ghost btn-icon w-full flex items-center justify-center"
-                onClick={() => setShowNewDialog(true)}
-                title="New Project"
-              >
+              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={() => setShowNewDialog(true)} title="New Project">
                 <FilePlus size={16} />
               </button>
-              <button
-                className="btn btn-ghost btn-icon w-full flex items-center justify-center"
-                onClick={handleOpenDialog}
-                title="Open Project"
-              >
+              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleOpenDialog} title="Open Project">
                 <FolderOpen size={16} />
               </button>
-              <button
-                className="btn btn-ghost btn-icon w-full flex items-center justify-center"
-                onClick={handleSave}
-                disabled={!project || isSaving}
-                title="Save"
-              >
+              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleSave} disabled={!project || isSaving} title="Save">
                 <Save size={16} />
               </button>
               {project && (
-                <button
-                  className="btn btn-ghost btn-icon w-full flex items-center justify-center"
-                  onClick={handleCloseProject}
-                  title="Close Project"
-                  style={{ color: 'var(--text-muted)' }}
-                >
+                <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleCloseProject} title="Close Project" style={{ color: 'var(--text-muted)' }}>
                   <FolderX size={16} />
                 </button>
               )}
-              <button
-                className="btn btn-ghost btn-icon w-full flex items-center justify-center"
-                onClick={() => onChangeView('settings')}
-                title="Settings"
-              >
+              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={() => onChangeView('settings')} title="Settings">
                 <Settings size={16} />
               </button>
             </div>
           ) : (
             <div className="px-3 flex flex-col gap-1">
               <div className="flex gap-1">
-                <button
-                  className="btn btn-secondary flex-1 text-xs"
-                  style={{ padding: '5px 8px' }}
-                  onClick={() => setShowNewDialog(true)}
-                >
+                <button className="btn btn-secondary flex-1 text-xs" style={{ padding: '5px 8px' }} onClick={() => setShowNewDialog(true)}>
                   <FilePlus size={13} /> New
                 </button>
-                <button
-                  className="btn btn-secondary flex-1 text-xs"
-                  style={{ padding: '5px 8px' }}
-                  onClick={handleOpenDialog}
-                >
+                <button className="btn btn-secondary flex-1 text-xs" style={{ padding: '5px 8px' }} onClick={handleOpenDialog}>
                   <FolderOpen size={13} /> Open
                 </button>
               </div>
-              <button
-                className="btn btn-primary w-full text-xs"
-                style={{ padding: '5px 8px' }}
-                onClick={handleSave}
-                disabled={!project || isSaving}
-              >
+              <button className="btn btn-primary w-full text-xs" style={{ padding: '5px 8px' }} onClick={handleSave} disabled={!project || isSaving}>
                 <Save size={13} /> {isSaving ? 'Saving...' : 'Save Project'}
               </button>
               {project && (
-                <button
-                  className="btn btn-ghost w-full text-xs"
-                  style={{ padding: '5px 8px', color: 'var(--text-muted)' }}
-                  onClick={handleCloseProject}
-                >
+                <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={handleCloseProject}>
                   <FolderX size={13} /> Close Project
                 </button>
               )}
-              <button
-                className="btn btn-ghost w-full text-xs"
-                style={{ padding: '5px 8px' }}
-                onClick={() => onChangeView('settings')}
-              >
+              <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px' }} onClick={() => onChangeView('settings')}>
                 <Settings size={13} /> Settings
               </button>
             </div>
@@ -309,21 +304,12 @@ export default function Sidebar({ activeView, onChangeView }) {
           width={400}
           footer={
             <>
-              <button
-                className="btn btn-secondary flex items-center gap-2"
-                onClick={() => importProjectRef.current?.click()}
-              >
+              <button className="btn btn-secondary flex items-center gap-2" onClick={() => importProjectRef.current?.click()}>
                 <Upload size={13} /> Import
               </button>
               <div style={{ flex: 1 }} />
-              <button className="btn btn-secondary" onClick={() => { setShowNewDialog(false); setNewName(''); }}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleNewProject}
-                disabled={!newName.trim() || creating}
-              >
+              <button className="btn btn-secondary" onClick={() => { setShowNewDialog(false); setNewName(''); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleNewProject} disabled={!newName.trim() || creating}>
                 {creating ? 'Creating...' : 'Create'}
               </button>
             </>
@@ -347,13 +333,10 @@ export default function Sidebar({ activeView, onChangeView }) {
       {showOpenDialog && (
         <Modal
           title="Open Project"
-          onClose={() => setShowOpenDialog(false)}
+          onClose={() => { setShowOpenDialog(false); setEditingProject(null); }}
           width={500}
           footer={
-            <button
-              className="btn btn-secondary flex items-center gap-2"
-              onClick={() => importProjectRef.current?.click()}
-            >
+            <button className="btn btn-secondary flex items-center gap-2" onClick={() => importProjectRef.current?.click()}>
               <Upload size={13} /> Import Project
             </button>
           }
@@ -366,41 +349,84 @@ export default function Sidebar({ activeView, onChangeView }) {
             </div>
           ) : (
             <div className="flex flex-col gap-1">
-              {projects.map(proj => (
-                <div
-                  key={proj.filename}
-                  className="flex items-center gap-2 p-3 rounded-md transition-colors"
-                  style={{ background: 'var(--bg-main)', border: '1px solid var(--border)' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-                >
+              {projects.map(proj => {
+                const isEditing = editingProject?.filename === proj.filename;
+                return (
                   <div
-                    className="flex-1 min-w-0 cursor-pointer"
-                    onClick={() => handleOpenProject(proj)}
+                    key={proj.filename}
+                    className="flex flex-col p-3 rounded-md transition-colors"
+                    style={{ background: 'var(--bg-main)', border: `1px solid ${isEditing ? 'var(--accent)' : 'var(--border)'}` }}
+                    onMouseEnter={e => { if (!isEditing) e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                    onMouseLeave={e => { if (!isEditing) e.currentTarget.style.borderColor = 'var(--border)'; }}
                   >
-                    <div className="text-sm font-medium text-text-primary">{proj.name}</div>
-                    <div className="text-xs text-text-muted mt-0.5">{proj.filename}</div>
+                    {isEditing ? (
+                      /* Edit mode */
+                      <div className="flex flex-col gap-2" onClick={e => e.stopPropagation()}>
+                        <div>
+                          <label className="block text-xs text-text-muted mb-1">Name</label>
+                          <input
+                            type="text"
+                            value={editingProject.name}
+                            onChange={e => setEditingProject(p => ({ ...p, name: e.target.value }))}
+                            style={{ fontSize: 13, padding: '4px 8px' }}
+                            autoFocus
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingProject(null); }}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-muted mb-1">Description</label>
+                          <input
+                            type="text"
+                            value={editingProject.description}
+                            onChange={e => setEditingProject(p => ({ ...p, description: e.target.value }))}
+                            placeholder="Optional description"
+                            style={{ fontSize: 13, padding: '4px 8px' }}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingProject(null); }}
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 mt-1">
+                          <button className="btn btn-secondary text-xs" style={{ padding: '3px 10px' }} onClick={() => setEditingProject(null)}>
+                            <X size={12} /> Cancel
+                          </button>
+                          <button
+                            className="btn btn-primary text-xs"
+                            style={{ padding: '3px 10px' }}
+                            onClick={handleSaveEdit}
+                            disabled={!editingProject.name.trim() || savingEdit}
+                          >
+                            <Check size={12} /> {savingEdit ? 'Saving...' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Normal mode */
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProject(proj)}>
+                          <div className="text-sm font-medium text-text-primary">{proj.name}</div>
+                          <div className="text-xs text-text-muted mt-0.5">{proj.filename}</div>
+                        </div>
+                        <div className="text-xs text-text-muted flex-shrink-0">
+                          {new Date(proj.modified).toLocaleDateString()}
+                        </div>
+                        <button className="btn btn-ghost btn-icon flex-shrink-0" title="Rename" onClick={e => handleStartEdit(proj, e)}>
+                          <Edit2 size={13} />
+                        </button>
+                        <button className="btn btn-ghost btn-icon flex-shrink-0" title="Export project" onClick={e => handleExportProject(proj, e)}>
+                          <Download size={13} />
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-icon flex-shrink-0"
+                          title="Delete project"
+                          style={{ color: '#e55353' }}
+                          onClick={e => { e.stopPropagation(); setConfirmDeleteProject(proj); }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-text-muted flex-shrink-0">
-                    {new Date(proj.modified).toLocaleDateString()}
-                  </div>
-                  <button
-                    className="btn btn-ghost btn-icon flex-shrink-0"
-                    title="Export project"
-                    onClick={e => handleExportProject(proj, e)}
-                  >
-                    <Download size={13} />
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-icon flex-shrink-0"
-                    title="Delete project"
-                    style={{ color: '#e55353' }}
-                    onClick={e => { e.stopPropagation(); setConfirmDeleteProject(proj); }}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Modal>
