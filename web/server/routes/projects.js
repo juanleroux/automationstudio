@@ -16,6 +16,10 @@ function getProjectPath(filename) {
   return path.join(projectsDir, safe);
 }
 
+function nameToFilename(name) {
+  return `${name.replace(/[^a-zA-Z0-9_\-]/g, '_')}.atsproj.json`;
+}
+
 // GET /api/projects - list all project files
 router.get('/', (req, res) => {
   try {
@@ -26,16 +30,13 @@ router.get('/', (req, res) => {
         const filePath = path.join(projectsDir, f);
         const stat = fs.statSync(filePath);
         let name = f.replace('.atsproj.json', '');
+        let description = '';
         try {
           const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
           if (data.name) name = data.name;
+          if (data.description) description = data.description;
         } catch (e) {}
-        return {
-          filename: f,
-          name,
-          size: stat.size,
-          modified: stat.mtime.toISOString()
-        };
+        return { filename: f, name, description, size: stat.size, modified: stat.mtime.toISOString() };
       });
     res.json(files);
   } catch (err) {
@@ -50,7 +51,7 @@ router.post('/', (req, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'Name required' });
 
-    const filename = `${name.replace(/[^a-zA-Z0-9_\-]/g, '_')}.atsproj.json`;
+    const filename = nameToFilename(name);
     const filePath = getProjectPath(filename);
 
     if (fs.existsSync(filePath)) {
@@ -60,6 +61,7 @@ router.post('/', (req, res) => {
     const now = new Date().toISOString();
     const project = {
       name,
+      description: '',
       templates: [],
       areas: [
         { id: 1, name: 'Area 1', description: '', lastModification: now }
@@ -119,6 +121,36 @@ router.put('/:filename', (req, res) => {
     res.json({ success: true, filename: req.params.filename });
   } catch (err) {
     console.error('PUT /api/projects error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/projects/:filename - rename project (updates name, description, and filename)
+router.patch('/:filename', (req, res) => {
+  try {
+    const { newName, description } = req.body;
+    if (!newName || !newName.trim()) return res.status(400).json({ error: 'newName required' });
+
+    const oldPath = getProjectPath(req.params.filename);
+    if (!fs.existsSync(oldPath)) return res.status(404).json({ error: 'Project not found' });
+
+    const newFilename = nameToFilename(newName.trim());
+    const newPath = getProjectPath(newFilename);
+
+    if (newPath !== oldPath && fs.existsSync(newPath)) {
+      return res.status(409).json({ error: 'A project with this name already exists' });
+    }
+
+    const data = JSON.parse(fs.readFileSync(oldPath, 'utf8'));
+    data.name = newName.trim();
+    if (description !== undefined) data.description = description.trim();
+
+    fs.writeFileSync(newPath, JSON.stringify(data, null, 2));
+    if (newPath !== oldPath) fs.unlinkSync(oldPath);
+
+    res.json({ success: true, filename: newFilename });
+  } catch (err) {
+    console.error('PATCH /api/projects error:', err);
     res.status(500).json({ error: err.message });
   }
 });
