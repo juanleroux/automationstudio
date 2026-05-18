@@ -5,6 +5,7 @@ import AttributeGrid from './AttributeGrid';
 import ProfilePanel, { ProfileForm } from './ProfilePanel';
 import Modal from '../shared/Modal';
 import { useProject } from '../../context/ProjectContext';
+import AreasView from '../areas/AreasView';
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
@@ -12,7 +13,6 @@ const DEFAULT_WIDTH = 260;
 
 const BLANK_PROFILE = { name: '', description: '', exportType: 0, formatType: 0, tabularExportDelimiter: ',', structuralExportTemplate: '', customFormat: '' };
 
-// Extracted as a proper top-level component so React doesn't remount it every render
 function RightPanel({ selected, selectedTemplate, selectedInstance, project, onUpdateTemplateAttrs, onUpdateInstanceAttrs, onUpdateTemplate }) {
   const [activeTab, setActiveTab] = useState(0);
   const [showAddProfileModal, setShowAddProfileModal] = useState(false);
@@ -65,7 +65,6 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
 
   return (
     <div className="flex flex-col h-full">
-      {/* Add Profile Modal */}
       {showAddProfileModal && (
         <Modal
           title="Add Profile"
@@ -82,7 +81,6 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
         </Modal>
       )}
 
-      {/* Tab bar */}
       <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-main)' }}>
         <div className="flex-1 flex overflow-x-auto" style={{ border: 'none' }}>
           {tabs.map((tab, i) => (
@@ -108,7 +106,6 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
         </div>
       </div>
 
-      {/* Tab content */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 0 ? (
           <AttributeGrid
@@ -128,7 +125,6 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
         )}
       </div>
 
-      {/* Status bar */}
       <div className="flex-shrink-0 px-3 py-1 text-xs flex items-center gap-4" style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-main)', color: 'var(--text-disabled)' }}>
         {mode === 'template' && selectedTemplate && (
           <>
@@ -151,6 +147,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
 
 export default function EngineeringView() {
   const { project, updateProject } = useProject();
+  const [assetTab, setAssetTab] = useState('derivation');
   const [selected, setSelected] = useState(null);
   const [paneWidth, setPaneWidth] = useState(DEFAULT_WIDTH);
   const dragging = useRef(false);
@@ -246,26 +243,49 @@ export default function EngineeringView() {
   }
 
   return (
-    <div className="flex h-full">
-      <div
-        className="flex flex-col flex-shrink-0 overflow-hidden"
-        style={{ width: paneWidth, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}
-      >
-        <TemplateTree selected={selected} onSelect={setSelected} />
+    <div className="flex flex-col h-full">
+      {/* View tab bar */}
+      <div className="flex flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+        {['derivation', 'model'].map(tab => (
+          <button
+            key={tab}
+            className={`tab-item ${assetTab === tab ? 'active' : ''}`}
+            onClick={() => setAssetTab(tab)}
+            style={{ textTransform: 'capitalize' }}
+          >
+            {tab === 'derivation' ? 'Derivation' : 'Model'}
+          </button>
+        ))}
       </div>
 
-      <div className="resize-handle" onMouseDown={onMouseDown} />
+      {/* Tab content */}
+      <div className="flex-1 overflow-hidden">
+        {assetTab === 'derivation' && (
+          <div className="flex h-full">
+            <div
+              className="flex flex-col flex-shrink-0 overflow-hidden"
+              style={{ width: paneWidth, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}
+            >
+              <TemplateTree selected={selected} onSelect={setSelected} />
+            </div>
 
-      <div className="flex-1 overflow-hidden" style={{ background: 'var(--bg-main)' }}>
-        <RightPanel
-          selected={selected}
-          selectedTemplate={selectedTemplate}
-          selectedInstance={selectedInstance}
-          project={project}
-          onUpdateTemplateAttrs={handleUpdateTemplateAttrs}
-          onUpdateInstanceAttrs={handleUpdateInstanceAttrs}
-          onUpdateTemplate={handleUpdateTemplate}
-        />
+            <div className="resize-handle" onMouseDown={onMouseDown} />
+
+            <div className="flex-1 overflow-hidden" style={{ background: 'var(--bg-main)' }}>
+              <RightPanel
+                selected={selected}
+                selectedTemplate={selectedTemplate}
+                selectedInstance={selectedInstance}
+                project={project}
+                onUpdateTemplateAttrs={handleUpdateTemplateAttrs}
+                onUpdateInstanceAttrs={handleUpdateInstanceAttrs}
+                onUpdateTemplate={handleUpdateTemplate}
+              />
+            </div>
+          </div>
+        )}
+
+        {assetTab === 'model' && <AreasView />}
       </div>
     </div>
   );
