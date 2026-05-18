@@ -4,7 +4,6 @@ import { useProject } from '../../context/ProjectContext';
 const VIEW_LABELS = {
   dashboard: 'Dashboard',
   engineering: 'Assets',
-  areas: 'Model',
   proposal: 'Proposal',
   settings: 'Settings',
 };
