@@ -233,7 +233,7 @@ export default function AreasView() {
                       <button
                         className="text-text-muted hover:text-text-primary"
                         onClick={() => toggleExpand(area.id)}
-                        style={{ padding: 2, visibility: (hasChildren || instances.length > 0) ? 'visible' : 'hidden' }}
+                        style={{ padding: 2, visibility: (hasChildren || instances.length > 0 || !area.isSystem) ? 'visible' : 'hidden' }}
                       >
                         {isExp ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                       </button>
