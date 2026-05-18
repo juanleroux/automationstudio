@@ -44,7 +44,6 @@ function EditCell({ value, onChange, disabled, type = 'text', style }) {
     <div
       className="editable-cell"
       onClick={() => { setEditing(true); setVal(value); }}
-      title={value || undefined}
       style={{ cursor: 'text', minHeight: 22, ...style }}
     >
       {value || <span style={{ color: 'var(--text-disabled)' }}>—</span>}
@@ -106,15 +105,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto">
-        <table className="data-table" style={{ tableLayout: 'fixed' }}>
-          <colgroup>
-            <col style={{ width: isTemplate ? '18%' : '18%' }} />
-            <col style={{ width: '22%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: isTemplate ? '22%' : '22%' }} />
-            <col style={{ width: '10%' }} />
-            {isTemplate && <col style={{ width: '5%' }} />}
-          </colgroup>
+        <table className="data-table" style={{ tableLayout: 'auto', width: 'auto', minWidth: '100%' }}>
           <thead>
             <tr>
               <th onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>
