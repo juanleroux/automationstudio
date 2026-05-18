@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
-import { listProjects, createProject, loadProject, saveProject, deleteProject } from '../../api/client';
+import { listProjects, createProject, loadProject, saveProject, deleteProject, renameProject } from '../../api/client';
 import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
 
@@ -100,15 +100,14 @@ export default function Sidebar({ activeView, onChangeView }) {
     if (!editingProject || !editingProject.name.trim()) return;
     setSavingEdit(true);
     try {
-      const data = await loadProject(editingProject.filename);
-      await saveProject(editingProject.filename, {
-        ...data,
-        name: editingProject.name.trim(),
-        description: editingProject.description.trim(),
-      });
+      const result = await renameProject(
+        editingProject.filename,
+        editingProject.name.trim(),
+        editingProject.description,
+      );
       setProjects(ps => ps.map(p =>
         p.filename === editingProject.filename
-          ? { ...p, name: editingProject.name.trim() }
+          ? { ...p, name: editingProject.name.trim(), filename: result.filename }
           : p
       ));
       toast.success('Project renamed');
