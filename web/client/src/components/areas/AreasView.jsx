@@ -289,12 +289,33 @@ export default function AreasView() {
             </tr>
           </thead>
           <tbody>
-            {allAreas.map(area => {
+            {allAreas.map((area, areaIdx) => {
               const instances = areaInstances[area.id] || [];
               const isExp = expanded.has(area.id);
               const isDragTarget = dragOver === area.id;
               const hasChildren = area.children?.length > 0;
               const indent = (area.depth || 0) * 20;
+              const currentDepth = area.depth || 0;
+
+              // Determine which expanded non-system areas' subtrees end after this area's content.
+              // A parent P closes here when the next sibling is shallower than P (depth-first order).
+              const nextArea = areaIdx + 1 < allAreas.length ? allAreas[areaIdx + 1] : null;
+              const nextDepth = nextArea ? (nextArea.depth || 0) : -1;
+              const closingAreas = [];
+              if (nextDepth <= currentDepth) {
+                // The current area itself closes here
+                if (isExp && !area.isSystem) closingAreas.push({ id: area.id, indent });
+                // Each ancestor at a depth that also closes here (innermost first)
+                for (let d = currentDepth - 1; d >= nextDepth; d--) {
+                  for (let j = areaIdx - 1; j >= 0; j--) {
+                    if ((allAreas[j].depth || 0) === d) {
+                      if (expanded.has(allAreas[j].id) && !allAreas[j].isSystem)
+                        closingAreas.push({ id: allAreas[j].id, indent: d * 20 });
+                      break;
+                    }
+                  }
+                }
+              }
 
               return (
                 <React.Fragment key={area.id}>
@@ -445,16 +466,16 @@ export default function AreasView() {
                       </td>
                     </tr>
                   )}
-                  {isExp && !area.isSystem && (
-                    <tr onClick={() => openAddArea(area.id)} style={{ cursor: 'pointer', background: '#1a1a1a' }} className="add-row">
+                  {closingAreas.map(ca => (
+                    <tr key={`add-${ca.id}`} onClick={() => openAddArea(ca.id)} style={{ cursor: 'pointer', background: '#1a1a1a' }} className="add-row">
                       <td></td>
-                      <td colSpan={4} style={{ paddingLeft: 36 + indent, padding: '5px 12px 5px ' + (36 + indent) + 'px' }}>
+                      <td colSpan={4} style={{ padding: `5px 12px 5px ${36 + ca.indent}px` }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
                           <Plus size={13} /> Add Area
                         </span>
                       </td>
                     </tr>
-                  )}
+                  ))}
                 </React.Fragment>
               );
             })}
