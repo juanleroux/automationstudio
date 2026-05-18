@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function NoProjectOpen() {
   return (
-    <div style={{ position: 'absolute', top: 28, left: 28, display: 'flex', alignItems: 'center', gap: 14 }}>
+    <div style={{ position: 'absolute', bottom: 28, left: 28, display: 'flex', alignItems: 'center', gap: 14 }}>
       <ArrowLeft
         size={28}
         className="arrow-heartbeat"
