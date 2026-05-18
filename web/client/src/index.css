@@ -82,6 +82,10 @@ body {
   padding: 6px 12px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 0;
 }
 .data-table tbody tr:hover { background: var(--bg-card); }
 .data-table tbody tr.add-row:hover span { color: var(--accent); }
@@ -90,7 +94,7 @@ body {
 .data-table tbody tr.selected td { color: var(--text-primary); }
 
 /* ── Editable cell ───────────────────────────────────────────── */
-.editable-cell { cursor: text; min-width: 80px; }
+.editable-cell { cursor: text; min-width: 80px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .editable-cell:focus-within { outline: 1px solid var(--accent); border-radius: 2px; }
 
 /* ── Tree ────────────────────────────────────────────────────── */

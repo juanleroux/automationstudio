@@ -44,6 +44,7 @@ function EditCell({ value, onChange, disabled, type = 'text', style }) {
     <div
       className="editable-cell"
       onClick={() => { setEditing(true); setVal(value); }}
+      title={value || undefined}
       style={{ cursor: 'text', minHeight: 22, ...style }}
     >
       {value || <span style={{ color: 'var(--text-disabled)' }}>—</span>}
