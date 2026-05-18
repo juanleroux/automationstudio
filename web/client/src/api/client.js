@@ -10,6 +10,8 @@ export const listProjects = () => api.get('/projects').then(r => r.data);
 export const createProject = (name) => api.post('/projects', { name }).then(r => r.data);
 export const loadProject = (filename) => api.get(`/projects/${filename}`).then(r => r.data);
 export const saveProject = (filename, data) => api.put(`/projects/${filename}`, data).then(r => r.data);
+export const renameProject = (filename, newName, description) =>
+  api.patch(`/projects/${filename}`, { newName, description }).then(r => r.data);
 export const deleteProject = (filename) => api.delete(`/projects/${filename}`).then(r => r.data);
 
 // Config
