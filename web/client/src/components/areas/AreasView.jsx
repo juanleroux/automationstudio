@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { Plus, Trash2, Edit2, Map, Tag, ChevronDown, ChevronRight, Check, X } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -10,14 +10,12 @@ function nextId(arr) {
   return Math.max(...arr.map(x => x.id)) + 1;
 }
 
-// Build nested tree from flat areas array using parentId
 function buildTree(areas, parentId = null) {
   return areas
     .filter(a => (a.parentId ?? null) === parentId)
     .map(a => ({ ...a, children: buildTree(areas, a.id) }));
 }
 
-// Flatten tree into ordered rows, only including children of expanded nodes
 function flattenVisible(nodes, expanded, depth = 0) {
   const rows = [];
   for (const node of nodes) {
@@ -29,7 +27,6 @@ function flattenVisible(nodes, expanded, depth = 0) {
   return rows;
 }
 
-// Collect all descendant IDs of an area
 function collectDescendants(areas, areaId) {
   const ids = [];
   const children = areas.filter(a => a.parentId === areaId);
@@ -40,18 +37,27 @@ function collectDescendants(areas, areaId) {
   return ids;
 }
 
+// Stable key for an instance used in selection sets
+function instKey(inst) {
+  return `${inst.templateId}_${inst.id}`;
+}
+
 export default function AreasView() {
   const { project, updateProject } = useProject();
   const toast = useToast();
 
   const [expanded, setExpanded] = useState(new Set([1]));
   const [editingArea, setEditingArea] = useState(null);
-  const [addParentId, setAddParentId] = useState(null); // null = top-level
+  const [addParentId, setAddParentId] = useState(null);
   const [showAddArea, setShowAddArea] = useState(false);
   const [newArea, setNewArea] = useState({ name: '', description: '' });
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   const [dragging, setDragging] = useState(null);
+
+  // Multi-select state
+  const [selected, setSelected] = useState(new Set());
+  const lastClickedKey = useRef(null);
 
   if (!project) {
     return (
@@ -67,7 +73,6 @@ export default function AreasView() {
   const areas = project.areas || [];
   const templates = project.templates || [];
 
-  // Build area → instances map
   const areaInstances = {};
   areas.forEach(a => { areaInstances[a.id] = []; });
   areaInstances[0] = [];
@@ -87,6 +92,11 @@ export default function AreasView() {
     ...visibleAreas
   ];
 
+  // Flat ordered list of all currently visible instance keys (for shift-range)
+  const visibleInstKeys = allAreas.flatMap(area =>
+    expanded.has(area.id) ? (areaInstances[area.id] || []).map(instKey) : []
+  );
+
   const toggleExpand = (id) => {
     setExpanded(prev => {
       const s = new Set(prev);
@@ -99,7 +109,6 @@ export default function AreasView() {
     setAddParentId(parentId);
     setNewArea({ name: '', description: '' });
     setShowAddArea(true);
-    // Auto-expand parent so the new child is visible
     if (parentId !== null) {
       setExpanded(prev => new Set([...prev, parentId]));
     }
@@ -155,35 +164,102 @@ export default function AreasView() {
     toast.success(`Area deleted${extra} (instances moved to Unassigned)`);
   };
 
-  const moveInstance = (templateId, instanceId, targetAreaId) => {
+  // Move a batch of instances [{templateId, id}] to targetAreaId
+  const moveInstances = (items, targetAreaId) => {
+    const byTemplate = {};
+    items.forEach(({ templateId, id }) => {
+      if (!byTemplate[templateId]) byTemplate[templateId] = new Set();
+      byTemplate[templateId].add(id);
+    });
     updateProject(p => ({
       ...p,
-      templates: p.templates.map(t =>
-        t.id === templateId
-          ? { ...t, instances: (t.instances || []).map(i => i.id === instanceId ? { ...i, areaId: targetAreaId } : i) }
-          : t
-      )
+      templates: p.templates.map(t => {
+        const ids = byTemplate[t.id];
+        if (!ids) return t;
+        return {
+          ...t,
+          instances: (t.instances || []).map(i =>
+            ids.has(i.id) ? { ...i, areaId: targetAreaId } : i
+          )
+        };
+      })
     }));
   };
 
-  const handleDragStart = (e, templateId, instanceId) => {
-    setDragging({ templateId, instanceId });
+  // Selection click handler — supports Ctrl and Shift
+  const handleInstanceClick = (e, key, areaInstList) => {
+    e.stopPropagation();
+    if (e.shiftKey && lastClickedKey.current) {
+      // Select range between last clicked and current in visible order
+      const a = visibleInstKeys.indexOf(lastClickedKey.current);
+      const b = visibleInstKeys.indexOf(key);
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        setSelected(prev => {
+          const s = new Set(prev);
+          visibleInstKeys.slice(lo, hi + 1).forEach(k => s.add(k));
+          return s;
+        });
+        return;
+      }
+    }
+    setSelected(prev => {
+      const s = new Set(prev);
+      if (e.ctrlKey || e.metaKey) {
+        s.has(key) ? s.delete(key) : s.add(key);
+      } else {
+        if (s.size === 1 && s.has(key)) {
+          s.clear(); // click selected item again to deselect
+        } else {
+          s.clear();
+          s.add(key);
+        }
+      }
+      return s;
+    });
+    lastClickedKey.current = key;
+  };
+
+  const handleDragStart = (e, inst) => {
+    const key = instKey(inst);
+    // If dragging an unselected row, make it the sole selection
+    if (!selected.has(key)) {
+      setSelected(new Set([key]));
+      lastClickedKey.current = key;
+    }
+    // Encode which instances are being dragged via dataTransfer
+    const draggingKeys = selected.has(key) ? [...selected] : [key];
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify(draggingKeys));
+    setDragging(draggingKeys);
   };
 
   const handleDrop = (e, targetAreaId) => {
     e.preventDefault();
-    if (!dragging) return;
-    moveInstance(dragging.templateId, dragging.instanceId, targetAreaId);
-    toast.success('Instance moved');
+    const payload = dragging;
     setDragOver(null);
     setDragging(null);
+    if (!payload?.length) return;
+
+    // Resolve keys back to {templateId, id} pairs
+    const items = payload.map(k => {
+      const [templateId, id] = k.split('_').map(Number);
+      return { templateId, id };
+    });
+
+    moveInstances(items, targetAreaId);
+    setSelected(new Set());
+    toast.success(`${items.length} instance${items.length > 1 ? 's' : ''} moved`);
   };
 
   const parentArea = addParentId !== null ? areas.find(a => a.id === addParentId) : null;
 
   return (
-    <div className="flex flex-col h-full" style={{ background: '#1c1c1c' }}>
+    <div
+      className="flex flex-col h-full"
+      style={{ background: '#1c1c1c' }}
+      onClick={() => setSelected(new Set())} // click outside deselects
+    >
       {/* Header */}
       <div
         className="flex items-center justify-between px-5 py-3 flex-shrink-0"
@@ -193,6 +269,9 @@ export default function AreasView() {
           <h2 className="text-sm font-semibold text-text-primary">Model</h2>
           <p className="text-xs text-text-muted">
             {areas.length} areas, {templates.reduce((s, t) => s + (t.instances?.length || 0), 0)} total instances
+            {selected.size > 0 && (
+              <span style={{ color: '#3ecf8e', marginLeft: 8 }}>· {selected.size} selected</span>
+            )}
           </p>
         </div>
       </div>
@@ -325,28 +404,39 @@ export default function AreasView() {
                   </tr>
 
                   {/* Instance rows */}
-                  {isExp && instances.map(inst => (
-                    <tr
-                      key={`${inst.templateId}_${inst.id}`}
-                      style={{ background: '#1a1a1a', cursor: 'grab' }}
-                      draggable
-                      onDragStart={e => handleDragStart(e, inst.templateId, inst.id)}
-                    >
-                      <td></td>
-                      <td style={{ paddingLeft: 36 + indent }}>
-                        <div className="flex items-center gap-2">
-                          <Tag size={12} style={{ color: '#666', flexShrink: 0 }} />
-                          <span className="text-sm">{inst.name}</span>
-                          {inst.isFlagged && (
-                            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#e55353' }} title="Flagged" />
-                          )}
-                        </div>
-                      </td>
-                      <td><span className="text-text-muted text-xs">{inst.description}</span></td>
-                      <td><span className="text-text-muted text-xs">{inst.templateName}</span></td>
-                      <td></td>
-                    </tr>
-                  ))}
+                  {isExp && instances.map(inst => {
+                    const key = instKey(inst);
+                    const isSelected = selected.has(key);
+                    return (
+                      <tr
+                        key={key}
+                        style={{
+                          background: isSelected ? 'rgba(62,207,142,0.12)' : '#1a1a1a',
+                          cursor: 'grab',
+                          outline: isSelected ? '1px solid rgba(62,207,142,0.4)' : 'none',
+                          userSelect: 'none',
+                        }}
+                        draggable
+                        onClick={e => handleInstanceClick(e, key, instances)}
+                        onDragStart={e => handleDragStart(e, inst)}
+                        onDragEnd={() => setDragging(null)}
+                      >
+                        <td></td>
+                        <td style={{ paddingLeft: 36 + indent }}>
+                          <div className="flex items-center gap-2">
+                            <Tag size={12} style={{ color: isSelected ? '#3ecf8e' : '#666', flexShrink: 0 }} />
+                            <span className="text-sm">{inst.name}</span>
+                            {inst.isFlagged && (
+                              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#e55353' }} title="Flagged" />
+                            )}
+                          </div>
+                        </td>
+                        <td><span className="text-text-muted text-xs">{inst.description}</span></td>
+                        <td><span className="text-text-muted text-xs">{inst.templateName}</span></td>
+                        <td></td>
+                      </tr>
+                    );
+                  })}
                   {isExp && instances.length === 0 && !hasChildren && (
                     <tr style={{ background: '#1a1a1a' }}>
                       <td></td>
