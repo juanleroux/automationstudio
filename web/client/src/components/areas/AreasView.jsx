@@ -355,6 +355,16 @@ export default function AreasView() {
                       </td>
                     </tr>
                   )}
+                  {isExp && !area.isSystem && (
+                    <tr onClick={() => openAddArea(area.id)} style={{ cursor: 'pointer', background: '#1a1a1a' }} className="add-row">
+                      <td></td>
+                      <td colSpan={4} style={{ paddingLeft: 36 + indent, padding: '5px 12px 5px ' + (36 + indent) + 'px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
+                          <Plus size={13} /> Add Area
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </React.Fragment>
               );
             })}
