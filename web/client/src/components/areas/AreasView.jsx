@@ -10,17 +10,48 @@ function nextId(arr) {
   return Math.max(...arr.map(x => x.id)) + 1;
 }
 
+// Build nested tree from flat areas array using parentId
+function buildTree(areas, parentId = null) {
+  return areas
+    .filter(a => (a.parentId ?? null) === parentId)
+    .map(a => ({ ...a, children: buildTree(areas, a.id) }));
+}
+
+// Flatten tree into ordered rows, only including children of expanded nodes
+function flattenVisible(nodes, expanded, depth = 0) {
+  const rows = [];
+  for (const node of nodes) {
+    rows.push({ ...node, depth });
+    if (expanded.has(node.id) && node.children.length > 0) {
+      rows.push(...flattenVisible(node.children, expanded, depth + 1));
+    }
+  }
+  return rows;
+}
+
+// Collect all descendant IDs of an area
+function collectDescendants(areas, areaId) {
+  const ids = [];
+  const children = areas.filter(a => a.parentId === areaId);
+  for (const child of children) {
+    ids.push(child.id);
+    ids.push(...collectDescendants(areas, child.id));
+  }
+  return ids;
+}
+
 export default function AreasView() {
   const { project, updateProject } = useProject();
   const toast = useToast();
 
   const [expanded, setExpanded] = useState(new Set([1]));
-  const [editingArea, setEditingArea] = useState(null); // { id, name, description }
+  const [editingArea, setEditingArea] = useState(null);
+  const [addParentId, setAddParentId] = useState(null); // null = top-level
   const [showAddArea, setShowAddArea] = useState(false);
   const [newArea, setNewArea] = useState({ name: '', description: '' });
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [dragOver, setDragOver] = useState(null);
-  const [dragging, setDragging] = useState(null); // { templateId, instanceId }
+  const [dragging, setDragging] = useState(null);
 
   if (!project) {
     return (
@@ -39,8 +70,7 @@ export default function AreasView() {
   // Build area → instances map
   const areaInstances = {};
   areas.forEach(a => { areaInstances[a.id] = []; });
-  areaInstances[0] = []; // unassigned
-
+  areaInstances[0] = [];
   templates.forEach(t => {
     (t.instances || []).forEach(inst => {
       const areaId = inst.areaId ?? 0;
@@ -49,13 +79,30 @@ export default function AreasView() {
     });
   });
 
+  const tree = buildTree(areas);
+  const visibleAreas = flattenVisible(tree, expanded);
+
+  const allAreas = [
+    { id: 0, name: 'Unassigned', description: 'Instances not assigned to any area', isSystem: true, depth: 0, children: [] },
+    ...visibleAreas
+  ];
+
   const toggleExpand = (id) => {
     setExpanded(prev => {
       const s = new Set(prev);
-      if (s.has(id)) s.delete(id);
-      else s.add(id);
+      s.has(id) ? s.delete(id) : s.add(id);
       return s;
     });
+  };
+
+  const openAddArea = (parentId = null) => {
+    setAddParentId(parentId);
+    setNewArea({ name: '', description: '' });
+    setShowAddArea(true);
+    // Auto-expand parent so the new child is visible
+    if (parentId !== null) {
+      setExpanded(prev => new Set([...prev, parentId]));
+    }
   };
 
   const addArea = () => {
@@ -64,11 +111,14 @@ export default function AreasView() {
     const id = nextId(areas);
     updateProject(p => ({
       ...p,
-      areas: [...(p.areas || []), { id, name: newArea.name.trim(), description: newArea.description.trim(), lastModification: now }]
+      areas: [
+        ...(p.areas || []),
+        { id, name: newArea.name.trim(), description: newArea.description.trim(), parentId: addParentId, lastModification: now }
+      ]
     }));
     setShowAddArea(false);
     setNewArea({ name: '', description: '' });
-    toast.success(`Area "${newArea.name.trim()}" added`);
+    toast.success(`${addParentId !== null ? 'Sub-area' : 'Area'} "${newArea.name.trim()}" added`);
     setExpanded(prev => new Set([...prev, id]));
   };
 
@@ -88,19 +138,21 @@ export default function AreasView() {
   };
 
   const deleteArea = (areaId) => {
-    // Move instances in this area to unassigned
+    const descendants = collectDescendants(areas, areaId);
+    const toRemove = new Set([areaId, ...descendants]);
     updateProject(p => ({
       ...p,
-      areas: (p.areas || []).filter(a => a.id !== areaId),
+      areas: (p.areas || []).filter(a => !toRemove.has(a.id)),
       templates: p.templates.map(t => ({
         ...t,
         instances: (t.instances || []).map(i =>
-          i.areaId === areaId ? { ...i, areaId: 0 } : i
+          toRemove.has(i.areaId) ? { ...i, areaId: 0 } : i
         )
       }))
     }));
     setConfirmDelete(null);
-    toast.success('Area deleted (instances moved to Unassigned)');
+    const extra = descendants.length > 0 ? ` and ${descendants.length} sub-area(s)` : '';
+    toast.success(`Area deleted${extra} (instances moved to Unassigned)`);
   };
 
   const moveInstance = (templateId, instanceId, targetAreaId) => {
@@ -108,12 +160,7 @@ export default function AreasView() {
       ...p,
       templates: p.templates.map(t =>
         t.id === templateId
-          ? {
-              ...t,
-              instances: (t.instances || []).map(i =>
-                i.id === instanceId ? { ...i, areaId: targetAreaId } : i
-              )
-            }
+          ? { ...t, instances: (t.instances || []).map(i => i.id === instanceId ? { ...i, areaId: targetAreaId } : i) }
           : t
       )
     }));
@@ -133,10 +180,7 @@ export default function AreasView() {
     setDragging(null);
   };
 
-  const allAreas = [
-    { id: 0, name: 'Unassigned', description: 'Instances not assigned to any area', isSystem: true },
-    ...areas
-  ];
+  const parentArea = addParentId !== null ? areas.find(a => a.id === addParentId) : null;
 
   return (
     <div className="flex flex-col h-full" style={{ background: '#1c1c1c' }}>
@@ -147,7 +191,9 @@ export default function AreasView() {
       >
         <div>
           <h2 className="text-sm font-semibold text-text-primary">Model</h2>
-          <p className="text-xs text-text-muted">{areas.length} areas, {templates.reduce((s, t) => s + (t.instances?.length || 0), 0)} total instances</p>
+          <p className="text-xs text-text-muted">
+            {areas.length} areas, {templates.reduce((s, t) => s + (t.instances?.length || 0), 0)} total instances
+          </p>
         </div>
       </div>
 
@@ -160,7 +206,7 @@ export default function AreasView() {
               <th>Area Name</th>
               <th>Description</th>
               <th style={{ width: 80 }}>Instances</th>
-              <th style={{ width: 80 }}>Actions</th>
+              <th style={{ width: 100 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -168,6 +214,8 @@ export default function AreasView() {
               const instances = areaInstances[area.id] || [];
               const isExp = expanded.has(area.id);
               const isDragTarget = dragOver === area.id;
+              const hasChildren = area.children?.length > 0;
+              const indent = (area.depth || 0) * 20;
 
               return (
                 <React.Fragment key={area.id}>
@@ -181,11 +229,11 @@ export default function AreasView() {
                     onDragLeave={() => setDragOver(null)}
                     onDrop={e => handleDrop(e, area.id)}
                   >
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center', paddingLeft: indent }}>
                       <button
                         className="text-text-muted hover:text-text-primary"
                         onClick={() => toggleExpand(area.id)}
-                        style={{ padding: 2 }}
+                        style={{ padding: 2, visibility: (hasChildren || instances.length > 0) ? 'visible' : 'hidden' }}
                       >
                         {isExp ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                       </button>
@@ -201,8 +249,14 @@ export default function AreasView() {
                           onKeyDown={e => { if (e.key === 'Enter') saveEditArea(); if (e.key === 'Escape') setEditingArea(null); }}
                         />
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <Map size={14} style={{ color: area.isSystem ? '#666' : '#3ecf8e', flexShrink: 0 }} />
+                        <div className="flex items-center gap-2" style={{ paddingLeft: indent }}>
+                          <Map
+                            size={14}
+                            style={{
+                              color: area.isSystem ? '#666' : area.depth > 0 ? '#6eb5ff' : '#3ecf8e',
+                              flexShrink: 0
+                            }}
+                          />
                           <span className="font-medium">{area.name}</span>
                           {area.isSystem && <span className="badge" style={{ fontSize: 9 }}>System</span>}
                         </div>
@@ -240,6 +294,14 @@ export default function AreasView() {
                               <>
                                 <button
                                   className="btn-ghost btn-icon"
+                                  style={{ padding: 3, color: 'var(--text-disabled)' }}
+                                  onClick={() => openAddArea(area.id)}
+                                  title="Add sub-area"
+                                >
+                                  <Plus size={13} />
+                                </button>
+                                <button
+                                  className="btn-ghost btn-icon"
                                   style={{ padding: 3 }}
                                   onClick={() => setEditingArea({ id: area.id, name: area.name, description: area.description || '' })}
                                   title="Edit"
@@ -249,7 +311,7 @@ export default function AreasView() {
                                 <button
                                   className="btn-ghost btn-icon"
                                   style={{ padding: 3, color: '#e55353' }}
-                                  onClick={() => setConfirmDelete({ id: area.id, name: area.name })}
+                                  onClick={() => setConfirmDelete({ id: area.id, name: area.name, hasChildren: area.children?.length > 0 })}
                                   title="Delete"
                                 >
                                   <Trash2 size={13} />
@@ -271,7 +333,7 @@ export default function AreasView() {
                       onDragStart={e => handleDragStart(e, inst.templateId, inst.id)}
                     >
                       <td></td>
-                      <td style={{ paddingLeft: 36 }}>
+                      <td style={{ paddingLeft: 36 + indent }}>
                         <div className="flex items-center gap-2">
                           <Tag size={12} style={{ color: '#666', flexShrink: 0 }} />
                           <span className="text-sm">{inst.name}</span>
@@ -280,19 +342,15 @@ export default function AreasView() {
                           )}
                         </div>
                       </td>
-                      <td>
-                        <span className="text-text-muted text-xs">{inst.description}</span>
-                      </td>
-                      <td>
-                        <span className="text-text-muted text-xs">{inst.templateName}</span>
-                      </td>
+                      <td><span className="text-text-muted text-xs">{inst.description}</span></td>
+                      <td><span className="text-text-muted text-xs">{inst.templateName}</span></td>
                       <td></td>
                     </tr>
                   ))}
-                  {isExp && instances.length === 0 && (
+                  {isExp && instances.length === 0 && !hasChildren && (
                     <tr style={{ background: '#1a1a1a' }}>
                       <td></td>
-                      <td colSpan={4} style={{ paddingLeft: 36, color: '#555', fontSize: 11, fontStyle: 'italic', paddingTop: 6, paddingBottom: 6 }}>
+                      <td colSpan={4} style={{ paddingLeft: 36 + indent, color: '#555', fontSize: 11, fontStyle: 'italic', paddingTop: 6, paddingBottom: 6 }}>
                         No instances — drag instances here or assign from Assets view
                       </td>
                     </tr>
@@ -300,7 +358,9 @@ export default function AreasView() {
                 </React.Fragment>
               );
             })}
-            <tr onClick={() => { setNewArea({ name: '', description: '' }); setShowAddArea(true); }} style={{ cursor: 'pointer' }} className="add-row">
+
+            {/* Add top-level area row */}
+            <tr onClick={() => openAddArea(null)} style={{ cursor: 'pointer' }} className="add-row">
               <td colSpan={5} style={{ padding: '6px 12px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
                   <Plus size={13} /> Add Area
@@ -311,10 +371,10 @@ export default function AreasView() {
         </table>
       </div>
 
-      {/* Add Area Modal */}
+      {/* Add Area / Sub-Area Modal */}
       {showAddArea && (
         <Modal
-          title="Add Area"
+          title={parentArea ? `Add Sub-Area under "${parentArea.name}"` : 'Add Area'}
           onClose={() => setShowAddArea(false)}
           width={400}
           footer={
@@ -326,12 +386,14 @@ export default function AreasView() {
         >
           <div className="flex flex-col gap-3">
             <div>
-              <label className="block text-xs text-text-muted mb-1">Area Name *</label>
+              <label className="block text-xs text-text-muted mb-1">
+                {parentArea ? 'Sub-Area Name *' : 'Area Name *'}
+              </label>
               <input
                 type="text"
                 value={newArea.name}
                 onChange={e => setNewArea(p => ({ ...p, name: e.target.value }))}
-                placeholder="Line 1"
+                placeholder={parentArea ? 'Zone A' : 'Line 1'}
                 autoFocus
                 onKeyDown={e => e.key === 'Enter' && addArea()}
               />
@@ -342,7 +404,7 @@ export default function AreasView() {
                 type="text"
                 value={newArea.description}
                 onChange={e => setNewArea(p => ({ ...p, description: e.target.value }))}
-                placeholder="Production line 1"
+                placeholder={parentArea ? `Sub-section of ${parentArea.name}` : 'Production line 1'}
               />
             </div>
           </div>
@@ -353,7 +415,11 @@ export default function AreasView() {
       {confirmDelete && (
         <ConfirmDialog
           title="Delete Area"
-          message={`Delete area "${confirmDelete.name}"? Instances in this area will be moved to Unassigned.`}
+          message={
+            confirmDelete.hasChildren
+              ? `Delete "${confirmDelete.name}" and all its sub-areas? Instances will be moved to Unassigned.`
+              : `Delete area "${confirmDelete.name}"? Instances will be moved to Unassigned.`
+          }
           danger
           onConfirm={() => deleteArea(confirmDelete.id)}
           onCancel={() => setConfirmDelete(null)}
