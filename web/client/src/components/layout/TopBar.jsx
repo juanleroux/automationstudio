@@ -1,5 +1,6 @@
 import React from 'react';
 import { useProject } from '../../context/ProjectContext';
+import { VERSION } from '../../version';
 
 const VIEW_LABELS = {
   dashboard: 'Dashboard',
@@ -42,8 +43,8 @@ export default function TopBar({ activeView }) {
         )}
       </div>
       <div className="flex items-center gap-2 text-xs text-text-muted">
-        <span>Automation Studio</span>
-        <span className="px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-card)', color: 'var(--text-muted)' }}>v1.0</span>
+        <span>One Technology Limited</span>
+        <span className="px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-card)', color: 'var(--text-muted)' }}>{VERSION}</span>
       </div>
     </div>
   );

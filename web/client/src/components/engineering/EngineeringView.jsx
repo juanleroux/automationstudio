@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Cpu, Plus, Zap } from 'lucide-react';
+import { VERSION } from '../../version';
 import TemplateTree from './TemplateTree';
 import AttributeGrid from './AttributeGrid';
 import ProfilePanel, { ProfileForm } from './ProfilePanel';
@@ -41,7 +42,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             fontSize: 11, color: 'var(--text-disabled)', opacity: 0.6,
           }}
         >
-          Automation Studio v1.0
+          Automation Studio {VERSION}
         </span>
       </div>
     );
