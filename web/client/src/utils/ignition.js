@@ -126,6 +126,14 @@ function collectUdtTypes(tags, bucket = [], currentPath = '') {
 /**
  * Convert one Ignition UdtType (+ its sibling instances) to our template format.
  */
+// Ignition's documentation field is a string or { value: "..." }
+function extractDoc(doc) {
+  if (!doc) return '';
+  if (typeof doc === 'string') return doc;
+  if (typeof doc === 'object' && doc.value != null) return String(doc.value);
+  return '';
+}
+
 function convertUdt(udtType, siblingInstances, templateId, folderPath) {
   const now = new Date().toISOString();
   let attrId = 1;
@@ -135,7 +143,7 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
 
   Object.entries(udtType.parameters || {}).forEach(([name, param]) => {
     attributes.push({
-      id: attrId++, name, description: '',
+      id: attrId++, name, description: extractDoc(param.documentation),
       dataType: internalDataType(param.dataType),
       value: String(param.value ?? ''),
       parameter: true,
@@ -144,7 +152,7 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
 
   (udtType.tags || []).filter(t => t.tagType === 'AtomicTag' || !t.tagType).forEach(tag => {
     attributes.push({
-      id: attrId++, name: tag.name, description: '',
+      id: attrId++, name: tag.name, description: extractDoc(tag.documentation),
       dataType: internalDataType(tag.dataType),
       value: String(tag.value ?? ''),
       parameter: false,
@@ -158,10 +166,10 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
       const ta = attributes.find(a => a.name === paramName && a.parameter);
       if (ta) instAttrs.push({ id: ta.id, value: String(paramVal?.value ?? '') });
     });
-    return { id: instId++, areaId: 0, name: inst.name, description: '', isFlagged: false, lastModification: now, attributes: instAttrs };
+    return { id: instId++, areaId: 0, name: inst.name, description: extractDoc(inst.documentation), isFlagged: false, lastModification: now, attributes: instAttrs };
   });
 
-  return { id: templateId, name: templateName, description: '', lastModification: now, attributes, instances, profiles: [] };
+  return { id: templateId, name: templateName, description: extractDoc(udtType.documentation), lastModification: now, attributes, instances, profiles: [] };
 }
 
 /**
