@@ -234,6 +234,32 @@ export default function TemplateTree({ selected, onSelect }) {
     setContextMenu(null);
   };
 
+  // RFC 4180 CSV line parser — handles quoted fields, embedded commas, and "" escaped quotes
+  const parseCSVLine = (line) => {
+    const fields = [];
+    let i = 0;
+    while (i <= line.length) {
+      if (i === line.length) { fields.push(''); break; }
+      if (line[i] === '"') {
+        i++;
+        let field = '';
+        while (i < line.length) {
+          if (line[i] === '"' && line[i + 1] === '"') { field += '"'; i += 2; }
+          else if (line[i] === '"') { i++; break; }
+          else { field += line[i++]; }
+        }
+        fields.push(field);
+        if (line[i] === ',') i++;
+      } else {
+        const end = line.indexOf(',', i);
+        if (end === -1) { fields.push(line.slice(i).trim()); break; }
+        fields.push(line.slice(i, end).trim());
+        i = end + 1;
+      }
+    }
+    return fields;
+  };
+
   // CSV Import
   const handleImportCSV = (templateId, file) => {
     if (!file) return;
@@ -242,8 +268,8 @@ export default function TemplateTree({ selected, onSelect }) {
       const text = e.target.result;
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length < 2) { toast.error('CSV must have header + data rows'); return; }
-      const headers = lines[0].split(',').map(h => h.trim());
-      const nameIdx = headers.findIndex(h => h.toLowerCase() === 'name');
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
+      const nameIdx = headers.findIndex(h => h === 'name');
       const now = new Date().toISOString();
       updateProject(p => ({
         ...p,
@@ -251,17 +277,17 @@ export default function TemplateTree({ selected, onSelect }) {
           if (t.id !== templateId) return t;
           let nextInstId = nextId(t.instances || []);
           const newInsts = lines.slice(1).map(line => {
-            const cells = line.split(',').map(c => c.trim());
+            const cells = parseCSVLine(line);
             const name = nameIdx >= 0 ? (cells[nameIdx] || `Instance_${nextInstId}`) : `Instance_${nextInstId}`;
             const instAttrs = (t.attributes || []).map(ta => {
-              const idx = headers.findIndex(h => h.toLowerCase() === ta.name.toLowerCase());
+              const idx = headers.findIndex(h => h === ta.name.toLowerCase());
               return { id: ta.id, value: idx >= 0 ? (cells[idx] || ta.value) : ta.value };
             });
             return {
               id: nextInstId++,
               areaId: 0,
               name,
-              description: cells[headers.findIndex(h => h.toLowerCase() === 'description')] || '',
+              description: cells[headers.findIndex(h => h === 'description')] || '',
               isFlagged: false,
               lastModification: now,
               attributes: instAttrs
@@ -283,7 +309,7 @@ export default function TemplateTree({ selected, onSelect }) {
       const text = e.target.result;
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length < 2) { toast.error('CSV must have header + data rows'); return; }
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
       const nameIdx = headers.indexOf('name');
       const descIdx = headers.indexOf('description');
       const typeIdx = headers.indexOf('datatype');
@@ -297,7 +323,7 @@ export default function TemplateTree({ selected, onSelect }) {
           if (t.id !== templateId) return t;
           let nextAttrId = nextId(t.attributes || []);
           const newAttrs = lines.slice(1).map(line => {
-            const cells = line.split(',').map(c => c.trim());
+            const cells = parseCSVLine(line);
             return {
               id: nextAttrId++,
               name: cells[nameIdx] || `Attr_${nextAttrId}`,
