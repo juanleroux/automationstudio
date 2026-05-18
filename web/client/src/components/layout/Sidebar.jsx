@@ -242,10 +242,10 @@ export default function Sidebar({ activeView, onChangeView }) {
         <div className="flex-shrink-0 py-2" style={{ borderTop: '1px solid var(--border)' }}>
           {collapsed ? (
             <div className="flex flex-col items-center gap-1 px-2">
-              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={() => setShowNewDialog(true)} title="New Project">
+              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={() => setShowNewDialog(true)} title="New Project" style={{ color: 'var(--text-muted)' }}>
                 <FilePlus size={16} />
               </button>
-              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleOpenDialog} title="Open Project">
+              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleOpenDialog} title="Open Project" style={{ color: 'var(--text-muted)' }}>
                 <FolderOpen size={16} />
               </button>
               <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleSave} disabled={!project || isSaving} title="Save">
@@ -262,14 +262,12 @@ export default function Sidebar({ activeView, onChangeView }) {
             </div>
           ) : (
             <div className="px-3 flex flex-col gap-1">
-              <div className="flex gap-1">
-                <button className="btn btn-secondary flex-1 text-xs" style={{ padding: '5px 8px' }} onClick={() => setShowNewDialog(true)}>
-                  <FilePlus size={13} /> New
-                </button>
-                <button className="btn btn-secondary flex-1 text-xs" style={{ padding: '5px 8px' }} onClick={handleOpenDialog}>
-                  <FolderOpen size={13} /> Open
-                </button>
-              </div>
+              <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={() => setShowNewDialog(true)}>
+                <FilePlus size={13} /> New Project
+              </button>
+              <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={handleOpenDialog}>
+                <FolderOpen size={13} /> Open Project
+              </button>
               <button className="btn btn-primary w-full text-xs" style={{ padding: '5px 8px' }} onClick={handleSave} disabled={!project || isSaving}>
                 <Save size={13} /> {isSaving ? 'Saving...' : 'Save Project'}
               </button>
