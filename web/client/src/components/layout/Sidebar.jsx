@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  Cpu, Map, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
+  Cpu, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
   FilePlus, FolderOpen, FolderX, Save, Zap, Trash2, Download, Upload
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
@@ -12,7 +12,6 @@ import ConfirmDialog from '../shared/ConfirmDialog';
 const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard', icon: LayoutDashboard, alwaysEnabled: true },
   { id: 'engineering', label: 'Assets',    icon: Cpu },
-  { id: 'areas',       label: 'Model',     icon: Map },
 ];
 
 export default function Sidebar({ activeView, onChangeView }) {
@@ -158,9 +157,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         }}
       >
         {/* Logo */}
-        <div
-          className="flex items-center gap-3 px-3 py-3 flex-shrink-0"
-        >
+        <div className="flex items-center gap-3 px-3 py-3 flex-shrink-0">
           <div
             className="flex items-center justify-center rounded-md flex-shrink-0"
             style={{ width: 32, height: 32, background: 'var(--accent)' }}
