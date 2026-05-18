@@ -36,9 +36,6 @@ export function buildAreaPath(areaId, areas) {
   return parentPath ? `${parentPath}/${area.name}` : area.name;
 }
 
-/**
- * Builds an Ignition UDT type tag object for the given template.
- */
 function buildUdtType(template) {
   const udtType = {
     name: template.name,
@@ -46,7 +43,6 @@ function buildUdtType(template) {
     parameters: {},
     tags: [],
   };
-
   (template.attributes || []).forEach(attr => {
     const dt = ignitionDataType(attr.dataType);
     if (attr.parameter) {
@@ -55,14 +51,12 @@ function buildUdtType(template) {
       udtType.tags.push({ name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' });
     }
   });
-
   return udtType;
 }
 
 /**
  * Builds the Ignition tag import payload for a template.
- * UDT type definitions must reside under the _types_ folder; instances go
- * at the root of the path supplied via ?path= on the request.
+ * instances: optional subset of template.instances to include (e.g. only unassigned ones).
  * Returns { tags: [...] } — the body expected by POST /data/api/v1/tags/import.
  */
 export function buildIgnitionPayload(template, instances = null) {
@@ -108,8 +102,6 @@ export function buildInstancesPayload(instanceList) {
   return { tags };
 }
 
-
-
 /**
  * Recursively walk Ignition tag trees and collect UdtType entries together
  * with any UdtInstance siblings that reference them.
@@ -141,7 +133,6 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
   const cleanPath = (folderPath || '').replace(/^_types_\/?/i, '');
   const templateName = cleanPath ? `${cleanPath}/${udtType.name}` : udtType.name;
 
-  // Parameters → parameter: true attributes
   Object.entries(udtType.parameters || {}).forEach(([name, param]) => {
     attributes.push({
       id: attrId++, name, description: '',
@@ -151,7 +142,6 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
     });
   });
 
-  // AtomicTag children → parameter: false attributes
   (udtType.tags || []).filter(t => t.tagType === 'AtomicTag' || !t.tagType).forEach(tag => {
     attributes.push({
       id: attrId++, name: tag.name, description: '',
@@ -176,104 +166,14 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
 
 /**
  * Parse the raw Ignition gateway response and return discovered UDT info.
- * Each item: { udtType, siblingInstances }
  */
 export function parseIgnitionResponse(rawData) {
-  // rawData may be { version, tagGroup, tags } or a bare array
   const tags = Array.isArray(rawData) ? rawData : (rawData?.tags || []);
   return collectUdtTypes(tags);
 }
 
 /**
  * Convert an array of { udtType, siblingInstances } results to template objects.
- * startId: next available template id.
- */
-export function convertUdtsToTemplates(udtResults, startId) {
-  return udtResults.map(({ udtType, siblingInstances, folderPath }, i) =>
-    convertUdt(udtType, siblingInstances, startId + i, folderPath)
-  );
-}
-
-
-
-
-/**
- * Recursively walk Ignition tag trees and collect UdtType entries together
- * with any UdtInstance siblings that reference them.
- */
-function collectUdtTypes(tags, bucket = [], currentPath = '') {
-  if (!Array.isArray(tags)) return bucket;
-  const udtTypes  = tags.filter(t => t.tagType === 'UdtType');
-  const instances = tags.filter(t => t.tagType === 'UdtInstance');
-  udtTypes.forEach(udt => {
-    const siblings = instances.filter(i =>
-      i.typeId === udt.name || (i.typeId || '').endsWith('/' + udt.name)
-    );
-    bucket.push({ udtType: udt, siblingInstances: siblings, folderPath: currentPath });
-  });
-  tags.filter(t => t.tagType === 'Folder').forEach(f => {
-    const childPath = currentPath ? `${currentPath}/${f.name}` : f.name;
-    collectUdtTypes(f.tags || [], bucket, childPath);
-  });
-  return bucket;
-}
-
-/**
- * Convert one Ignition UdtType (+ its sibling instances) to our template format.
- */
-function convertUdt(udtType, siblingInstances, templateId, folderPath) {
-  const now = new Date().toISOString();
-  let attrId = 1;
-  const attributes = [];
-  const cleanPath = (folderPath || '').replace(/^_types_\/?/i, '');
-  const templateName = cleanPath ? `${cleanPath}/${udtType.name}` : udtType.name;
-
-  // Parameters → parameter: true attributes
-  Object.entries(udtType.parameters || {}).forEach(([name, param]) => {
-    attributes.push({
-      id: attrId++, name, description: '',
-      dataType: internalDataType(param.dataType),
-      value: String(param.value ?? ''),
-      parameter: true,
-    });
-  });
-
-  // AtomicTag children → parameter: false attributes
-  (udtType.tags || []).filter(t => t.tagType === 'AtomicTag' || !t.tagType).forEach(tag => {
-    attributes.push({
-      id: attrId++, name: tag.name, description: '',
-      dataType: internalDataType(tag.dataType),
-      value: String(tag.value ?? ''),
-      parameter: false,
-    });
-  });
-
-  let instId = 1;
-  const instances = siblingInstances.map(inst => {
-    const instAttrs = [];
-    Object.entries(inst.parameters || {}).forEach(([paramName, paramVal]) => {
-      const ta = attributes.find(a => a.name === paramName && a.parameter);
-      if (ta) instAttrs.push({ id: ta.id, value: String(paramVal?.value ?? '') });
-    });
-    return { id: instId++, areaId: 0, name: inst.name, description: '', isFlagged: false, lastModification: now, attributes: instAttrs };
-  });
-
-  return { id: templateId, name: templateName, description: '', lastModification: now, attributes, instances, profiles: [] };
-}
-
-/**
- * Parse the raw Ignition gateway response and return discovered UDT info.
- * Each item: { udtType, siblingInstances }
- */
-export function parseIgnitionResponse(rawData) {
-  // rawData may be { version, tagGroup, tags } or a bare array
-  const tags = Array.isArray(rawData) ? rawData : (rawData?.tags || []);
-  return collectUdtTypes(tags);
-}
-
-/**
- * Convert an array of { udtType, siblingInstances } results to template objects.
- * startId: next available template id.
  */
 export function convertUdtsToTemplates(udtResults, startId) {
   return udtResults.map(({ udtType, siblingInstances, folderPath }, i) =>
