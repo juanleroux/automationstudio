@@ -7,6 +7,7 @@ import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
+import NoProjectOpen from '../shared/NoProjectOpen';
 
 function nextId(arr) {
   if (!arr || !arr.length) return 1;
@@ -67,14 +68,7 @@ export default function ProposalView() {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   if (!project) {
-    return (
-      <div className="flex items-center justify-center h-full text-text-muted">
-        <div className="text-center">
-          <FileText size={48} className="mx-auto mb-3 opacity-20" />
-          <p className="text-lg font-medium">No Project Open</p>
-        </div>
-      </div>
-    );
+    return <div className="relative h-full"><NoProjectOpen /></div>;
   }
 
   const proposal = project.proposal || {};

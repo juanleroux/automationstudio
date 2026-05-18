@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Cpu, Plus, Zap } from 'lucide-react';
+import NoProjectOpen from '../shared/NoProjectOpen';
 import { VERSION } from '../../version';
 import TemplateTree from './TemplateTree';
 import AttributeGrid from './AttributeGrid';
@@ -232,15 +233,7 @@ export default function EngineeringView() {
   }, [selectedTemplate, updateProject]);
 
   if (!project) {
-    return (
-      <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-disabled)' }}>
-        <div className="text-center">
-          <Cpu size={48} className="mx-auto mb-3" style={{ opacity: 0.2 }} />
-          <p className="text-lg font-medium" style={{ color: 'var(--text-muted)' }}>No Project Open</p>
-          <p className="text-sm mt-1">Create or open a project from the sidebar</p>
-        </div>
-      </div>
-    );
+    return <div className="relative h-full"><NoProjectOpen /></div>;
   }
 
   return (

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Layers, Database, Map, Cpu, AlertTriangle, Clock } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
+import NoProjectOpen from '../shared/NoProjectOpen';
 
 function StatCard({ icon: Icon, label, value, sub, warn }) {
   return (
@@ -106,14 +107,7 @@ export default function DashboardView() {
   }, [project]);
 
   if (!project) {
-    return (
-      <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-disabled)' }}>
-        <div className="text-center">
-          <p className="text-lg font-medium" style={{ color: 'var(--text-muted)' }}>No Project Open</p>
-          <p className="text-sm mt-1">Create or open a project from the sidebar</p>
-        </div>
-      </div>
-    );
+    return <div className="relative h-full"><NoProjectOpen /></div>;
   }
 
   return (

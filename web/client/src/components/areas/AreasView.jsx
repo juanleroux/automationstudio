@@ -4,6 +4,7 @@ import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
+import NoProjectOpen from '../shared/NoProjectOpen';
 
 function nextId(arr) {
   if (!arr || !arr.length) return 1;
@@ -60,14 +61,7 @@ export default function AreasView() {
   const lastClickedKey = useRef(null);
 
   if (!project) {
-    return (
-      <div className="flex items-center justify-center h-full text-text-muted">
-        <div className="text-center">
-          <Map size={48} className="mx-auto mb-3 opacity-20" />
-          <p className="text-lg font-medium">No Project Open</p>
-        </div>
-      </div>
-    );
+    return <div className="relative h-full"><NoProjectOpen /></div>;
   }
 
   const areas = project.areas || [];

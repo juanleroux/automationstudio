@@ -254,3 +254,13 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
 @keyframes fadeIn  { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .toast-enter { animation: slideIn 0.25s ease; }
 .fade-in { animation: fadeIn 0.15s ease; }
+
+@keyframes heartbeat-arrow {
+  0%   { transform: translateX(0)    scale(1);    opacity: 0.5; }
+  14%  { transform: translateX(-8px) scale(1.25); opacity: 1;   }
+  28%  { transform: translateX(0)    scale(1);    opacity: 0.5; }
+  42%  { transform: translateX(-5px) scale(1.1);  opacity: 0.85;}
+  60%  { transform: translateX(0)    scale(1);    opacity: 0.5; }
+  100% { transform: translateX(0)    scale(1);    opacity: 0.5; }
+}
+.arrow-heartbeat { animation: heartbeat-arrow 1.6s ease-in-out infinite; }
