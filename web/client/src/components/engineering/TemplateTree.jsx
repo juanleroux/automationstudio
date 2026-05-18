@@ -8,7 +8,7 @@ import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
 import { exportFromIgnition } from '../../api/client';
-import { buildIgnitionPayload, buildInstancesPayload, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
+import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
@@ -365,16 +365,40 @@ export default function TemplateTree({ selected, onSelect }) {
       toast.error('Configure Ignition gateway in Settings first');
       return;
     }
-    const payload = buildIgnitionPayload(template, project.areas || []);
+    const areas = project.areas || [];
+    const base = eng.folderPath || '';
+
+    // Separate unassigned instances (go with the type) from area-assigned ones
+    const unassigned = (template.instances || []).filter(i => !i.areaId || i.areaId === 0);
+    const assigned   = (template.instances || []).filter(i => i.areaId && i.areaId !== 0);
+
+    // Group area-assigned instances by their resolved folder path
+    const groups = new Map();
+    for (const inst of assigned) {
+      const areaPath = buildAreaPath(inst.areaId, areas);
+      const fullPath = [base, areaPath].filter(Boolean).join('/');
+      if (!groups.has(fullPath)) groups.set(fullPath, []);
+      groups.get(fullPath).push(inst);
+    }
+
+    const uploadOpts = (folderPath, payload) => ({
+      gatewayUrl: eng.ignitionGateway,
+      apiKey: eng.apiKey,
+      provider: eng.provider || 'default',
+      collisionPolicy: eng.collisionPolicy || 'Overwrite',
+      folderPath,
+      payload,
+    });
+
     try {
-      await uploadToIgnition({
-        gatewayUrl: eng.ignitionGateway,
-        apiKey: eng.apiKey,
-        provider: eng.provider || 'default',
-        collisionPolicy: eng.collisionPolicy || 'Overwrite',
-        folderPath: eng.folderPath || '',
-        payload,
-      });
+      // Upload UDT type + unassigned instances together
+      await uploadToIgnition(uploadOpts(base, buildIgnitionPayload(template, unassigned)));
+
+      // Upload each area group with the matching ?path=
+      await Promise.all([...groups.entries()].map(([folderPath, insts]) =>
+        uploadToIgnition(uploadOpts(folderPath, buildInstancesPayload(insts.map(inst => ({ template, instance: inst })))))
+      ));
+
       toast.success(`Uploaded "${template.name}" to Ignition`);
     } catch (err) {
       const detail = err.response?.data?.error || err.message;
@@ -448,16 +472,30 @@ export default function TemplateTree({ selected, onSelect }) {
     setContextMenu(null);
     const eng = project?.engineering;
     if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
-    const payload = buildInstancesPayload(instanceList, project.areas || []);
+
+    const areas = project.areas || [];
+    const base = eng.folderPath || '';
+
+    // Group instances by their resolved folder path
+    const groups = new Map();
+    for (const item of instanceList) {
+      const areaPath = buildAreaPath(item.instance.areaId, areas);
+      const fullPath = [base, areaPath].filter(Boolean).join('/');
+      if (!groups.has(fullPath)) groups.set(fullPath, []);
+      groups.get(fullPath).push(item);
+    }
+
     try {
-      await uploadToIgnition({
-        gatewayUrl: eng.ignitionGateway,
-        apiKey: eng.apiKey,
-        provider: eng.provider || 'default',
-        collisionPolicy: eng.collisionPolicy || 'Overwrite',
-        folderPath: eng.folderPath || '',
-        payload,
-      });
+      await Promise.all([...groups.entries()].map(([folderPath, items]) =>
+        uploadToIgnition({
+          gatewayUrl: eng.ignitionGateway,
+          apiKey: eng.apiKey,
+          provider: eng.provider || 'default',
+          collisionPolicy: eng.collisionPolicy || 'Overwrite',
+          folderPath,
+          payload: buildInstancesPayload(items),
+        })
+      ));
       toast.success(`Uploaded ${instanceList.length} instance(s) to Ignition`);
     } catch (err) {
       const detail = err.response?.data?.error || err.message;

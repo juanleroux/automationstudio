@@ -27,33 +27,13 @@ function internalDataType(ignType) {
 }
 
 // Resolve an instance's areaId to a slash-separated folder path using the areas list.
-function buildAreaPath(areaId, areas) {
+// Exported so callers can resolve paths for grouping before upload.
+export function buildAreaPath(areaId, areas) {
   if (!areaId || areaId === 0) return '';
-  const area = areas.find(a => a.id === areaId);
+  const area = (areas || []).find(a => a.id === areaId);
   if (!area) return '';
   const parentPath = area.parentId != null ? buildAreaPath(area.parentId, areas) : '';
   return parentPath ? `${parentPath}/${area.name}` : area.name;
-}
-
-// Merge a list of { path, tag } items into a nested Folder/tag tree.
-function buildFolderTree(items) {
-  const root = { children: {}, instances: [] };
-  for (const { path, tag } of items) {
-    const parts = path ? path.split('/').filter(Boolean) : [];
-    let node = root;
-    for (const part of parts) {
-      if (!node.children[part]) node.children[part] = { children: {}, instances: [] };
-      node = node.children[part];
-    }
-    node.instances.push(tag);
-  }
-  function render(node) {
-    const tags = [...node.instances];
-    for (const [name, child] of Object.entries(node.children))
-      tags.push({ name, tagType: 'Folder', tags: render(child) });
-    return tags;
-  }
-  return render(root);
 }
 
 /**
@@ -82,14 +62,14 @@ function buildUdtType(template) {
 /**
  * Builds the Ignition tag import payload for a template.
  * UDT type definitions must reside under the _types_ folder; instances go
- * at the root (or under the folder path supplied as a query param).
- * Instances assigned to an area are nested inside matching Folder tags.
+ * at the root of the path supplied via ?path= on the request.
  * Returns { tags: [...] } — the body expected by POST /data/api/v1/tags/import.
  */
-export function buildIgnitionPayload(template, areas = []) {
+export function buildIgnitionPayload(template, instances = null) {
   const udtType = buildUdtType(template);
+  const insts = instances ?? template.instances ?? [];
 
-  const items = (template.instances || []).map(inst => {
+  const instanceTags = insts.map(inst => {
     const overrides = {};
     (inst.attributes || []).forEach(ia => {
       const ta = (template.attributes || []).find(a => a.id === ia.id);
@@ -97,28 +77,25 @@ export function buildIgnitionPayload(template, areas = []) {
         overrides[ta.name] = { dataType: ignitionDataType(ta.dataType), value: ia.value ?? '' };
       }
     });
-    return {
-      path: buildAreaPath(inst.areaId, areas),
-      tag: { name: inst.name, tagType: 'UdtInstance', typeId: template.name, parameters: overrides },
-    };
+    return { name: inst.name, tagType: 'UdtInstance', typeId: template.name, parameters: overrides };
   });
 
   return {
     tags: [
       { name: '_types_', tagType: 'Folder', tags: [udtType] },
-      ...buildFolderTree(items),
+      ...instanceTags,
     ],
   };
 }
 
 /**
- * Builds the Ignition import payload for a list of UDT instances.
+ * Builds the Ignition import payload for a flat list of UDT instances.
  * instanceList: [{ template, instance }]
- * Instances assigned to an area are nested inside matching Folder tags.
- * Returns { tags: [...] } — no _types_ wrapper needed.
+ * All instances must share the same target folder — callers group by area first.
+ * Returns { tags: [...UdtInstances] } — no _types_ wrapper needed.
  */
-export function buildInstancesPayload(instanceList, areas = []) {
-  const items = instanceList.map(({ template, instance }) => {
+export function buildInstancesPayload(instanceList) {
+  const tags = instanceList.map(({ template, instance }) => {
     const overrides = {};
     (instance.attributes || []).forEach(ia => {
       const ta = (template.attributes || []).find(a => a.id === ia.id);
@@ -126,12 +103,9 @@ export function buildInstancesPayload(instanceList, areas = []) {
         overrides[ta.name] = { dataType: ignitionDataType(ta.dataType), value: ia.value ?? '' };
       }
     });
-    return {
-      path: buildAreaPath(instance.areaId, areas),
-      tag: { name: instance.name, tagType: 'UdtInstance', typeId: template.name, parameters: overrides },
-    };
+    return { name: instance.name, tagType: 'UdtInstance', typeId: template.name, parameters: overrides };
   });
-  return { tags: buildFolderTree(items) };
+  return { tags };
 }
 
 
