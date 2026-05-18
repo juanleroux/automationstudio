@@ -33,7 +33,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             <Zap size={56} color="var(--bg-main)" />
           </div>
           <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
-            One Technology Limited
+            Automation Studio
           </span>
         </div>
         <span
