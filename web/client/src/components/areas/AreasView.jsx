@@ -251,20 +251,20 @@ export default function AreasView() {
   return (
     <div
       className="flex flex-col h-full"
-      style={{ background: '#1c1c1c' }}
-      onClick={() => setSelected(new Set())} // click outside deselects
+      style={{ background: 'var(--bg-main)' }}
+      onClick={() => setSelected(new Set())}
     >
       {/* Header */}
       <div
         className="flex items-center justify-between px-5 py-3 flex-shrink-0"
-        style={{ borderBottom: '1px solid #333', background: '#242424' }}
+        style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}
       >
         <div>
           <h2 className="text-sm font-semibold text-text-primary">Model</h2>
           <p className="text-xs text-text-muted">
             {areas.length} areas, {templates.reduce((s, t) => s + (t.instances?.length || 0), 0)} total instances
             {selected.size > 0 && (
-              <span style={{ color: '#3ecf8e', marginLeft: 8 }}>· {selected.size} selected</span>
+              <span style={{ color: 'var(--accent)', marginLeft: 8 }}>· {selected.size} selected</span>
             )}
           </p>
         </div>
@@ -316,8 +316,8 @@ export default function AreasView() {
                   {/* Area row */}
                   <tr
                     style={{
-                      background: isDragTarget ? 'rgba(62,207,142,0.08)' : undefined,
-                      borderLeft: isDragTarget ? '2px solid #3ecf8e' : '2px solid transparent'
+                      background: isDragTarget ? 'var(--accent-bg)' : undefined,
+                      borderLeft: isDragTarget ? '2px solid var(--accent)' : '2px solid transparent'
                     }}
                     onDragOver={e => { e.preventDefault(); setDragOver(area.id); }}
                     onDragLeave={() => setDragOver(null)}
@@ -347,7 +347,7 @@ export default function AreasView() {
                           <Map
                             size={14}
                             style={{
-                              color: area.isSystem ? '#666' : area.depth > 0 ? '#6eb5ff' : '#3ecf8e',
+                              color: area.isSystem ? 'var(--text-disabled)' : 'var(--accent)',
                               flexShrink: 0
                             }}
                           />
@@ -375,7 +375,7 @@ export default function AreasView() {
                       <div className="flex items-center gap-1">
                         {editingArea?.id === area.id ? (
                           <>
-                            <button className="btn-ghost btn-icon" style={{ padding: 3, color: '#3ecf8e' }} onClick={saveEditArea} title="Save">
+                            <button className="btn-ghost btn-icon" style={{ padding: 3, color: 'var(--accent)' }} onClick={saveEditArea} title="Save">
                               <Check size={13} />
                             </button>
                             <button className="btn-ghost btn-icon" style={{ padding: 3 }} onClick={() => setEditingArea(null)} title="Cancel">
@@ -404,7 +404,7 @@ export default function AreasView() {
                                 </button>
                                 <button
                                   className="btn-ghost btn-icon"
-                                  style={{ padding: 3, color: '#e55353' }}
+                                  style={{ padding: 3, color: 'var(--danger)' }}
                                   onClick={() => setConfirmDelete({ id: area.id, name: area.name, hasChildren: area.children?.length > 0 })}
                                   title="Delete"
                                 >
@@ -426,9 +426,9 @@ export default function AreasView() {
                       <tr
                         key={key}
                         style={{
-                          background: isSelected ? 'rgba(62,207,142,0.12)' : '#1a1a1a',
+                          background: isSelected ? 'var(--accent-bg)' : 'var(--bg-card)',
                           cursor: 'grab',
-                          outline: isSelected ? '1px solid rgba(62,207,142,0.4)' : 'none',
+                          outline: isSelected ? '1px solid var(--accent)' : 'none',
                           userSelect: 'none',
                         }}
                         draggable
@@ -439,10 +439,10 @@ export default function AreasView() {
                         <td></td>
                         <td style={{ paddingLeft: 36 + indent }}>
                           <div className="flex items-center gap-2">
-                            <Tag size={12} style={{ color: isSelected ? '#3ecf8e' : '#666', flexShrink: 0 }} />
+                            <Tag size={12} style={{ color: isSelected ? 'var(--accent)' : 'var(--text-disabled)', flexShrink: 0 }} />
                             <span className="text-sm">{inst.name}</span>
                             {inst.isFlagged && (
-                              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#e55353' }} title="Flagged" />
+                              <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--danger)' }} title="Flagged" />
                             )}
                           </div>
                         </td>
@@ -453,15 +453,15 @@ export default function AreasView() {
                     );
                   })}
                   {isExp && instances.length === 0 && !hasChildren && (
-                    <tr style={{ background: '#1a1a1a' }}>
+                    <tr style={{ background: 'var(--bg-card)' }}>
                       <td></td>
-                      <td colSpan={4} style={{ paddingLeft: 36 + indent, color: '#555', fontSize: 11, fontStyle: 'italic', paddingTop: 6, paddingBottom: 6 }}>
+                      <td colSpan={4} style={{ paddingLeft: 36 + indent, color: 'var(--text-disabled)', fontSize: 11, fontStyle: 'italic', paddingTop: 6, paddingBottom: 6 }}>
                         No instances — drag instances here or assign from Assets view
                       </td>
                     </tr>
                   )}
                   {closingAreas.map(ca => (
-                    <tr key={`add-${ca.id}`} onClick={() => openAddArea(ca.id)} style={{ cursor: 'pointer', background: '#1a1a1a' }} className="add-row">
+                    <tr key={`add-${ca.id}`} onClick={() => openAddArea(ca.id)} style={{ cursor: 'pointer', background: 'var(--bg-card)' }} className="add-row">
                       <td></td>
                       <td colSpan={4} style={{ padding: `5px 12px 5px ${36 + ca.indent}px` }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
