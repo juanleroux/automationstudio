@@ -3,7 +3,7 @@ import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, Sun, Moon, Cpu, Folde
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, saveProject, testIgnitionConnection, testSiemensConnection } from '../../api/client';
+import { loadConfig, saveConfig, saveProject, testIgnitionConnection } from '../../api/client';
 
 export default function SettingsView() {
   const { project, filename, updateProject } = useProject();
@@ -23,16 +23,14 @@ export default function SettingsView() {
   );
   const [siemens, setSiemens] = useState(
     project?.siemens || {
-      bridgeUrl: 'http://localhost:5100',
       tiaVersion: 'V21',
       projectPath: '',
+      openWithUI: false,
       enableSiemensMenuItems: true,
     }
   );
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
-  const [siemensTesting, setSiemensTesting] = useState(false);
-  const [siemensTestResult, setSiemensTestResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const tiaProjectFileRef = useRef(null);
 
@@ -291,19 +289,9 @@ export default function SettingsView() {
                 </div>
               )}
               <div className="p-3 rounded-md text-sm" style={{ background: 'rgba(0,114,198,0.08)', border: '1px solid rgba(0,114,198,0.25)', color: 'var(--text-secondary)' }}>
-                Requires the TIA Portal Openness bridge service running on this machine.
-                The bridge is a small .NET helper that communicates with TIA Portal V21.
-              </div>
-              <div>
-                <label className="block text-xs text-text-muted mb-1">Bridge Service URL</label>
-                <input
-                  type="url"
-                  value={siemens.bridgeUrl}
-                  onChange={e => setSiemens(p => ({ ...p, bridgeUrl: e.target.value }))}
-                  placeholder="http://localhost:5100"
-                  disabled={!project}
-                />
-                <p className="text-xs text-text-muted mt-1">Local URL of the TIA Openness bridge service</p>
+                Uses TIA Portal Openness — a direct .NET assembly call registered in the Windows GAC.
+                No separate service is required. Access is controlled by Windows authentication
+                inherited from the running process.
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -319,6 +307,7 @@ export default function SettingsView() {
                     <option value="V18">V18</option>
                     <option value="V17">V17</option>
                   </select>
+                  <p className="text-xs text-text-muted mt-1">Must match the installed TIA Portal version</p>
                 </div>
               </div>
               <div>
@@ -353,39 +342,37 @@ export default function SettingsView() {
                     e.target.value = '';
                   }}
                 />
-                <p className="text-xs text-text-muted mt-1">Full path to the TIA Portal project file (.ap21)</p>
+                <p className="text-xs text-text-muted mt-1">Full path to the TIA Portal project file on this machine</p>
               </div>
 
-              {/* Test connection */}
-              <div className="flex items-center gap-3">
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleTestSiemensConnection}
-                  disabled={siemensTesting || !siemens.bridgeUrl}
-                >
-                  {siemensTesting ? 'Testing...' : 'Test Connection'}
-                </button>
-                {siemensTestResult && (
-                  <div className="flex items-center gap-2 text-sm">
-                    {siemensTestResult.success
-                      ? <><Wifi size={14} style={{ color: 'var(--accent)' }} /><span style={{ color: 'var(--accent)' }}>{siemensTestResult.message}</span></>
-                      : <><WifiOff size={14} style={{ color: '#e55353' }} /><span style={{ color: '#e55353' }}>{siemensTestResult.message}</span></>
-                    }
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
-                <input
-                  type="checkbox"
-                  id="enableSiemens"
-                  checked={siemens.enableSiemensMenuItems}
-                  onChange={e => setSiemens(p => ({ ...p, enableSiemensMenuItems: e.target.checked }))}
-                  disabled={!project}
-                />
-                <label htmlFor="enableSiemens" className="text-sm text-text-primary cursor-pointer">
-                  Enable Siemens Menu Items
-                </label>
+              <div className="flex flex-col gap-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="openWithUI"
+                    checked={siemens.openWithUI || false}
+                    onChange={e => setSiemens(p => ({ ...p, openWithUI: e.target.checked }))}
+                    disabled={!project}
+                  />
+                  <label htmlFor="openWithUI" className="text-sm text-text-primary cursor-pointer">
+                    Open TIA Portal with UI visible
+                  </label>
+                </div>
+                <p className="text-xs text-text-muted" style={{ paddingLeft: 22 }}>
+                  When unchecked, TIA Portal runs headless in the background
+                </p>
+                <div className="flex items-center gap-3 mt-1">
+                  <input
+                    type="checkbox"
+                    id="enableSiemens"
+                    checked={siemens.enableSiemensMenuItems}
+                    onChange={e => setSiemens(p => ({ ...p, enableSiemensMenuItems: e.target.checked }))}
+                    disabled={!project}
+                  />
+                  <label htmlFor="enableSiemens" className="text-sm text-text-primary cursor-pointer">
+                    Enable Siemens Menu Items
+                  </label>
+                </div>
               </div>
             </div>
           )}
