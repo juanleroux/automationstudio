@@ -664,7 +664,7 @@ export default function TemplateTree({ selected, onSelect }) {
       instances = instances.filter(i => i.name.toLowerCase().includes(q) || i.description?.toLowerCase().includes(q));
       if (!t.name.toLowerCase().includes(q) && instances.length === 0) return null;
     }
-    instances = [...instances].sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+    instances = [...instances].sort((a, b) => a.name.localeCompare(b.name));
     return { ...t, instances };
   }).filter(Boolean);
 
@@ -816,7 +816,7 @@ export default function TemplateTree({ selected, onSelect }) {
               </div>
 
               {/* Instances */}
-              {isExp && (template.instances || []).map(inst => {
+              {isExp && [...(template.instances || [])].sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)).map(inst => {
                 const isISelected = isSelected('instance', template.id, inst.id);
                 return (
                   <div
