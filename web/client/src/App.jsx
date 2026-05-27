@@ -5,25 +5,16 @@ import { ToastProvider } from './components/shared/Toast';
 import Layout from './components/layout/Layout';
 import DashboardView from './components/dashboard/DashboardView';
 import EngineeringView from './components/engineering/EngineeringView';
-import SettingsModal from './components/settings/SettingsModal';
+import SettingsView from './components/settings/SettingsView';
 
 function AppInner() {
   const [activeView, setActiveView] = useState('dashboard');
-  const [showSettings, setShowSettings] = useState(false);
-
-  const handleChangeView = (view) => {
-    if (view === 'settings') {
-      setShowSettings(true);
-      return;
-    }
-    setActiveView(view);
-  };
 
   return (
-    <Layout activeView={activeView} onChangeView={handleChangeView}>
+    <Layout activeView={activeView} onChangeView={setActiveView}>
       {activeView === 'dashboard'   && <DashboardView />}
       {activeView === 'engineering' && <EngineeringView />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {activeView === 'settings'    && <SettingsView />}
     </Layout>
   );
 }
