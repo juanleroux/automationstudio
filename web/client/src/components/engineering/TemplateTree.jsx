@@ -680,6 +680,7 @@ export default function TemplateTree({ selected, onSelect }) {
               tabularExportDelimiter: prof.tabularExportDelimiter || ',',
               structuralExportTemplate: prof.structuralExportTemplate || '',
               customFormat: prof.customFormat || '',
+              attributes: prof.attributes || [],
             }));
             return { ...t, lastModification: now, profiles: [...existing, ...added] };
           })
