@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Layers, Database, Map, Cpu, AlertTriangle, Clock } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import NoProjectOpen from '../shared/NoProjectOpen';
@@ -31,15 +31,15 @@ function StatCard({ icon: Icon, label, value, sub, warn }) {
 
 function SectionHeader({ children }) {
   return (
-    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{children}</span>
     </div>
   );
 }
 
-const Card = React.forwardRef(function Card({ children, style }, ref) {
+function Card({ children, style }) {
   return (
-    <div ref={ref} style={{
+    <div style={{
       background: 'var(--bg-surface)',
       border: '1px solid var(--border)',
       borderRadius: 8,
@@ -49,22 +49,10 @@ const Card = React.forwardRef(function Card({ children, style }, ref) {
       {children}
     </div>
   );
-});
+}
 
 export default function DashboardView() {
   const { project } = useProject();
-  const templatesCardRef = useRef(null);
-  const [templatesCardHeight, setTemplatesCardHeight] = useState(null);
-
-  useLayoutEffect(() => {
-    const el = templatesCardRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setTemplatesCardHeight(entry.contentRect.height);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const m = useMemo(() => {
     if (!project) return null;
@@ -135,87 +123,91 @@ export default function DashboardView() {
         <StatCard icon={AlertTriangle} label="Flagged"    value={m.flaggedCount} warn />
       </div>
 
-      {/* Main grid */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      {/* Main grid — CSS Grid stretches same-row items to equal height automatically */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '2fr 1fr',
+        gridTemplateRows: 'auto auto',
+        gap: 16,
+        marginBottom: 16,
+      }}>
 
-        {/* Templates table */}
-        <Card style={{ flex: '2 1 400px' }} ref={templatesCardRef}>
+        {/* Templates — row 1, col 1 */}
+        <Card style={{ display: 'flex', flexDirection: 'column' }}>
           <SectionHeader>Templates</SectionHeader>
           {m.templateStats.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No templates yet</div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th style={{ textAlign: 'right' }}>Instances</th>
-                  <th style={{ textAlign: 'right' }}>Attributes</th>
-                  <th style={{ textAlign: 'right' }}>Profiles</th>
-                </tr>
-              </thead>
-              <tbody>
-                {m.templateStats.map(t => (
-                  <tr key={t.id}>
-                    <td style={{ fontWeight: 500 }}>{t.name}</td>
-                    <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{t.instances}</td>
-                    <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{t.attributes}</td>
-                    <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{t.profiles}</td>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th style={{ textAlign: 'right' }}>Instances</th>
+                    <th style={{ textAlign: 'right' }}>Attributes</th>
+                    <th style={{ textAlign: 'right' }}>Profiles</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {m.templateStats.map(t => (
+                    <tr key={t.id}>
+                      <td style={{ fontWeight: 500 }}>{t.name}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{t.instances}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{t.attributes}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{t.profiles}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
 
-        {/* Right column */}
-        <div style={{ flex: '1 1 240px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* Areas — same height as Templates card, scrollable */}
-          <Card style={{ height: templatesCardHeight ?? 'auto', display: 'flex', flexDirection: 'column' }}>
-            <SectionHeader>Areas</SectionHeader>
-            {m.areaStats.length === 0 ? (
-              <div style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: 13 }}>No areas defined</div>
-            ) : (
-              <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
-                {m.areaStats.map(a => (
-                  <div key={a.id} className="flex items-center justify-between" style={{ padding: '6px 16px' }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{a.name}</span>
-                    <span className="badge">{a.count}</span>
-                  </div>
-                ))}
-                {m.unassigned > 0 && (
-                  <div className="flex items-center justify-between" style={{ padding: '6px 16px' }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>Unassigned</span>
-                    <span className="badge">{m.unassigned}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
-
-          {/* Flagged instances */}
-          {m.flagged.length > 0 && (
-            <Card>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertTriangle size={13} style={{ color: '#e55353' }} />
-                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>Flagged Instances</span>
-              </div>
-              <div style={{ maxHeight: 220, overflowY: 'auto', padding: '6px 0' }}>
-                {m.flagged.map((inst, i) => (
-                  <div key={i} style={{ padding: '6px 16px' }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{inst.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{inst.templateName}</div>
-                  </div>
-                ))}
-              </div>
-            </Card>
+        {/* Areas — row 1, col 2. CSS Grid stretches this to match Templates height. */}
+        <Card style={{ display: 'flex', flexDirection: 'column' }}>
+          <SectionHeader>Areas</SectionHeader>
+          {m.areaStats.length === 0 ? (
+            <div style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: 13 }}>No areas defined</div>
+          ) : (
+            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+              {m.areaStats.map(a => (
+                <div key={a.id} className="flex items-center justify-between" style={{ padding: '6px 16px' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{a.name}</span>
+                  <span className="badge">{a.count}</span>
+                </div>
+              ))}
+              {m.unassigned > 0 && (
+                <div className="flex items-center justify-between" style={{ padding: '6px 16px' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>Unassigned</span>
+                  <span className="badge">{m.unassigned}</span>
+                </div>
+              )}
+            </div>
           )}
-        </div>
+        </Card>
+
+        {/* Flagged instances — row 2, col 2 (only when present) */}
+        {m.flagged.length > 0 && (
+          <Card style={{ gridColumn: 2, gridRow: 2 }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <AlertTriangle size={13} style={{ color: '#e55353' }} />
+              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>Flagged Instances</span>
+            </div>
+            <div style={{ maxHeight: 220, overflowY: 'auto', padding: '6px 0' }}>
+              {m.flagged.map((inst, i) => (
+                <div key={i} style={{ padding: '6px 16px' }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{inst.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{inst.templateName}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
 
-      {/* Recent activity */}
+      {/* Recent activity — full width below grid */}
       {m.recent.length > 0 && (
-        <Card style={{ marginTop: 16 }}>
+        <Card>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Clock size={13} style={{ color: 'var(--text-muted)' }} />
             <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>Recent Activity</span>
