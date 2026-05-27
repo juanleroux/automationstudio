@@ -35,8 +35,11 @@ export default function TemplateTree({ selected, onSelect }) {
   const [newName, setNewName] = useState('');
   const [importModalTemplate, setImportModalTemplate] = useState(null);
   const [importAttributesModalTemplate, setImportAttributesModalTemplate] = useState(null);
+  const [importProfileTemplateId, setImportProfileTemplateId] = useState(null);
+  const [importProfileModalTemplate, setImportProfileModalTemplate] = useState(null); // templateId for profile-select modal
   const [dragOver, setDragOver] = useState(null);
   const importTemplateRef = useRef(null);
+  const importProfileRef = useRef(null);
   const [showImportIgnition, setShowImportIgnition] = useState(false);
   const [ignitionPath, setIgnitionPath] = useState('');
   const [ignitionFetch, setIgnitionFetch] = useState({ loading: false, error: null, udts: [] });
@@ -655,6 +658,41 @@ export default function TemplateTree({ selected, onSelect }) {
     setContextMenu(null);
   };
 
+  // Import profile(s) from JSON file into a template
+  const handleImportProfileJSON = (templateId, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        const incoming = Array.isArray(data) ? data : [data];
+        const now = new Date().toISOString();
+        updateProject(p => ({
+          ...p,
+          templates: p.templates.map(t => {
+            if (t.id !== templateId) return t;
+            const existing = t.profiles || [];
+            const added = incoming.map(prof => ({
+              name: prof.name || 'Imported Profile',
+              description: prof.description || '',
+              exportType: prof.exportType ?? 0,
+              formatType: prof.formatType ?? 0,
+              tabularExportDelimiter: prof.tabularExportDelimiter || ',',
+              structuralExportTemplate: prof.structuralExportTemplate || '',
+              customFormat: prof.customFormat || '',
+            }));
+            return { ...t, lastModification: now, profiles: [...existing, ...added] };
+          })
+        }));
+        toast.success(`Imported ${incoming.length} profile${incoming.length > 1 ? 's' : ''}`);
+      } catch {
+        toast.error('Invalid profile JSON');
+      }
+    };
+    reader.readAsText(file);
+    setImportProfileTemplateId(null);
+  };
+
   // Filter & search
   const filteredTemplates = templates.map(t => {
     let instances = t.instances || [];
@@ -741,13 +779,23 @@ export default function TemplateTree({ selected, onSelect }) {
         </button>
       </div>
 
-      {/* Hidden file input for template JSON import */}
+      {/* Hidden file inputs */}
       <input
         ref={importTemplateRef}
         type="file"
         accept=".json"
         style={{ display: 'none' }}
         onChange={e => { handleImportTemplateJSON(e.target.files[0]); e.target.value = ''; }}
+      />
+      <input
+        ref={importProfileRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={e => {
+          if (importProfileTemplateId !== null) handleImportProfileJSON(importProfileTemplateId, e.target.files[0]);
+          e.target.value = '';
+        }}
       />
 
       {/* Tree */}
@@ -990,6 +1038,20 @@ export default function TemplateTree({ selected, onSelect }) {
                             <Download size={14} /> {p.name || `Profile ${i + 1}`}
                           </div>
                         ))}
+                        <div className="context-menu-separator" />
+                        <div className="context-menu-item" onClick={() => {
+                          const blob = new Blob([JSON.stringify(profiles, null, 2)], { type: 'application/json' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `${t.name}_profiles.json`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          toast.success(`Exported ${profiles.length} profile definition${profiles.length > 1 ? 's' : ''}`);
+                          setContextMenu(null);
+                        }}>
+                          <Download size={14} /> Export Profile Definitions
+                        </div>
                       </>
                     );
                   })()}
@@ -1006,6 +1068,9 @@ export default function TemplateTree({ selected, onSelect }) {
                   </div>
                   <div className="context-menu-item" onClick={() => { setImportModalTemplate(contextMenu.templateId); setContextMenu(null); }}>
                     <Upload size={14} /> Import Instances
+                  </div>
+                  <div className="context-menu-item" onClick={() => { setImportProfileModalTemplate(contextMenu.templateId); setContextMenu(null); }}>
+                    <Upload size={14} /> Import Profile
                   </div>
                 </div>
               </div>
@@ -1202,6 +1267,57 @@ export default function TemplateTree({ selected, onSelect }) {
           </div>
         </Modal>
       )}
+
+      {/* Import Profile Modal */}
+      {importProfileModalTemplate !== null && (() => {
+        const tmpl = templates.find(t => t.id === importProfileModalTemplate);
+        const existingProfiles = tmpl?.profiles || [];
+        return (
+          <Modal
+            title="Import Profile"
+            onClose={() => setImportProfileModalTemplate(null)}
+            width={480}
+          >
+            <div className="flex flex-col gap-4">
+              {existingProfiles.length > 0 && (
+                <div>
+                  <p className="text-xs text-text-muted mb-2">Profiles already on this template:</p>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 4, maxHeight: 140, overflowY: 'auto' }}>
+                    {existingProfiles.map((p, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '6px 10px', borderBottom: i < existingProfiles.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                        }}
+                      >
+                        <Download size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                        <span className="text-sm text-text-primary">{p.name || `Profile ${i + 1}`}</span>
+                        {p.description && <span className="text-xs text-text-muted truncate">{p.description}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <p className="text-sm text-text-secondary mb-3">
+                  Select a profile JSON file exported from another template. The profile(s) will be added to <strong style={{ color: 'var(--text-primary)' }}>{tmpl?.name}</strong>.
+                </p>
+                <label className="block text-xs text-text-muted mb-2">Select Profile JSON File</label>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={e => {
+                    handleImportProfileJSON(importProfileModalTemplate, e.target.files[0]);
+                    setImportProfileModalTemplate(null);
+                  }}
+                  style={{ background: 'transparent', border: 'none', padding: 0 }}
+                />
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* Import from Ignition Modal */}
       {showImportIgnition && (
