@@ -1,17 +1,60 @@
 /**
  * Generates and opens a commissioning check sheet as a printable HTML page.
- * Columns: Instance, Description, I/O, PLC, SCADA, MES, Notes.
- * Landscape orientation. Templates with no instances are excluded.
+ * Column widths are calculated from the actual max name/description lengths
+ * so every instance row fits on a single line.
  */
 export function openCommissioningReport(project) {
   const templates = (project?.templates || [])
-    .filter(t => (t.instances?.length || 0) > 0)   // skip empty templates
+    .filter(t => (t.instances?.length || 0) > 0)
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const now = new Date();
   const dateStr = now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 
+  // ── Measure max column content across ALL templates ──────────────
+  let maxNameLen = 8;   // minimum sensible widths (chars)
+  let maxDescLen = 11;  // "Description" header text
+
+  for (const tmpl of templates) {
+    for (const inst of tmpl.instances || []) {
+      maxNameLen = Math.max(maxNameLen, inst.name.length);
+      maxDescLen = Math.max(maxDescLen, (inst.description || '').length);
+    }
+  }
+
+  // ── Compute column widths ────────────────────────────────────────
+  // Landscape A4 content width ≈ 265mm (297mm − 2×16mm padding).
+  // Fixed columns: 4 checkbox cols + Notes.
+  // Arial 11px ≈ 1.65mm average char width (measured at 96dpi→print).
+  const CONTENT_MM   = 265;
+  const CHECK_MM     = 13;   // per checkbox column (I/O, PLC, SCADA, MES)
+  const NOTES_MM     = 48;
+  const CELL_PAD_MM  = 4.2;  // 8px padding each side × 0.264mm/px
+  const AVG_CHAR_MM  = 1.65;
+
+  const fixedMM   = (4 * CHECK_MM) + NOTES_MM;
+  const flexMM    = CONTENT_MM - fixedMM;
+
+  const rawNameMM = maxNameLen * AVG_CHAR_MM + CELL_PAD_MM * 2;
+  const rawDescMM = maxDescLen * AVG_CHAR_MM + CELL_PAD_MM * 2;
+
+  let nameMM, descMM;
+  if (rawNameMM + rawDescMM <= flexMM) {
+    // Content fits — use exact measured widths, give remainder to description
+    nameMM = rawNameMM;
+    descMM = flexMM - nameMM;
+  } else {
+    // Scale proportionally to fill available space
+    const ratio = flexMM / (rawNameMM + rawDescMM);
+    nameMM = rawNameMM * ratio;
+    descMM = rawDescMM * ratio;
+  }
+
+  // Convert mm → percentage of content width for CSS
+  const pct = v => (v / CONTENT_MM * 100).toFixed(2) + '%';
+
+  // ── Build template sections ──────────────────────────────────────
   let body = '';
 
   for (const tmpl of templates) {
@@ -23,13 +66,13 @@ export function openCommissioningReport(project) {
         : '';
       return `
         <tr class="${idx % 2 === 0 ? 'even' : 'odd'}">
-          <td>${flagDot}${esc(inst.name)}</td>
-          <td class="desc-cell">${esc(inst.description || '')}</td>
-          <td class="check-cell"><span class="checkbox"></span></td>
-          <td class="check-cell"><span class="checkbox"></span></td>
-          <td class="check-cell"><span class="checkbox"></span></td>
-          <td class="check-cell"><span class="checkbox"></span></td>
-          <td class="notes-cell"></td>
+          <td class="col-name">${flagDot}${esc(inst.name)}</td>
+          <td class="col-desc">${esc(inst.description || '')}</td>
+          <td class="col-check"><span class="checkbox"></span></td>
+          <td class="col-check"><span class="checkbox"></span></td>
+          <td class="col-check"><span class="checkbox"></span></td>
+          <td class="col-check"><span class="checkbox"></span></td>
+          <td class="col-notes"></td>
         </tr>`;
     }).join('');
 
@@ -41,15 +84,24 @@ export function openCommissioningReport(project) {
         </div>
         ${tmpl.description ? `<div class="template-desc">${esc(tmpl.description)}</div>` : ''}
         <table>
+          <colgroup>
+            <col style="width:${pct(nameMM)}">
+            <col style="width:${pct(descMM)}">
+            <col style="width:${pct(CHECK_MM)}">
+            <col style="width:${pct(CHECK_MM)}">
+            <col style="width:${pct(CHECK_MM)}">
+            <col style="width:${pct(CHECK_MM)}">
+            <col style="width:${pct(NOTES_MM)}">
+          </colgroup>
           <thead>
             <tr>
-              <th>Instance</th>
-              <th class="desc-cell">Description</th>
-              <th class="check-cell">I/O</th>
-              <th class="check-cell">PLC</th>
-              <th class="check-cell">SCADA</th>
-              <th class="check-cell">MES</th>
-              <th class="notes-cell">Notes</th>
+              <th class="col-name">Instance</th>
+              <th class="col-desc">Description</th>
+              <th class="col-check">I/O</th>
+              <th class="col-check">PLC</th>
+              <th class="col-check">SCADA</th>
+              <th class="col-check">MES</th>
+              <th class="col-notes">Notes</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -71,9 +123,6 @@ export function openCommissioningReport(project) {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* Landscape, zero @page margin so the browser doesn't inject its own
-       header/footer chrome (URL, date, page number). Content margin is
-       handled by body padding instead. */
     @page {
       size: A4 landscape;
       margin: 0;
@@ -87,7 +136,6 @@ export function openCommissioningReport(project) {
       padding: 14mm 16mm;
     }
 
-    /* ── Report header ── */
     .report-header {
       display: flex;
       justify-content: space-between;
@@ -100,7 +148,6 @@ export function openCommissioningReport(project) {
     .report-project { font-size: 13px; color: #444; margin-top: 2px; }
     .report-meta    { text-align: right; font-size: 10px; color: #666; line-height: 1.8; }
 
-    /* ── Template sections ── */
     .template-section { margin-bottom: 24px; page-break-inside: avoid; }
     .template-header {
       display: flex;
@@ -122,8 +169,12 @@ export function openCommissioningReport(project) {
       border-right: 1px solid #ccc;
     }
 
-    /* ── Table ── */
-    table { width: 100%; border-collapse: collapse; border: 1px solid #ccc; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #ccc;
+      table-layout: fixed;
+    }
     thead tr { background: #f0f0f0; }
     th {
       padding: 5px 8px;
@@ -134,19 +185,21 @@ export function openCommissioningReport(project) {
       letter-spacing: 0.04em;
       border: 1px solid #ccc;
       white-space: nowrap;
+      overflow: hidden;
     }
     td {
-      padding: 6px 8px;
+      padding: 5px 8px;
       border: 1px solid #ddd;
       vertical-align: middle;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     tr.even { background: #fff; }
     tr.odd  { background: #fafafa; }
 
-    /* ── Column widths ── */
-    .desc-cell  { width: 30%; }
-    .check-cell { width: 48px; text-align: center; }
-    .notes-cell { width: 24%; }
+    .col-check { text-align: center; }
+    .col-notes { white-space: normal; }
 
     .checkbox {
       display: inline-block;
@@ -156,7 +209,6 @@ export function openCommissioningReport(project) {
       border-radius: 2px;
     }
 
-    /* ── Report footer ── */
     .report-footer {
       margin-top: 24px;
       padding-top: 8px;
@@ -196,13 +248,11 @@ export function openCommissioningReport(project) {
 </body>
 </html>`;
 
-  // Use a Blob URL so the browser doesn't show "about:blank" in print headers/footers
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const win = window.open(url, '_blank');
   if (win) {
     win.addEventListener('afterprint', () => URL.revokeObjectURL(url));
-    // Fallback cleanup after 5 minutes
     setTimeout(() => URL.revokeObjectURL(url), 300_000);
   }
 }
