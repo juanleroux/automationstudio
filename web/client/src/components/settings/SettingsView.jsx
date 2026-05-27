@@ -89,29 +89,9 @@ export default function SettingsView() {
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg-main)' }}>
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-4"
-        style={{
-          height: 40,
-          background: 'var(--bg-surface)',
-          borderBottom: '1px solid var(--border)',
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Settings</span>
-        <button
-          className="btn btn-primary"
-          onClick={handleSave}
-          disabled={saving}
-          style={{ height: 28, fontSize: 12, padding: '0 14px' }}
-        >
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
-      </div>
-
-      {/* Tab bar */}
-      <div className="tab-bar" style={{ flexShrink: 0, paddingLeft: 4 }}>
+      {/* Tab bar with Save button */}
+      <div className="tab-bar" style={{ flexShrink: 0, paddingLeft: 4, paddingRight: 8, justifyContent: 'space-between' }}>
+        <div className="flex">
         {tabs.map(tab => {
           const Icon = tab.icon;
           return (
@@ -125,6 +105,15 @@ export default function SettingsView() {
             </button>
           );
         })}
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={saving}
+          style={{ height: 28, fontSize: 12, padding: '0 14px', alignSelf: 'center', marginBottom: 2 }}
+        >
+          {saving ? 'Saving...' : 'Save Settings'}
+        </button>
       </div>
 
       {/* Content */}
