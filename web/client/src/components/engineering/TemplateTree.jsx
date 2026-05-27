@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ChevronRight, ChevronDown, Folder, FolderOpen, Tag,
   Circle, Search, Filter, Plus, Trash2, Copy, Edit2,
-  Upload, Download, Flag, MoreVertical
+  Upload, Download, Flag, MoreVertical, ArrowUpAZ, ArrowDownAZ
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -25,6 +25,7 @@ export default function TemplateTree({ selected, onSelect }) {
   const [expanded, setExpanded] = useState(new Set());
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all'); // all | flagged
+  const [sortDir, setSortDir] = useState('asc'); // asc | desc
   const [contextMenu, setContextMenu] = useState(null);
   const [renaming, setRenaming] = useState(null); // { type: 'template'|'instance', templateId, instanceId }
   const [renameValue, setRenameValue] = useState('');
@@ -663,7 +664,7 @@ export default function TemplateTree({ selected, onSelect }) {
       instances = instances.filter(i => i.name.toLowerCase().includes(q) || i.description?.toLowerCase().includes(q));
       if (!t.name.toLowerCase().includes(q) && instances.length === 0) return null;
     }
-    instances = [...instances].sort((a, b) => a.name.localeCompare(b.name));
+    instances = [...instances].sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
     return { ...t, instances };
   }).filter(Boolean);
 
@@ -730,6 +731,14 @@ export default function TemplateTree({ selected, onSelect }) {
           <option value="all">All</option>
           <option value="flagged">Flagged</option>
         </select>
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+          title={sortDir === 'asc' ? 'Sorted A→Z (click for Z→A)' : 'Sorted Z→A (click for A→Z)'}
+          style={{ padding: 4, color: 'var(--text-muted)' }}
+        >
+          {sortDir === 'asc' ? <ArrowUpAZ size={15} /> : <ArrowDownAZ size={15} />}
+        </button>
       </div>
 
       {/* Hidden file input for template JSON import */}
