@@ -1071,13 +1071,7 @@ export default function TemplateTree({ selected, onSelect }) {
                     )}
                     <div className="context-menu-separator" />
                     <div className="context-menu-item danger" onClick={() => {
-                      if (multi) {
-                        setConfirmDelete({ type: 'multi-instance', instances: ctxInsts, count: ctxInsts.length });
-                      } else {
-                        const t = templates.find(x => x.id === contextMenu.templateId);
-                        const inst = t?.instances?.find(i => i.id === contextMenu.instanceId);
-                        setConfirmDelete({ type: 'instance', templateId: contextMenu.templateId, instanceId: contextMenu.instanceId, name: inst?.name });
-                      }
+                      setConfirmDelete({ type: 'multi-instance', instances: ctxInsts, count: ctxInsts.length });
                       setContextMenu(null);
                     }}>
                       <Trash2 size={14} /> Delete {multi ? `${ctxInsts.length} Instances` : 'Instance'}
@@ -1093,13 +1087,12 @@ export default function TemplateTree({ selected, onSelect }) {
       {/* Confirm Delete */}
       {confirmDelete && (
         <ConfirmDialog
-          title={confirmDelete.type === 'template' ? 'Delete Template' : confirmDelete.type === 'multi-instance' ? `Delete ${confirmDelete.count} Instances` : 'Delete Instance'}
-          message={confirmDelete.type === 'multi-instance' ? `Delete ${confirmDelete.count} selected instances? This cannot be undone.` : `Delete "${confirmDelete.name}"? This cannot be undone.`}
+          title={confirmDelete.type === 'template' ? 'Delete Template' : confirmDelete.count > 1 ? `Delete ${confirmDelete.count} Instances` : 'Delete Instance'}
+          message={confirmDelete.type === 'template' ? `Delete "${confirmDelete.name}"? This cannot be undone.` : confirmDelete.count > 1 ? `Delete ${confirmDelete.count} selected instances? This cannot be undone.` : `Delete "${confirmDelete.instances?.[0]?.instance?.name}"? This cannot be undone.`}
           danger
           onConfirm={() => {
             if (confirmDelete.type === 'template') deleteTemplate(confirmDelete.templateId);
-            else if (confirmDelete.type === 'multi-instance') deleteMultipleInstances(confirmDelete.instances);
-            else deleteInstance(confirmDelete.templateId, confirmDelete.instanceId);
+            else deleteMultipleInstances(confirmDelete.instances);
           }}
           onCancel={() => setConfirmDelete(null)}
         />
