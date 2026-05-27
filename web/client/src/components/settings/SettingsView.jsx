@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, Sun, Moon, Cpu } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, Sun, Moon, Cpu, FolderOpen } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
@@ -34,6 +34,7 @@ export default function SettingsView() {
   const [siemensTesting, setSiemensTesting] = useState(false);
   const [siemensTestResult, setSiemensTestResult] = useState(null);
   const [saving, setSaving] = useState(false);
+  const tiaProjectFileRef = useRef(null);
 
   useEffect(() => {
     loadConfig().then(setConfig).catch(() => setConfig({
@@ -322,14 +323,37 @@ export default function SettingsView() {
               </div>
               <div>
                 <label className="block text-xs text-text-muted mb-1">TIA Project Path (optional)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={siemens.projectPath}
+                    onChange={e => setSiemens(p => ({ ...p, projectPath: e.target.value }))}
+                    placeholder="C:\Projects\MyPlant\MyPlant.ap21"
+                    disabled={!project}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => tiaProjectFileRef.current?.click()}
+                    disabled={!project}
+                    title="Browse for TIA project file"
+                    style={{ flexShrink: 0, padding: '0 10px' }}
+                  >
+                    <FolderOpen size={14} />
+                  </button>
+                </div>
                 <input
-                  type="text"
-                  value={siemens.projectPath}
-                  onChange={e => setSiemens(p => ({ ...p, projectPath: e.target.value }))}
-                  placeholder="C:\Projects\MyPlant\MyPlant.ap21"
-                  disabled={!project}
+                  ref={tiaProjectFileRef}
+                  type="file"
+                  accept=".ap21,.ap20,.ap19,.ap18,.ap17"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) setSiemens(p => ({ ...p, projectPath: file.name }));
+                    e.target.value = '';
+                  }}
                 />
-                <p className="text-xs text-text-muted mt-1">Full path to the .ap21 project file on the local machine</p>
+                <p className="text-xs text-text-muted mt-1">Full path to the TIA Portal project file (.ap21)</p>
               </div>
 
               {/* Test connection */}
