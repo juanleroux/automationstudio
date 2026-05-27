@@ -1016,7 +1016,7 @@ export default function TemplateTree({ selected, onSelect }) {
                       <Upload size={14} /> Upload to Ignition
                     </div>
                   )}
-                  {/* Profile exports */}
+                  {/* Profile data exports (run each configured profile format) */}
                   {(() => {
                     const t = templates.find(x => x.id === contextMenu.templateId);
                     const profiles = t?.profiles || [];
@@ -1038,19 +1038,33 @@ export default function TemplateTree({ selected, onSelect }) {
                             <Download size={14} /> {p.name || `Profile ${i + 1}`}
                           </div>
                         ))}
+                      </>
+                    );
+                  })()}
+                  {/* Export profile definitions as JSON (for re-importing into other templates) */}
+                  {(() => {
+                    const t = templates.find(x => x.id === contextMenu.templateId);
+                    const profiles = t?.profiles || [];
+                    const disabled = profiles.length === 0;
+                    return (
+                      <>
                         <div className="context-menu-separator" />
-                        <div className="context-menu-item" onClick={() => {
-                          const blob = new Blob([JSON.stringify(profiles, null, 2)], { type: 'application/json' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `${t.name}_profiles.json`;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                          toast.success(`Exported ${profiles.length} profile definition${profiles.length > 1 ? 's' : ''}`);
-                          setContextMenu(null);
-                        }}>
-                          <Download size={14} /> Export Profile Definitions
+                        <div
+                          className="context-menu-item"
+                          style={{ opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? 'none' : 'auto' }}
+                          onClick={() => {
+                            const blob = new Blob([JSON.stringify(profiles, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${t.name}_profiles.json`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            toast.success(`Exported ${profiles.length} profile${profiles.length !== 1 ? 's' : ''} as JSON`);
+                            setContextMenu(null);
+                          }}
+                        >
+                          <Download size={14} /> Export Profiles (JSON)
                         </div>
                       </>
                     );
