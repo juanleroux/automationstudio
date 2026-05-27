@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, Sun, Moon } from 'lucide-react';
+import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, Sun, Moon, Cpu } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, saveProject, testIgnitionConnection } from '../../api/client';
+import { loadConfig, saveConfig, saveProject, testIgnitionConnection, testSiemensConnection } from '../../api/client';
 
 export default function SettingsView() {
   const { project, filename, updateProject } = useProject();
@@ -21,8 +21,18 @@ export default function SettingsView() {
       enableIgnitionMenuItems: true
     }
   );
+  const [siemens, setSiemens] = useState(
+    project?.siemens || {
+      bridgeUrl: 'http://localhost:5100',
+      tiaVersion: 'V21',
+      projectPath: '',
+      enableSiemensMenuItems: true,
+    }
+  );
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [siemensTesting, setSiemensTesting] = useState(false);
+  const [siemensTestResult, setSiemensTestResult] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -44,7 +54,7 @@ export default function SettingsView() {
     setSaving(true);
     try {
       if (project && filename) {
-        const updatedProject = { ...project, engineering };
+        const updatedProject = { ...project, engineering, siemens };
         updateProject(updatedProject);
         await saveProject(filename, updatedProject);
       }
@@ -57,6 +67,24 @@ export default function SettingsView() {
       toast.error('Failed to save: ' + detail);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestSiemensConnection = async () => {
+    if (!siemens.bridgeUrl) {
+      toast.error('Enter a bridge URL first');
+      return;
+    }
+    setSiemensTesting(true);
+    setSiemensTestResult(null);
+    try {
+      const result = await testSiemensConnection({ bridgeUrl: siemens.bridgeUrl });
+      const versionNote = result.tiaVersion ? ` · TIA ${result.tiaVersion}` : '';
+      setSiemensTestResult({ success: true, message: `Bridge reachable (HTTP ${result.status})${versionNote}` });
+    } catch (err) {
+      setSiemensTestResult({ success: false, message: err.response?.data?.error || err.message });
+    } finally {
+      setSiemensTesting(false);
     }
   };
 
@@ -84,6 +112,7 @@ export default function SettingsView() {
   const tabs = [
     { id: 'general', label: 'General', icon: SlidersHorizontal },
     { id: 'engineering', label: 'Ignition API', icon: Zap },
+    { id: 'siemens', label: 'Siemens API', icon: Cpu },
     { id: 'company', label: 'Company', icon: Building2 },
   ];
 
@@ -247,6 +276,91 @@ export default function SettingsView() {
                 />
                 <label htmlFor="enableIgnition" className="text-sm text-text-primary cursor-pointer">
                   Enable Ignition Menu Items
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Siemens tab */}
+          {activeTab === 'siemens' && (
+            <div className="flex flex-col gap-4">
+              {!project && (
+                <div className="p-3 rounded-md text-sm text-yellow-400" style={{ background: 'rgba(255,193,7,0.1)', border: '1px solid rgba(255,193,7,0.2)' }}>
+                  Open a project to configure Siemens settings
+                </div>
+              )}
+              <div className="p-3 rounded-md text-sm" style={{ background: 'rgba(0,114,198,0.08)', border: '1px solid rgba(0,114,198,0.25)', color: 'var(--text-secondary)' }}>
+                Requires the TIA Portal Openness bridge service running on this machine.
+                The bridge is a small .NET helper that communicates with TIA Portal V21.
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Bridge Service URL</label>
+                <input
+                  type="url"
+                  value={siemens.bridgeUrl}
+                  onChange={e => setSiemens(p => ({ ...p, bridgeUrl: e.target.value }))}
+                  placeholder="http://localhost:5100"
+                  disabled={!project}
+                />
+                <p className="text-xs text-text-muted mt-1">Local URL of the TIA Openness bridge service</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">TIA Portal Version</label>
+                  <select
+                    value={siemens.tiaVersion || 'V21'}
+                    onChange={e => setSiemens(p => ({ ...p, tiaVersion: e.target.value }))}
+                    disabled={!project}
+                  >
+                    <option value="V21">V21</option>
+                    <option value="V20">V20</option>
+                    <option value="V19">V19</option>
+                    <option value="V18">V18</option>
+                    <option value="V17">V17</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1">TIA Project Path (optional)</label>
+                <input
+                  type="text"
+                  value={siemens.projectPath}
+                  onChange={e => setSiemens(p => ({ ...p, projectPath: e.target.value }))}
+                  placeholder="C:\Projects\MyPlant\MyPlant.ap21"
+                  disabled={!project}
+                />
+                <p className="text-xs text-text-muted mt-1">Full path to the .ap21 project file on the local machine</p>
+              </div>
+
+              {/* Test connection */}
+              <div className="flex items-center gap-3">
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleTestSiemensConnection}
+                  disabled={siemensTesting || !siemens.bridgeUrl}
+                >
+                  {siemensTesting ? 'Testing...' : 'Test Connection'}
+                </button>
+                {siemensTestResult && (
+                  <div className="flex items-center gap-2 text-sm">
+                    {siemensTestResult.success
+                      ? <><Wifi size={14} style={{ color: 'var(--accent)' }} /><span style={{ color: 'var(--accent)' }}>{siemensTestResult.message}</span></>
+                      : <><WifiOff size={14} style={{ color: '#e55353' }} /><span style={{ color: '#e55353' }}>{siemensTestResult.message}</span></>
+                    }
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+                <input
+                  type="checkbox"
+                  id="enableSiemens"
+                  checked={siemens.enableSiemensMenuItems}
+                  onChange={e => setSiemens(p => ({ ...p, enableSiemensMenuItems: e.target.checked }))}
+                  disabled={!project}
+                />
+                <label htmlFor="enableSiemens" className="text-sm text-text-primary cursor-pointer">
+                  Enable Siemens Menu Items
                 </label>
               </div>
             </div>

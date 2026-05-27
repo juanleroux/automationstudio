@@ -5,6 +5,7 @@ const fs = require('fs');
 
 const projectsRouter = require('./routes/projects');
 const ignitionRouter = require('./routes/ignition');
+const siemensRouter = require('./routes/siemens');
 const configRouter = require('./routes/config');
 
 const app = express();
@@ -50,6 +51,7 @@ app.use(express.json({ limit: '50mb' }));
 
 app.use('/api/projects', projectsRouter);
 app.use('/api/ignition', ignitionRouter);
+app.use('/api/siemens', siemensRouter);
 app.use('/api/config', configRouter);
 
 app.get('/api/health', (req, res) => {
