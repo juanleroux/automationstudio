@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ChevronRight, ChevronDown, Folder, FolderOpen, Tag,
   Circle, Search, Filter, Plus, Trash2, Copy, Edit2,
-  Upload, Download, Flag, MoreVertical, ArrowUpAZ, ArrowDownAZ
+  Upload, Download, Flag, MoreVertical, ArrowUpDown
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -735,9 +735,10 @@ export default function TemplateTree({ selected, onSelect }) {
           className="btn btn-ghost btn-icon"
           onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
           title={sortDir === 'asc' ? 'Sorted A→Z (click for Z→A)' : 'Sorted Z→A (click for A→Z)'}
-          style={{ padding: 4, color: 'var(--text-muted)' }}
+          style={{ padding: '3px 6px', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: 2 }}
         >
-          {sortDir === 'asc' ? <ArrowUpAZ size={15} /> : <ArrowDownAZ size={15} />}
+          <ArrowUpDown size={11} />
+          {sortDir === 'asc' ? 'A→Z' : 'Z→A'}
         </button>
       </div>
 
