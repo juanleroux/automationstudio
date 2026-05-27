@@ -152,6 +152,15 @@ body {
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
   z-index: 10000;
 }
+/* Transparent bridge over the gap so hover isn't lost when moving to the submenu */
+.context-menu-submenu-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 8px;
+  height: 100%;
+}
 
 /* ── Inputs ──────────────────────────────────────────────────── */
 input[type="text"],
