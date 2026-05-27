@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, Edit2, Map, Tag, ChevronDown, ChevronRight, Check, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Map, Tag, ChevronDown, ChevronRight, Check, X, Upload, Download } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import ConfirmDialog from '../shared/ConfirmDialog';
@@ -59,6 +59,51 @@ export default function AreasView() {
   // Multi-select state
   const [selected, setSelected] = useState(new Set());
   const lastClickedKey = useRef(null);
+  const importAreasRef = useRef(null);
+
+  const exportAreas = () => {
+    const data = JSON.stringify(project.areas || [], null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.name || 'model'}_areas.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${(project.areas || []).length} areas`);
+  };
+
+  const importAreas = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const incoming = JSON.parse(e.target.result);
+        if (!Array.isArray(incoming)) throw new Error('Expected an array of areas');
+        const now = new Date().toISOString();
+        updateProject(p => {
+          const existing = p.areas || [];
+          const maxId = existing.length ? Math.max(...existing.map(a => a.id)) : 0;
+          const idMap = {};
+          const remapped = incoming.map((a, i) => {
+            const newId = maxId + i + 1;
+            idMap[a.id] = newId;
+            return { ...a, id: newId, lastModification: now };
+          });
+          // Fix up parentId references
+          const fixed = remapped.map(a => ({
+            ...a,
+            parentId: a.parentId != null ? (idMap[a.parentId] ?? null) : null,
+          }));
+          return { ...p, areas: [...existing, ...fixed] };
+        });
+        toast.success(`Imported ${incoming.length} area${incoming.length !== 1 ? 's' : ''}`);
+      } catch (err) {
+        toast.error('Invalid areas JSON: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
 
   if (!project) {
     return <NoProjectOpen />;
@@ -267,6 +312,31 @@ export default function AreasView() {
               <span style={{ color: 'var(--accent)', marginLeft: 8 }}>· {selected.size} selected</span>
             )}
           </p>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            className="btn btn-ghost btn-icon"
+            onClick={() => importAreasRef.current?.click()}
+            title="Import areas from JSON"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <Upload size={15} />
+          </button>
+          <button
+            className="btn btn-ghost btn-icon"
+            onClick={exportAreas}
+            title="Export areas to JSON"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <Download size={15} />
+          </button>
+          <input
+            ref={importAreasRef}
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={e => { importAreas(e.target.files[0]); e.target.value = ''; }}
+          />
         </div>
       </div>
 
