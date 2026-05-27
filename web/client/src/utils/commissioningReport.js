@@ -1,9 +1,11 @@
 /**
  * Generates and opens a commissioning check sheet as a printable HTML page.
  * Columns: Instance, Description, I/O, PLC, SCADA, MES, Notes.
+ * Landscape orientation. Templates with no instances are excluded.
  */
 export function openCommissioningReport(project) {
   const templates = (project?.templates || [])
+    .filter(t => (t.instances?.length || 0) > 0)   // skip empty templates
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -31,10 +33,6 @@ export function openCommissioningReport(project) {
         </tr>`;
     }).join('');
 
-    const emptyNote = instances.length === 0
-      ? `<tr><td colspan="7" style="text-align:center;color:#aaa;font-style:italic;padding:12px">No instances</td></tr>`
-      : '';
-
     body += `
       <div class="template-section">
         <div class="template-header">
@@ -54,16 +52,13 @@ export function openCommissioningReport(project) {
               <th class="notes-cell">Notes</th>
             </tr>
           </thead>
-          <tbody>
-            ${rows}
-            ${emptyNote}
-          </tbody>
+          <tbody>${rows}</tbody>
         </table>
       </div>`;
   }
 
   if (templates.length === 0) {
-    body = '<p style="text-align:center;color:#aaa;margin-top:60px">No templates defined in this project.</p>';
+    body = '<p style="text-align:center;color:#aaa;margin-top:60px">No templates with instances found in this project.</p>';
   }
 
   const totalInstances = templates.reduce((n, t) => n + (t.instances?.length || 0), 0);
@@ -76,12 +71,20 @@ export function openCommissioningReport(project) {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* Landscape, zero @page margin so the browser doesn't inject its own
+       header/footer chrome (URL, date, page number). Content margin is
+       handled by body padding instead. */
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
     body {
       font-family: Arial, Helvetica, sans-serif;
       font-size: 11px;
       color: #1a1a1a;
       background: #fff;
-      padding: 20mm 15mm;
+      padding: 14mm 16mm;
     }
 
     /* ── Report header ── */
@@ -91,14 +94,14 @@ export function openCommissioningReport(project) {
       align-items: flex-end;
       border-bottom: 2px solid #1a1a1a;
       padding-bottom: 8px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
-    .report-title  { font-size: 18px; font-weight: 700; }
+    .report-title   { font-size: 18px; font-weight: 700; }
     .report-project { font-size: 13px; color: #444; margin-top: 2px; }
-    .report-meta   { text-align: right; font-size: 10px; color: #666; line-height: 1.8; }
+    .report-meta    { text-align: right; font-size: 10px; color: #666; line-height: 1.8; }
 
     /* ── Template sections ── */
-    .template-section { margin-bottom: 28px; page-break-inside: avoid; }
+    .template-section { margin-bottom: 24px; page-break-inside: avoid; }
     .template-header {
       display: flex;
       align-items: baseline;
@@ -141,11 +144,10 @@ export function openCommissioningReport(project) {
     tr.odd  { background: #fafafa; }
 
     /* ── Column widths ── */
-    .desc-cell  { width: 28%; }
-    .check-cell { width: 44px; text-align: center; }
-    .notes-cell { width: 22%; }
+    .desc-cell  { width: 30%; }
+    .check-cell { width: 48px; text-align: center; }
+    .notes-cell { width: 24%; }
 
-    /* Printed checkbox */
     .checkbox {
       display: inline-block;
       width: 13px;
@@ -154,9 +156,9 @@ export function openCommissioningReport(project) {
       border-radius: 2px;
     }
 
-    /* ── Footer ── */
+    /* ── Report footer ── */
     .report-footer {
-      margin-top: 30px;
+      margin-top: 24px;
       padding-top: 8px;
       border-top: 1px solid #ccc;
       font-size: 9px;
@@ -166,7 +168,6 @@ export function openCommissioningReport(project) {
     }
 
     @media print {
-      body { padding: 10mm 12mm; }
       .template-section { page-break-inside: avoid; }
       thead { display: table-header-group; }
     }
@@ -195,10 +196,14 @@ export function openCommissioningReport(project) {
 </body>
 </html>`;
 
-  const win = window.open('', '_blank');
+  // Use a Blob URL so the browser doesn't show "about:blank" in print headers/footers
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
   if (win) {
-    win.document.write(html);
-    win.document.close();
+    win.addEventListener('afterprint', () => URL.revokeObjectURL(url));
+    // Fallback cleanup after 5 minutes
+    setTimeout(() => URL.revokeObjectURL(url), 300_000);
   }
 }
 
