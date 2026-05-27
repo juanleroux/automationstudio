@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Cpu, Plus, Zap } from 'lucide-react';
+import { Cpu, Plus, Zap, Printer } from 'lucide-react';
 import NoProjectOpen from '../shared/NoProjectOpen';
 import { VERSION } from '../../version';
 import TemplateTree from './TemplateTree';
@@ -8,6 +8,7 @@ import ProfilePanel, { ProfileForm } from './ProfilePanel';
 import Modal from '../shared/Modal';
 import { useProject } from '../../context/ProjectContext';
 import AreasView from '../areas/AreasView';
+import { openCommissioningReport } from '../../utils/commissioningReport';
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
@@ -239,7 +240,16 @@ export default function EngineeringView() {
   return (
     <div className="flex flex-col h-full">
       {/* View tab bar */}
-      <div className="flex flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+      <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={() => openCommissioningReport(project)}
+          title="Print commissioning check sheet"
+          style={{ marginLeft: 6, marginRight: 2, color: 'var(--text-muted)', flexShrink: 0 }}
+        >
+          <Printer size={15} />
+        </button>
+        <div style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 2, flexShrink: 0 }} />
         {['derivation', 'model'].map(tab => (
           <button
             key={tab}
