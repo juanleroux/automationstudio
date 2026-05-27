@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
-import { Layers, Database, Map, Cpu, AlertTriangle, Clock } from 'lucide-react';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { Layers, Database, Map, Cpu, AlertTriangle, Clock, ChevronRight, ChevronDown } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import NoProjectOpen from '../shared/NoProjectOpen';
 
@@ -51,20 +51,41 @@ function Card({ children, style }) {
   );
 }
 
-function AreaRow({ node, depth }) {
+function AreaRow({ node, depth, collapsed, onToggle }) {
+  const hasChildren = node.children.length > 0;
+  const isCollapsed = collapsed.has(node.id);
+
   return (
     <>
-      <div className="flex items-center justify-between" style={{ padding: `5px 16px 5px ${16 + depth * 14}px` }}>
-        {depth > 0 && (
-          <span style={{ color: 'var(--border)', marginRight: 6, fontSize: 10, flexShrink: 0 }}>└</span>
-        )}
-        <span style={{ fontSize: 13, color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div
+        className="flex items-center"
+        style={{
+          padding: `4px 16px 4px ${12 + depth * 16}px`,
+          cursor: hasChildren ? 'pointer' : 'default',
+          userSelect: 'none',
+        }}
+        onClick={() => hasChildren && onToggle(node.id)}
+      >
+        <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+          {hasChildren
+            ? (isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />)
+            : null}
+        </span>
+        <span style={{
+          fontSize: 13,
+          color: 'var(--text-primary)',
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
           {node.name}
         </span>
         <span className="badge" style={{ marginLeft: 8, flexShrink: 0 }}>{node.instanceCount}</span>
       </div>
-      {node.children.map(child => (
-        <AreaRow key={child.id} node={child} depth={depth + 1} />
+      {!isCollapsed && node.children.map(child => (
+        <AreaRow key={child.id} node={child} depth={depth + 1} collapsed={collapsed} onToggle={onToggle} />
       ))}
     </>
   );
@@ -85,15 +106,14 @@ export default function DashboardView() {
   const { project } = useProject();
   const templatesRef = useRef(null);
   const [areasCardHeight, setAreasCardHeight] = useState(null);
+  const [collapsedAreas, setCollapsedAreas] = useState(new Set());
 
-  useLayoutEffect(() => {
-    const el = templatesRef.current;
-    if (!el) return;
-    const measure = () => setAreasCardHeight(el.getBoundingClientRect().height);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
+  const toggleArea = useCallback((id) => {
+    setCollapsedAreas(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }, []);
 
   const m = useMemo(() => {
@@ -144,6 +164,21 @@ export default function DashboardView() {
     };
   }, [project]);
 
+  // useEffect (post-paint) ensures getBoundingClientRect returns the real laid-out height.
+  // Re-runs whenever m changes so the Areas card height stays in sync with Templates content.
+  useEffect(() => {
+    const el = templatesRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.getBoundingClientRect().height;
+      if (h > 0) setAreasCardHeight(h);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [m]);
+
   if (!project) {
     return <NoProjectOpen />;
   }
@@ -161,12 +196,12 @@ export default function DashboardView() {
         <StatCard icon={AlertTriangle} label="Flagged"    value={m.flaggedCount} warn />
       </div>
 
-      {/* Two-column layout */}
+      {/* Two-column layout — Templates natural height; Areas matches via measurement */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
 
-        {/* Left: Templates — natural height, measured for Areas */}
+        {/* Left: Templates card — natural height, ref measured for Areas sizing */}
         <div ref={templatesRef} style={{ flex: '2 1 0', minWidth: 0 }}>
-          <Card style={{ display: 'flex', flexDirection: 'column' }}>
+          <Card>
             <SectionHeader>Templates</SectionHeader>
             {m.templateStats.length === 0 ? (
               <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No templates yet</div>
@@ -195,7 +230,7 @@ export default function DashboardView() {
           </Card>
         </div>
 
-        {/* Right: Areas + optional Flagged */}
+        {/* Right column: Areas + optional Flagged */}
         <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card style={{
             display: 'flex',
@@ -207,22 +242,21 @@ export default function DashboardView() {
             {m.areaTree.length === 0 && m.unassigned === 0 ? (
               <div style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: 13 }}>No areas defined</div>
             ) : (
-              <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
-                {/* Unassigned always first */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
                 {m.unassigned > 0 && (
-                  <div className="flex items-center justify-between" style={{ padding: '5px 16px' }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>Unassigned</span>
-                    <span className="badge">{m.unassigned}</span>
+                  <div className="flex items-center" style={{ padding: '4px 16px' }}>
+                    <span style={{ width: 16, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic', flex: 1 }}>Unassigned</span>
+                    <span className="badge" style={{ marginLeft: 8, flexShrink: 0 }}>{m.unassigned}</span>
                   </div>
                 )}
                 {m.areaTree.map(node => (
-                  <AreaRow key={node.id} node={node} depth={0} />
+                  <AreaRow key={node.id} node={node} depth={0} collapsed={collapsedAreas} onToggle={toggleArea} />
                 ))}
               </div>
             )}
           </Card>
 
-          {/* Flagged instances */}
           {m.flagged.length > 0 && (
             <Card>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
