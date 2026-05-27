@@ -260,12 +260,26 @@ export default function TemplateTree({ selected, onSelect }) {
     return fields;
   };
 
+  // Read a CSV file as text, falling back to windows-1252 if UTF-8 produces replacement chars
+  const readCSVFile = (file, onText) => {
+    const utf8Reader = new FileReader();
+    utf8Reader.onload = (e) => {
+      const text = e.target.result;
+      if (text.includes('�')) {
+        const fallbackReader = new FileReader();
+        fallbackReader.onload = (e2) => onText(e2.target.result);
+        fallbackReader.readAsText(file, 'windows-1252');
+      } else {
+        onText(text);
+      }
+    };
+    utf8Reader.readAsText(file, 'utf-8');
+  };
+
   // CSV Import
   const handleImportCSV = (templateId, file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target.result;
+    readCSVFile(file, (text) => {
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length < 2) { toast.error('CSV must have header + data rows'); return; }
       const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
@@ -298,15 +312,12 @@ export default function TemplateTree({ selected, onSelect }) {
       }));
       toast.success(`Imported ${lines.length - 1} instances`);
       setImportModalTemplate(null);
-    };
-    reader.readAsText(file);
+    });
   };
 
   const handleImportAttributesCSV = (templateId, file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target.result;
+    readCSVFile(file, (text) => {
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length < 2) { toast.error('CSV must have header + data rows'); return; }
       const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
@@ -339,8 +350,7 @@ export default function TemplateTree({ selected, onSelect }) {
       }));
       toast.success(`Imported ${lines.length - 1} attributes`);
       setImportAttributesModalTemplate(null);
-    };
-    reader.readAsText(file);
+    });
   };
 
   // Export attributes as CSV
