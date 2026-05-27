@@ -480,6 +480,7 @@ export default function TemplateTree({ selected, onSelect }) {
 
   // Multi-select helpers
   const instKey = (templateId, instanceId) => `${templateId}:${instanceId}`;
+  const lastClickedRef = useRef(null);
 
   const toggleMultiSelect = (e, templateId, instanceId) => {
     e.stopPropagation();
@@ -489,6 +490,64 @@ export default function TemplateTree({ selected, onSelect }) {
       if (s.has(key)) s.delete(key); else s.add(key);
       return s;
     });
+  };
+
+  const handleInstanceClick = (e, templateId, instanceId) => {
+    e.stopPropagation();
+    const key = instKey(templateId, instanceId);
+
+    if (e.shiftKey && lastClickedRef.current) {
+      const [lastTid] = lastClickedRef.current.split(':').map(Number);
+      if (lastTid === templateId) {
+        const tmpl = filteredTemplates.find(t => t.id === templateId);
+        const keys = (tmpl?.instances || []).map(i => instKey(templateId, i.id));
+        const curIdx = keys.indexOf(key);
+        const lastIdx = keys.indexOf(lastClickedRef.current);
+        if (curIdx >= 0 && lastIdx >= 0) {
+          const [from, to] = [Math.min(curIdx, lastIdx), Math.max(curIdx, lastIdx)];
+          setMultiSelected(prev => {
+            const s = new Set(prev);
+            keys.slice(from, to + 1).forEach(k => s.add(k));
+            return s;
+          });
+          return;
+        }
+      }
+    }
+
+    if (e.ctrlKey || e.metaKey) {
+      setMultiSelected(prev => {
+        const s = new Set(prev);
+        if (s.has(key)) s.delete(key); else s.add(key);
+        return s;
+      });
+      lastClickedRef.current = key;
+      return;
+    }
+
+    setMultiSelected(new Set());
+    onSelect({ type: 'instance', templateId, instanceId });
+    lastClickedRef.current = key;
+  };
+
+  const deleteMultipleInstances = (instanceList) => {
+    const byTemplate = {};
+    instanceList.forEach(({ template, instance }) => {
+      if (!byTemplate[template.id]) byTemplate[template.id] = new Set();
+      byTemplate[template.id].add(instance.id);
+    });
+    updateProject(p => ({
+      ...p,
+      templates: p.templates.map(t => {
+        const ids = byTemplate[t.id];
+        if (!ids) return t;
+        return { ...t, instances: (t.instances || []).filter(i => !ids.has(i.id)) };
+      })
+    }));
+    setMultiSelected(new Set());
+    onSelect(null);
+    toast.success(`Deleted ${instanceList.length} instance${instanceList.length > 1 ? 's' : ''}`);
+    setConfirmDelete(null);
   };
 
   const getSelectedInstances = (fallbackTemplateId, fallbackInstanceId) => {
@@ -753,7 +812,7 @@ export default function TemplateTree({ selected, onSelect }) {
                   <div
                     key={inst.id}
                     className={`tree-node flex items-center gap-1 pl-6 pr-2 py-1 ${isISelected ? 'selected' : ''} ${multiSelected.has(instKey(template.id, inst.id)) ? 'bg-accent-muted' : ''}`}
-                    onClick={() => onSelect({ type: 'instance', templateId: template.id, instanceId: inst.id })}
+                    onClick={e => handleInstanceClick(e, template.id, inst.id)}
                     onContextMenu={e => handleContextMenu(e, 'instance', template.id, inst.id)}
                     draggable
                     onDragStart={e => handleDragStart(e, template.id, inst.id)}
@@ -1003,12 +1062,16 @@ export default function TemplateTree({ selected, onSelect }) {
                     )}
                     <div className="context-menu-separator" />
                     <div className="context-menu-item danger" onClick={() => {
-                      const t = templates.find(x => x.id === contextMenu.templateId);
-                      const inst = t?.instances?.find(i => i.id === contextMenu.instanceId);
-                      setConfirmDelete({ type: 'instance', templateId: contextMenu.templateId, instanceId: contextMenu.instanceId, name: inst?.name });
+                      if (multi) {
+                        setConfirmDelete({ type: 'multi-instance', instances: ctxInsts, count: ctxInsts.length });
+                      } else {
+                        const t = templates.find(x => x.id === contextMenu.templateId);
+                        const inst = t?.instances?.find(i => i.id === contextMenu.instanceId);
+                        setConfirmDelete({ type: 'instance', templateId: contextMenu.templateId, instanceId: contextMenu.instanceId, name: inst?.name });
+                      }
                       setContextMenu(null);
                     }}>
-                      <Trash2 size={14} /> Delete Instance
+                      <Trash2 size={14} /> Delete {multi ? `${ctxInsts.length} Instances` : 'Instance'}
                     </div>
                   </>
                 );
@@ -1021,11 +1084,12 @@ export default function TemplateTree({ selected, onSelect }) {
       {/* Confirm Delete */}
       {confirmDelete && (
         <ConfirmDialog
-          title={`Delete ${confirmDelete.type === 'template' ? 'Template' : 'Instance'}`}
-          message={`Delete "${confirmDelete.name}"? This cannot be undone.`}
+          title={confirmDelete.type === 'template' ? 'Delete Template' : confirmDelete.type === 'multi-instance' ? `Delete ${confirmDelete.count} Instances` : 'Delete Instance'}
+          message={confirmDelete.type === 'multi-instance' ? `Delete ${confirmDelete.count} selected instances? This cannot be undone.` : `Delete "${confirmDelete.name}"? This cannot be undone.`}
           danger
           onConfirm={() => {
             if (confirmDelete.type === 'template') deleteTemplate(confirmDelete.templateId);
+            else if (confirmDelete.type === 'multi-instance') deleteMultipleInstances(confirmDelete.instances);
             else deleteInstance(confirmDelete.templateId, confirmDelete.instanceId);
           }}
           onCancel={() => setConfirmDelete(null)}
