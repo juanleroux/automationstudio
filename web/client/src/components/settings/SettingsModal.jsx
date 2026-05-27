@@ -85,7 +85,7 @@ export default function SettingsModal({ onClose }) {
 
   const tabs = [
     { id: 'general', label: 'General', icon: SlidersHorizontal },
-    { id: 'engineering', label: 'Engineering', icon: Zap },
+    { id: 'engineering', label: 'Ignition API', icon: Zap },
     { id: 'company', label: 'Company', icon: Building2 },
   ];
 
