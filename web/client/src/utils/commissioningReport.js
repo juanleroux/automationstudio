@@ -240,7 +240,7 @@ export function openCommissioningReport(project) {
   ${body}
 
   <div class="report-footer">
-    <span>Automation Studio &mdash; Commissioning Check Sheet</span>
+    <span>Automation Studio &mdash; One Technology Limited</span>
     <span>Generated ${now.toLocaleString()}</span>
   </div>
 
