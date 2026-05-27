@@ -1,28 +1,11 @@
 /**
  * Generates and opens a commissioning check sheet as a printable HTML page.
- * The browser's File > Print (or Ctrl+P) can save it as PDF.
+ * Columns: Instance, Description, I/O, PLC, SCADA, MES, Notes.
  */
 export function openCommissioningReport(project) {
   const templates = (project?.templates || [])
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  const areas = project?.areas || [];
-
-  function areaName(areaId) {
-    if (!areaId || areaId === 0) return '—';
-    function search(nodes) {
-      for (const n of nodes) {
-        if (n.id === areaId) return n.name;
-        if (n.children) {
-          const found = search(n.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    }
-    return search(areas) || '—';
-  }
 
   const now = new Date();
   const dateStr = now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -30,52 +13,45 @@ export function openCommissioningReport(project) {
   let body = '';
 
   for (const tmpl of templates) {
-    const attrs = tmpl.attributes || [];
     const instances = (tmpl.instances || []).slice().sort((a, b) => a.name.localeCompare(b.name));
 
-    // Column headers: Instance, Area, each attribute, Checked, Notes
-    const attrHeaders = attrs.map(a => `<th>${esc(a.name)}</th>`).join('');
-
     const rows = instances.map((inst, idx) => {
-      const attrCells = attrs.map(ta => {
-        const ia = (inst.attributes || []).find(a => a.id === ta.id);
-        const val = (ia?.value ?? ta.value) || '';
-        return `<td>${esc(val)}</td>`;
-      }).join('');
-
       const flagDot = inst.isFlagged
         ? '<span style="color:#e55353;margin-right:4px;">●</span>'
         : '';
-
       return `
         <tr class="${idx % 2 === 0 ? 'even' : 'odd'}">
           <td>${flagDot}${esc(inst.name)}</td>
-          <td>${esc(areaName(inst.areaId))}</td>
-          ${attrCells}
+          <td class="desc-cell">${esc(inst.description || '')}</td>
+          <td class="check-cell"><span class="checkbox"></span></td>
+          <td class="check-cell"><span class="checkbox"></span></td>
+          <td class="check-cell"><span class="checkbox"></span></td>
           <td class="check-cell"><span class="checkbox"></span></td>
           <td class="notes-cell"></td>
         </tr>`;
     }).join('');
 
     const emptyNote = instances.length === 0
-      ? `<tr><td colspan="${4 + attrs.length}" style="text-align:center;color:#aaa;font-style:italic;padding:12px">No instances</td></tr>`
+      ? `<tr><td colspan="7" style="text-align:center;color:#aaa;font-style:italic;padding:12px">No instances</td></tr>`
       : '';
 
     body += `
       <div class="template-section">
         <div class="template-header">
           <span class="template-name">${esc(tmpl.name)}</span>
-          <span class="template-meta">${instances.length} instance${instances.length !== 1 ? 's' : ''} &nbsp;·&nbsp; ${attrs.length} attribute${attrs.length !== 1 ? 's' : ''}</span>
+          <span class="template-meta">${instances.length} instance${instances.length !== 1 ? 's' : ''}</span>
         </div>
         ${tmpl.description ? `<div class="template-desc">${esc(tmpl.description)}</div>` : ''}
         <table>
           <thead>
             <tr>
               <th>Instance</th>
-              <th>Area</th>
-              ${attrHeaders}
-              <th class="check-cell">Done</th>
-              <th class="notes-cell">Notes / Sign-off</th>
+              <th class="desc-cell">Description</th>
+              <th class="check-cell">I/O</th>
+              <th class="check-cell">PLC</th>
+              <th class="check-cell">SCADA</th>
+              <th class="check-cell">MES</th>
+              <th class="notes-cell">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -90,11 +66,13 @@ export function openCommissioningReport(project) {
     body = '<p style="text-align:center;color:#aaa;margin-top:60px">No templates defined in this project.</p>';
   }
 
+  const totalInstances = templates.reduce((n, t) => n + (t.instances?.length || 0), 0);
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Commissioning Report — ${esc(project?.name || 'Project')}</title>
+  <title>Commissioning Check Sheet — ${esc(project?.name || 'Project')}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -115,9 +93,9 @@ export function openCommissioningReport(project) {
       padding-bottom: 8px;
       margin-bottom: 20px;
     }
-    .report-title { font-size: 18px; font-weight: 700; }
+    .report-title  { font-size: 18px; font-weight: 700; }
     .report-project { font-size: 13px; color: #444; margin-top: 2px; }
-    .report-meta { text-align: right; font-size: 10px; color: #666; line-height: 1.6; }
+    .report-meta   { text-align: right; font-size: 10px; color: #666; line-height: 1.8; }
 
     /* ── Template sections ── */
     .template-section { margin-bottom: 28px; page-break-inside: avoid; }
@@ -131,22 +109,18 @@ export function openCommissioningReport(project) {
       border-radius: 3px 3px 0 0;
     }
     .template-name { font-size: 12px; font-weight: 700; }
-    .template-meta { font-size: 10px; opacity: 0.65; }
+    .template-meta { font-size: 10px; opacity: 0.6; }
     .template-desc {
       font-size: 10px;
       color: #555;
       padding: 4px 10px;
       background: #f5f5f5;
-      border-left: 1px solid #ddd;
-      border-right: 1px solid #ddd;
+      border-left: 1px solid #ccc;
+      border-right: 1px solid #ccc;
     }
 
     /* ── Table ── */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      border: 1px solid #ccc;
-    }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #ccc; }
     thead tr { background: #f0f0f0; }
     th {
       padding: 5px 8px;
@@ -159,23 +133,23 @@ export function openCommissioningReport(project) {
       white-space: nowrap;
     }
     td {
-      padding: 5px 8px;
+      padding: 6px 8px;
       border: 1px solid #ddd;
       vertical-align: middle;
-      white-space: nowrap;
     }
     tr.even { background: #fff; }
     tr.odd  { background: #fafafa; }
-    tr:hover { background: #f0f7ff; }
 
-    /* ── Special columns ── */
-    .check-cell { width: 40px; text-align: center; }
-    .notes-cell { width: 160px; min-width: 120px; }
+    /* ── Column widths ── */
+    .desc-cell  { width: 28%; }
+    .check-cell { width: 44px; text-align: center; }
+    .notes-cell { width: 22%; }
 
+    /* Printed checkbox */
     .checkbox {
       display: inline-block;
-      width: 14px;
-      height: 14px;
+      width: 13px;
+      height: 13px;
       border: 1.5px solid #555;
       border-radius: 2px;
     }
@@ -191,7 +165,6 @@ export function openCommissioningReport(project) {
       justify-content: space-between;
     }
 
-    /* ── Print rules ── */
     @media print {
       body { padding: 10mm 12mm; }
       .template-section { page-break-inside: avoid; }
@@ -207,21 +180,18 @@ export function openCommissioningReport(project) {
     </div>
     <div class="report-meta">
       <div>Date: ${dateStr}</div>
-      <div>Templates: ${templates.length}</div>
-      <div>Total instances: ${templates.reduce((n, t) => n + (t.instances?.length || 0), 0)}</div>
+      <div>Templates: ${templates.length} &nbsp;·&nbsp; Instances: ${totalInstances}</div>
     </div>
   </div>
 
   ${body}
 
   <div class="report-footer">
-    <span>Automation Studio &mdash; Commissioning Report</span>
+    <span>Automation Studio &mdash; Commissioning Check Sheet</span>
     <span>Generated ${now.toLocaleString()}</span>
   </div>
 
-  <script>
-    window.onload = function() { window.print(); };
-  </script>
+  <script>window.onload = function() { window.print(); };</script>
 </body>
 </html>`;
 

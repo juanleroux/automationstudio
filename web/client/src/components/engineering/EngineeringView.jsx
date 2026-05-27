@@ -241,15 +241,6 @@ export default function EngineeringView() {
     <div className="flex flex-col h-full">
       {/* View tab bar */}
       <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
-        <button
-          className="btn btn-ghost btn-icon"
-          onClick={() => openCommissioningReport(project)}
-          title="Print commissioning check sheet"
-          style={{ marginLeft: 6, marginRight: 2, color: 'var(--text-muted)', flexShrink: 0 }}
-        >
-          <Printer size={15} />
-        </button>
-        <div style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 2, flexShrink: 0 }} />
         {['derivation', 'model'].map(tab => (
           <button
             key={tab}
@@ -260,6 +251,16 @@ export default function EngineeringView() {
             {tab === 'derivation' ? 'Derivation' : 'Model'}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        <div style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 2, flexShrink: 0 }} />
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={() => openCommissioningReport(project)}
+          title="Print commissioning check sheet"
+          style={{ marginRight: 6, color: 'var(--text-muted)', flexShrink: 0 }}
+        >
+          <Printer size={15} />
+        </button>
       </div>
 
       {/* Tab content */}
