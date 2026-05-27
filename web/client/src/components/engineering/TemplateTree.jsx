@@ -594,6 +594,7 @@ export default function TemplateTree({ selected, onSelect }) {
       instances = instances.filter(i => i.name.toLowerCase().includes(q) || i.description?.toLowerCase().includes(q));
       if (!t.name.toLowerCase().includes(q) && instances.length === 0) return null;
     }
+    instances = [...instances].sort((a, b) => a.name.localeCompare(b.name));
     return { ...t, instances };
   }).filter(Boolean);
 
