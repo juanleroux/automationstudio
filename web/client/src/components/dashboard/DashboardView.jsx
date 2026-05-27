@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Layers, Database, Map, Cpu, AlertTriangle, Clock } from 'lucide-react';
+import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
+import { Layers, Database, Map, Cpu, AlertTriangle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import NoProjectOpen from '../shared/NoProjectOpen';
 
@@ -37,9 +37,9 @@ function SectionHeader({ children }) {
   );
 }
 
-function Card({ children, style }) {
+const Card = React.forwardRef(function Card({ children, style }, ref) {
   return (
-    <div style={{
+    <div ref={ref} style={{
       background: 'var(--bg-surface)',
       border: '1px solid var(--border)',
       borderRadius: 8,
@@ -49,10 +49,23 @@ function Card({ children, style }) {
       {children}
     </div>
   );
-}
+});
 
 export default function DashboardView() {
   const { project } = useProject();
+  const [areasExpanded, setAreasExpanded] = useState(false);
+  const templatesCardRef = useRef(null);
+  const [templatesCardHeight, setTemplatesCardHeight] = useState(null);
+
+  useLayoutEffect(() => {
+    const el = templatesCardRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setTemplatesCardHeight(entry.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const m = useMemo(() => {
     if (!project) return null;
@@ -127,7 +140,7 @@ export default function DashboardView() {
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
 
         {/* Templates table */}
-        <Card style={{ flex: '2 1 400px' }}>
+        <Card style={{ flex: '2 1 400px' }} ref={templatesCardRef}>
           <SectionHeader>Templates</SectionHeader>
           {m.templateStats.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No templates yet</div>
@@ -158,28 +171,72 @@ export default function DashboardView() {
         {/* Right column */}
         <div style={{ flex: '1 1 240px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Areas */}
-          <Card>
-            <SectionHeader>Areas</SectionHeader>
-            {m.areaStats.length === 0 ? (
-              <div style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: 13 }}>No areas defined</div>
-            ) : (
-              <div style={{ padding: '6px 0' }}>
-                {m.areaStats.map(a => (
-                  <div key={a.id} className="flex items-center justify-between" style={{ padding: '6px 16px' }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{a.name}</span>
-                    <span className="badge">{a.count}</span>
-                  </div>
-                ))}
-                {m.unassigned > 0 && (
-                  <div className="flex items-center justify-between" style={{ padding: '6px 16px' }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>Unassigned</span>
-                    <span className="badge">{m.unassigned}</span>
-                  </div>
+          {/* Areas — constrained to Templates card height, collapsible if overflow */}
+          {(() => {
+            const HEADER_H = 41;   // SectionHeader height px
+            const TOGGLE_H = 32;   // expand/collapse button row height px
+            const allAreaRows = [
+              ...m.areaStats,
+              ...(m.unassigned > 0 ? [{ id: '__unassigned__', name: 'Unassigned', count: m.unassigned, _unassigned: true }] : []),
+            ];
+            const maxListH = templatesCardHeight != null
+              ? Math.max(60, templatesCardHeight - HEADER_H - TOGGLE_H)
+              : null;
+            const listStyle = maxListH != null && !areasExpanded
+              ? { maxHeight: maxListH, overflowY: 'hidden' }
+              : {};
+            // Approximate whether overflow occurs: each row ≈ 33px
+            const rowH = 33;
+            const contentH = allAreaRows.length * rowH + 12; // 12px padding top+bottom
+            const overflows = maxListH != null && contentH > maxListH;
+
+            return (
+              <Card>
+                <SectionHeader>Areas</SectionHeader>
+                {allAreaRows.length === 0 ? (
+                  <div style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: 13 }}>No areas defined</div>
+                ) : (
+                  <>
+                    <div style={{ padding: '6px 0', ...listStyle }}>
+                      {m.areaStats.map(a => (
+                        <div key={a.id} className="flex items-center justify-between" style={{ padding: '6px 16px' }}>
+                          <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{a.name}</span>
+                          <span className="badge">{a.count}</span>
+                        </div>
+                      ))}
+                      {m.unassigned > 0 && (
+                        <div className="flex items-center justify-between" style={{ padding: '6px 16px' }}>
+                          <span style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>Unassigned</span>
+                          <span className="badge">{m.unassigned}</span>
+                        </div>
+                      )}
+                    </div>
+                    {overflows && (
+                      <button
+                        onClick={() => setAreasExpanded(v => !v)}
+                        className="flex items-center justify-center gap-1 w-full"
+                        style={{
+                          padding: '6px 0',
+                          borderTop: '1px solid var(--border-subtle)',
+                          fontSize: 11,
+                          color: 'var(--text-muted)',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                      >
+                        {areasExpanded
+                          ? <><ChevronUp size={11} /> Collapse</>
+                          : <><ChevronDown size={11} /> Show all {allAreaRows.length} areas</>
+                        }
+                      </button>
+                    )}
+                  </>
                 )}
-              </div>
-            )}
-          </Card>
+              </Card>
+            );
+          })()}
 
           {/* Flagged instances */}
           {m.flagged.length > 0 && (
