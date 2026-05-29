@@ -488,7 +488,7 @@ const labelStyle = {
 // ─── Calculator registry ──────────────────────────────────────────────────────
 const CALCULATORS = [
   { id: 'ma420', label: '4-20mA Scaling',   desc: 'Signal & process range converter',             component: MA420Calculator },
-  { id: 'unit',  label: 'Unit Conversion',  desc: 'Engineering units, pressure, temperature, flow', component: UnitConverter },
+  { id: 'unit',  label: 'Unit Conversion',  desc: 'Engineering unit converter',                    component: UnitConverter },
 ];
 
 // ─── Main view ────────────────────────────────────────────────────────────────
