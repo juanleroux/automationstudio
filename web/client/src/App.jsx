@@ -6,6 +6,7 @@ import Layout from './components/layout/Layout';
 import DashboardView from './components/dashboard/DashboardView';
 import EngineeringView from './components/engineering/EngineeringView';
 import CalculatorsView from './components/calculators/CalculatorsView';
+import CommTestView from './components/commtest/CommTestView';
 import SettingsView from './components/settings/SettingsView';
 
 function AppInner() {
@@ -16,6 +17,7 @@ function AppInner() {
       {activeView === 'dashboard'   && <DashboardView />}
       {activeView === 'engineering' && <EngineeringView />}
       {activeView === 'calculators' && <CalculatorsView />}
+      {activeView === 'commtest'    && <CommTestView />}
       {activeView === 'settings'    && <SettingsView />}
     </Layout>
   );

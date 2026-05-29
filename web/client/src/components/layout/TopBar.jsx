@@ -6,6 +6,7 @@ const VIEW_LABELS = {
   engineering: 'Assets',
   proposal:    'Proposal',
   calculators: 'Calculators',
+  commtest:    'Comm Test',
   settings:    'Settings',
 };
 

@@ -26,4 +26,9 @@ export const testIgnitionConnection = (data) => api.post('/ignition/test', data)
 // Siemens TIA Portal bridge
 export const testSiemensConnection = (data) => api.post('/siemens/test', data).then(r => r.data);
 
+// Communications test
+export const testOpcConnection    = (data) => api.post('/commtest/opc',    data).then(r => r.data);
+export const testMqttConnection   = (data) => api.post('/commtest/mqtt',   data).then(r => r.data);
+export const testModbusConnection = (data) => api.post('/commtest/modbus', data).then(r => r.data);
+
 export default api;
