@@ -8,6 +8,7 @@ const ignitionRouter = require('./routes/ignition');
 const siemensRouter = require('./routes/siemens');
 const configRouter = require('./routes/config');
 const commtestRouter = require('./routes/commtest');
+const connectionsRouter = require('./routes/connections');
 
 const app = express();
 const PORT = 3001;
@@ -55,6 +56,7 @@ app.use('/api/ignition', ignitionRouter);
 app.use('/api/siemens', siemensRouter);
 app.use('/api/config', configRouter);
 app.use('/api/commtest', commtestRouter);
+app.use('/api/connections', connectionsRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
