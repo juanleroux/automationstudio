@@ -334,4 +334,269 @@ router.post('/modbus/disconnect', (req, res) => {
   res.json({ success: true });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// EtherNet/IP — Logix tag browser + read
+// ═══════════════════════════════════════════════════════════════════════════════
+
+router.post('/enip/connect', async (req, res) => {
+  const { host, port = 44818, slot = 0 } = req.body;
+  if (!host) return res.status(400).json({ error: 'Host required' });
+
+  const key = `enip:${host}:${port}:${slot}`;
+  if (store.has(key)) { closeSession(store.get(key)); store.delete(key); }
+
+  let EthernetIP;
+  try { EthernetIP = require('ethernet-ip'); }
+  catch { return res.status(500).json({ error: 'ethernet-ip package not available' }); }
+
+  const { Controller } = EthernetIP;
+  const plc = new Controller();
+  const start = Date.now();
+
+  try {
+    await plc.connect(host, parseInt(slot));
+    store.set(key, {
+      type: 'enip', plc, EthernetIP, lastUsed: Date.now(),
+      close: () => { try { plc.destroy(); } catch {} },
+    });
+    res.json({ success: true, sessionId: key, responseTime: Date.now() - start });
+  } catch (err) {
+    try { plc.destroy(); } catch {}
+    const msg = err.message.includes('ECONNREFUSED') ? 'Connection refused'
+              : err.message.includes('ETIMEDOUT') || err.message.includes('timed out') ? 'Connection timed out'
+              : err.message;
+    res.json({ success: false, error: msg, responseTime: Date.now() - start });
+  }
+});
+
+router.post('/enip/tags', async (req, res) => {
+  const { sessionId } = req.body;
+  const s = store.get(sessionId);
+  if (!s || s.type !== 'enip') return res.status(404).json({ error: 'Session not found — reconnect' });
+  s.lastUsed = Date.now();
+
+  try {
+    await s.plc.getTagList();
+    const tags = [];
+    s.plc.tagList.forEach((tag, name) => {
+      tags.push({ name, type: tag.type?.name || String(tag.type ?? '') });
+    });
+    tags.sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ success: true, tags });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+router.post('/enip/read', async (req, res) => {
+  const { sessionId, tagNames } = req.body;
+  const s = store.get(sessionId);
+  if (!s || s.type !== 'enip') return res.status(404).json({ error: 'Session not found — reconnect' });
+  if (!Array.isArray(tagNames) || tagNames.length === 0) return res.status(400).json({ error: 'tagNames required' });
+  s.lastUsed = Date.now();
+
+  const { Tag } = s.EthernetIP;
+  const ts = new Date().toISOString();
+
+  try {
+    const values = await Promise.all(tagNames.map(async name => {
+      const tag = new Tag(name);
+      s.plc.addTag(tag);
+      try {
+        await s.plc.readTag(tag);
+        return { name, value: tag.value, type: tag.type?.name || String(tag.type ?? ''), timestamp: ts };
+      } catch (e) {
+        return { name, value: null, type: '', timestamp: ts, error: e.message };
+      } finally {
+        s.plc.removeTag(tag);
+      }
+    }));
+    res.json({ success: true, values });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+router.post('/enip/disconnect', (req, res) => {
+  const { sessionId } = req.body;
+  const s = store.get(sessionId);
+  if (s) { closeSession(s); store.delete(sessionId); }
+  res.json({ success: true });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROFINET / S7 — Siemens S7-300/400/1200/1500 via nodes7
+// ═══════════════════════════════════════════════════════════════════════════════
+
+router.post('/s7/connect', async (req, res) => {
+  const { host, port = 102, rack = 0, slot = 1 } = req.body;
+  if (!host) return res.status(400).json({ error: 'Host required' });
+
+  const key = `s7:${host}:${port}:${rack}:${slot}`;
+  if (store.has(key)) { closeSession(store.get(key)); store.delete(key); }
+
+  let NodeS7;
+  try { NodeS7 = require('nodes7'); }
+  catch { return res.status(500).json({ error: 'nodes7 package not available' }); }
+
+  const conn = new NodeS7({ silent: true });
+  const start = Date.now();
+
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        try { conn.dropConnection(); } catch {}
+        reject(new Error('Connection timed out'));
+      }, 8000);
+      conn.initiateConnection({ port: parseInt(port), host, rack: parseInt(rack), slot: parseInt(slot) }, (err) => {
+        clearTimeout(timer);
+        if (err) { try { conn.dropConnection(); } catch {}; reject(new Error(`Connection failed (code ${err})`)); }
+        else resolve();
+      });
+    });
+
+    store.set(key, {
+      type: 's7', conn, lastUsed: Date.now(),
+      close: () => { try { conn.dropConnection(); } catch {} },
+    });
+    res.json({ success: true, sessionId: key, responseTime: Date.now() - start });
+  } catch (err) {
+    const msg = err.message.includes('ECONNREFUSED') ? 'Connection refused'
+              : err.message.includes('timed out') ? 'Connection timed out'
+              : err.message;
+    res.json({ success: false, error: msg, responseTime: Date.now() - start });
+  }
+});
+
+router.post('/s7/read', async (req, res) => {
+  const { sessionId, variables } = req.body;
+  const s = store.get(sessionId);
+  if (!s || s.type !== 's7') return res.status(404).json({ error: 'Session not found — reconnect' });
+  if (!Array.isArray(variables) || variables.length === 0) return res.status(400).json({ error: 'variables required' });
+  s.lastUsed = Date.now();
+
+  try {
+    const vals = await new Promise((resolve, reject) => {
+      s.conn.addItems(variables);
+      s.conn.readAllItems((err, values) => {
+        s.conn.removeItems(variables);
+        if (err) reject(new Error('Read error'));
+        else resolve(values);
+      });
+    });
+
+    const ts = new Date().toISOString();
+    const results = variables.map(v => ({ variable: v, value: vals[v] ?? null, timestamp: ts }));
+    res.json({ success: true, values: results });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+router.post('/s7/disconnect', (req, res) => {
+  const { sessionId } = req.body;
+  const s = store.get(sessionId);
+  if (s) { closeSession(s); store.delete(sessionId); }
+  res.json({ success: true });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SNMP — walk / get / set
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function makeSnmpSession(snmp, host, port, community, version) {
+  const verMap = { '1': snmp.Version1, '2c': snmp.Version2c };
+  return snmp.createSession(host, community, {
+    port: parseInt(port) || 161,
+    version: verMap[version] ?? snmp.Version2c,
+    timeout: 5000,
+    retries: 1,
+  });
+}
+
+router.post('/snmp/walk', (req, res) => {
+  const { host, port = 161, community = 'public', version = '2c', oid = '1.3.6.1.2.1.1' } = req.body;
+  if (!host) return res.status(400).json({ error: 'Host required' });
+
+  let snmp;
+  try { snmp = require('net-snmp'); }
+  catch { return res.status(500).json({ error: 'net-snmp package not available' }); }
+
+  const session = makeSnmpSession(snmp, host, port, community, version);
+  const results = [];
+
+  session.walk(oid, 20,
+    (varbinds) => {
+      for (const vb of varbinds) {
+        if (!snmp.isVarbindError(vb)) {
+          let value;
+          try { value = vb.value instanceof Buffer ? vb.value.toString('utf8') : String(vb.value); }
+          catch { value = String(vb.value); }
+          results.push({ oid: vb.oid, type: snmp.ObjectType[vb.type] ?? String(vb.type), value });
+        }
+      }
+    },
+    (err) => {
+      session.close();
+      if (err && results.length === 0) {
+        return res.json({ success: false, error: err.message.includes('Timeout') ? 'Request timed out — check host and community string' : err.message });
+      }
+      res.json({ success: true, results });
+    }
+  );
+});
+
+router.post('/snmp/get', (req, res) => {
+  const { host, port = 161, community = 'public', version = '2c', oids } = req.body;
+  if (!host) return res.status(400).json({ error: 'Host required' });
+  if (!Array.isArray(oids) || oids.length === 0) return res.status(400).json({ error: 'oids required' });
+
+  let snmp;
+  try { snmp = require('net-snmp'); } catch { return res.status(500).json({ error: 'net-snmp unavailable' }); }
+
+  const session = makeSnmpSession(snmp, host, port, community, version);
+  session.get(oids, (err, varbinds) => {
+    session.close();
+    if (err) return res.json({ success: false, error: err.message.includes('Timeout') ? 'Request timed out' : err.message });
+    const results = varbinds.map(vb => ({
+      oid: vb.oid,
+      type: snmp.ObjectType[vb.type] ?? String(vb.type),
+      value: snmp.isVarbindError(vb) ? `Error: ${snmp.varbindError(vb)}` : (vb.value instanceof Buffer ? vb.value.toString('utf8') : String(vb.value)),
+    }));
+    res.json({ success: true, results });
+  });
+});
+
+router.post('/snmp/set', (req, res) => {
+  const { host, port = 161, community = 'public', version = '2c', oid, value, type = 'OctetString' } = req.body;
+  if (!host) return res.status(400).json({ error: 'Host required' });
+  if (!oid) return res.status(400).json({ error: 'OID required' });
+
+  let snmp;
+  try { snmp = require('net-snmp'); } catch { return res.status(500).json({ error: 'net-snmp unavailable' }); }
+
+  const typeMap = {
+    OctetString: snmp.ObjectType.OctetString,
+    Integer: snmp.ObjectType.Integer,
+    Gauge: snmp.ObjectType.Gauge,
+    Counter: snmp.ObjectType.Counter,
+    TimeTicks: snmp.ObjectType.TimeTicks,
+    IpAddress: snmp.ObjectType.IpAddress,
+  };
+
+  const intTypes = new Set(['Integer', 'Gauge', 'Counter', 'TimeTicks']);
+  const varbind = {
+    oid,
+    type: typeMap[type] ?? snmp.ObjectType.OctetString,
+    value: intTypes.has(type) ? parseInt(value) : (type === 'IpAddress' ? value : Buffer.from(String(value ?? ''))),
+  };
+
+  const session = makeSnmpSession(snmp, host, port, community, version);
+  session.set([varbind], (err) => {
+    session.close();
+    if (err) return res.json({ success: false, error: err.message });
+    res.json({ success: true });
+  });
+});
+
 module.exports = router;

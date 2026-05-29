@@ -7,6 +7,9 @@ import {
   connectOpc, browseOpc, readOpc, disconnectOpc,
   connectMqtt, mqttMessages, publishMqtt, disconnectMqtt,
   connectModbus, readModbus, disconnectModbus,
+  connectEnip, enipTags, readEnip, disconnectEnip,
+  connectS7, readS7, disconnectS7,
+  snmpWalk, snmpGet, snmpSet,
 } from '../../api/client';
 
 // ─── Shared ───────────────────────────────────────────────────────────────────
@@ -582,12 +585,426 @@ function ModbusTab() {
   );
 }
 
+// ─── EtherNet/IP tab ─────────────────────────────────────────────────────────
+
+function EnipTab() {
+  const [host, setHost]         = useState('host.docker.internal');
+  const [port, setPort]         = useState('44818');
+  const [slot, setSlot]         = useState('0');
+  const [connecting, setConnecting] = useState(false);
+  const [sessionId, setSessionId]   = useState(null);
+  const [error, setError]           = useState(null);
+  const [tags, setTags]             = useState([]);
+  const [loadingTags, setLoadingTags] = useState(false);
+  const [tagFilter, setTagFilter]   = useState('');
+  const [monitored, setMonitored]   = useState([]);
+  const [polling, setPolling]       = useState(false);
+  const pollRef = useRef(null);
+
+  const connected = !!sessionId;
+
+  const loadTags = async (sid) => {
+    setLoadingTags(true);
+    try {
+      const r = await enipTags({ sessionId: sid });
+      if (r.success) setTags(r.tags);
+      else setError(r.error);
+    } catch (e) { setError(e.message); }
+    setLoadingTags(false);
+  };
+
+  const connect = async () => {
+    setConnecting(true); setError(null);
+    try {
+      const r = await connectEnip({ host: host.trim(), port, slot });
+      if (r.success) { setSessionId(r.sessionId); loadTags(r.sessionId); }
+      else setError(r.error);
+    } catch (e) { setError(e.message); }
+    setConnecting(false);
+  };
+
+  const disconnect = async () => {
+    clearInterval(pollRef.current);
+    if (sessionId) { try { await disconnectEnip({ sessionId }); } catch {} }
+    setSessionId(null); setTags([]); setMonitored([]); setPolling(false);
+  };
+
+  const addMonitor = (tag) => {
+    if (!monitored.find(m => m.name === tag.name))
+      setMonitored(prev => [...prev, { name: tag.name, type: tag.type, value: null, timestamp: null }]);
+  };
+
+  const refreshValues = useCallback(async () => {
+    if (!sessionId || monitored.length === 0) return;
+    try {
+      const r = await readEnip({ sessionId, tagNames: monitored.map(m => m.name) });
+      if (r.success)
+        setMonitored(prev => prev.map(m => {
+          const v = r.values.find(x => x.name === m.name);
+          return v ? { ...m, value: v.value, type: v.type || m.type, timestamp: v.timestamp } : m;
+        }));
+    } catch {}
+  }, [sessionId, monitored]);
+
+  useEffect(() => {
+    if (polling && sessionId && monitored.length > 0) {
+      pollRef.current = setInterval(refreshValues, 2000);
+      return () => clearInterval(pollRef.current);
+    }
+    clearInterval(pollRef.current);
+  }, [polling, sessionId, monitored.length, refreshValues]);
+
+  const filteredTags = tags.filter(t => !tagFilter || t.name.toLowerCase().includes(tagFilter.toLowerCase()));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', flexShrink: 0, flexWrap: 'wrap' }}>
+        <input className="input" style={{ width: 180 }} placeholder="Host / IP"  value={host} onChange={e => setHost(e.target.value)} disabled={connected} />
+        <input className="input" style={{ width: 72 }}  placeholder="Port"       value={port} onChange={e => setPort(e.target.value)} disabled={connected} />
+        <input className="input" style={{ width: 60 }}  placeholder="Slot"       value={slot} onChange={e => setSlot(e.target.value)} disabled={connected} />
+        <button className={`btn ${connected ? 'btn-secondary' : 'btn-primary'}`} style={{ flexShrink: 0 }} onClick={connected ? disconnect : connect} disabled={connecting || (!connected && !host.trim())}>
+          {connected ? 'Disconnect' : 'Connect'}
+        </button>
+        <StatusDot connected={connected} connecting={connecting} />
+        {connected && <span style={{ fontSize: 11, color: '#22c55e' }}>Connected · {tags.length} tags</span>}
+      </div>
+      <DockerHint host={host} />
+      <ErrorBanner error={error} onDismiss={() => setError(null)} />
+      {!connected ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-disabled)', fontSize: 13 }}>
+          Enter PLC details and click Connect — tag list loads automatically
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <SectionLabel right={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input className="input" style={{ width: 160, height: 24, fontSize: 11 }} placeholder="Filter tags…" value={tagFilter} onChange={e => setTagFilter(e.target.value)} />
+                <IconBtn icon={RefreshCw} title="Reload tags" onClick={() => loadTags(sessionId)} disabled={loadingTags} />
+              </div>
+            }>
+              Tags {loadingTags ? '(loading…)' : `(${filteredTags.length})`}
+            </SectionLabel>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {filteredTags.length === 0 ? (
+                <div style={{ padding: '16px 14px', color: 'var(--text-disabled)', fontSize: 12 }}>
+                  {loadingTags ? 'Loading tags from controller…' : 'No tags found'}
+                </div>
+              ) : (
+                <table className="data-table" style={{ fontSize: 12 }}>
+                  <thead><tr><th>Tag Name</th><th>Type</th><th style={{ width: 32 }}></th></tr></thead>
+                  <tbody>
+                    {filteredTags.map(t => (
+                      <tr key={t.name}>
+                        <td style={{ fontFamily: 'monospace' }}>{t.name}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>{t.type || '—'}</td>
+                        <td>
+                          <button title="Add to monitored items" onClick={() => addMonitor(t)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', color: 'var(--accent)' }}>
+                            <Plus size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+          <div style={{ height: 220, display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--border)' }}>
+            <SectionLabel right={
+              <div style={{ display: 'flex', gap: 4 }}>
+                <IconBtn icon={RefreshCw} title="Refresh values" onClick={refreshValues} disabled={monitored.length === 0} />
+                <button className={`btn ${polling ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setPolling(p => !p)} disabled={monitored.length === 0} style={{ fontSize: 11, padding: '2px 8px' }}>
+                  {polling ? '⏸ Pause' : '▶ Auto 2s'}
+                </button>
+                <IconBtn icon={Trash2} title="Clear all" onClick={() => { setMonitored([]); setPolling(false); }} />
+              </div>
+            }>
+              Monitored Items ({monitored.length})
+            </SectionLabel>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {monitored.length === 0 ? (
+                <div style={{ padding: '12px 14px', color: 'var(--text-disabled)', fontSize: 12 }}>Click + on a tag above to monitor its value</div>
+              ) : (
+                <table className="data-table" style={{ fontSize: 11 }}>
+                  <thead><tr><th>Tag</th><th style={{ textAlign: 'right' }}>Value</th><th>Type</th><th>Timestamp</th><th style={{ width: 28 }}></th></tr></thead>
+                  <tbody>
+                    {monitored.map(m => (
+                      <tr key={m.name}>
+                        <td style={{ fontFamily: 'monospace', fontSize: 10 }}>{m.name}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--accent)', fontWeight: 600 }}>{fmtVal(m.value)}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>{m.type || '—'}</td>
+                        <td style={{ color: 'var(--text-disabled)' }}>{fmtTime(m.timestamp)}</td>
+                        <td><IconBtn icon={Trash2} onClick={() => setMonitored(prev => prev.filter(x => x.name !== m.name))} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PROFINET / S7 tab ────────────────────────────────────────────────────────
+
+function ProfinetTab() {
+  const [host, setHost]       = useState('host.docker.internal');
+  const [port, setPort]       = useState('102');
+  const [rack, setRack]       = useState('0');
+  const [slot, setSlot]       = useState('1');
+  const [connecting, setConnecting] = useState(false);
+  const [sessionId, setSessionId]   = useState(null);
+  const [error, setError]           = useState(null);
+  const [varInput, setVarInput]     = useState('');
+  const [watchList, setWatchList]   = useState([]);
+  const [reading, setReading]       = useState(false);
+  const [polling, setPolling]       = useState(false);
+  const pollRef = useRef(null);
+
+  const connected = !!sessionId;
+
+  const connect = async () => {
+    setConnecting(true); setError(null);
+    try {
+      const r = await connectS7({ host: host.trim(), port, rack, slot });
+      if (r.success) setSessionId(r.sessionId);
+      else setError(r.error);
+    } catch (e) { setError(e.message); }
+    setConnecting(false);
+  };
+
+  const disconnect = async () => {
+    clearInterval(pollRef.current);
+    if (sessionId) { try { await disconnectS7({ sessionId }); } catch {} }
+    setSessionId(null); setWatchList([]); setPolling(false);
+  };
+
+  const addVariable = () => {
+    const v = varInput.trim();
+    if (!v || watchList.find(w => w.variable === v)) return;
+    setWatchList(prev => [...prev, { variable: v, value: null, timestamp: null }]);
+    setVarInput('');
+  };
+
+  const read = useCallback(async () => {
+    if (!sessionId || watchList.length === 0) return;
+    setReading(true);
+    try {
+      const r = await readS7({ sessionId, variables: watchList.map(w => w.variable) });
+      if (r.success)
+        setWatchList(prev => prev.map(w => {
+          const found = r.values.find(v => v.variable === w.variable);
+          return found ? { ...w, value: found.value, timestamp: found.timestamp } : w;
+        }));
+      else setError(r.error);
+    } catch (e) { setError(e.message); }
+    setReading(false);
+  }, [sessionId, watchList]);
+
+  useEffect(() => {
+    if (polling && connected) {
+      read();
+      pollRef.current = setInterval(read, 2000);
+      return () => clearInterval(pollRef.current);
+    }
+    clearInterval(pollRef.current);
+  }, [polling, connected, read]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', flexShrink: 0, flexWrap: 'wrap' }}>
+        <input className="input" style={{ width: 180 }} placeholder="Host / IP" value={host} onChange={e => setHost(e.target.value)} disabled={connected} />
+        <input className="input" style={{ width: 72 }} placeholder="Port" value={port} onChange={e => setPort(e.target.value)} disabled={connected} />
+        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          Rack <input className="input" style={{ width: 44 }} value={rack} onChange={e => setRack(e.target.value)} disabled={connected} />
+        </label>
+        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          Slot <input className="input" style={{ width: 44 }} value={slot} onChange={e => setSlot(e.target.value)} disabled={connected} />
+        </label>
+        <button className={`btn ${connected ? 'btn-secondary' : 'btn-primary'}`} style={{ flexShrink: 0 }} onClick={connected ? disconnect : connect} disabled={connecting || (!connected && !host.trim())}>
+          {connected ? 'Disconnect' : 'Connect'}
+        </button>
+        <StatusDot connected={connected} connecting={connecting} />
+        {connected && <span style={{ fontSize: 11, color: '#22c55e' }}>Connected</span>}
+      </div>
+      <DockerHint host={host} />
+      <ErrorBanner error={error} onDismiss={() => setError(null)} />
+      {!connected ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 13 }}>
+          <span>Enter S7 device details and click Connect</span>
+          <span style={{ fontSize: 11 }}>S7-300/400: Rack 0 Slot 2 · S7-1200/1500: Rack 0 Slot 1</span>
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', flexShrink: 0, flexWrap: 'wrap' }}>
+            <input className="input" style={{ flex: 1 }}
+              placeholder="Variable address — e.g. DB1,REAL0 · DB2,INT4 · M0.0 · Q0.0 · I0.0"
+              value={varInput} onChange={e => setVarInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addVariable()} />
+            <button className="btn btn-primary" onClick={addVariable} disabled={!varInput.trim()}>Add</button>
+            <button className="btn btn-primary" onClick={read} disabled={reading || watchList.length === 0}>
+              {reading ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : 'Read'}
+            </button>
+            <button className={`btn ${polling ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setPolling(p => !p)} style={{ fontSize: 12 }}>
+              {polling ? '⏸ Pause 2s' : '▶ Auto 2s'}
+            </button>
+          </div>
+          <SectionLabel right={<IconBtn icon={Trash2} title="Clear all" onClick={() => { setWatchList([]); setPolling(false); }} />}>
+            Watch List ({watchList.length})
+          </SectionLabel>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {watchList.length === 0 ? (
+              <div style={{ padding: '16px 14px', color: 'var(--text-disabled)', fontSize: 12 }}>Add a variable address above and click Read</div>
+            ) : (
+              <table className="data-table" style={{ fontSize: 11 }}>
+                <thead><tr><th>Variable</th><th style={{ textAlign: 'right' }}>Value</th><th>Timestamp</th><th style={{ width: 28 }}></th></tr></thead>
+                <tbody>
+                  {watchList.map(w => (
+                    <tr key={w.variable}>
+                      <td style={{ fontFamily: 'monospace' }}>{w.variable}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--accent)', fontWeight: 600 }}>{fmtVal(w.value)}</td>
+                      <td style={{ color: 'var(--text-disabled)' }}>{fmtTime(w.timestamp)}</td>
+                      <td><IconBtn icon={Trash2} onClick={() => setWatchList(prev => prev.filter(x => x.variable !== w.variable))} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SNMP tab ─────────────────────────────────────────────────────────────────
+
+const SNMP_TYPES = ['OctetString', 'Integer', 'Gauge', 'Counter', 'TimeTicks', 'IpAddress'];
+
+function SnmpTab() {
+  const [host, setHost]         = useState('host.docker.internal');
+  const [port, setPort]         = useState('161');
+  const [community, setCommunity] = useState('public');
+  const [version, setVersion]   = useState('2c');
+  const [oid, setOid]           = useState('1.3.6.1.2.1.1');
+  const [loading, setLoading]   = useState(false);
+  const [results, setResults]   = useState([]);
+  const [error, setError]       = useState(null);
+  const [setOidVal, setSetOidVal]   = useState('');
+  const [setValStr, setSetValStr]   = useState('');
+  const [setType, setSetType]       = useState('OctetString');
+  const [setting, setSetting]       = useState(false);
+  const [setResult, setSetResult]   = useState(null);
+
+  const walk = async () => {
+    setLoading(true); setError(null); setResults([]);
+    try {
+      const r = await snmpWalk({ host: host.trim(), port, community, version, oid });
+      if (r.success) setResults(r.results);
+      else setError(r.error);
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  };
+
+  const get = async () => {
+    setLoading(true); setError(null); setResults([]);
+    try {
+      const r = await snmpGet({ host: host.trim(), port, community, version, oids: [oid] });
+      if (r.success) setResults(r.results);
+      else setError(r.error);
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  };
+
+  const doSet = async () => {
+    setSetting(true); setSetResult(null);
+    try {
+      const r = await snmpSet({ host: host.trim(), port, community, version, oid: setOidVal, value: setValStr, type: setType });
+      setSetResult({ ok: r.success, msg: r.success ? 'Set successful' : (r.error || 'Failed') });
+    } catch (e) { setSetResult({ ok: false, msg: e.message }); }
+    setSetting(false);
+    setTimeout(() => setSetResult(null), 3000);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Query row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', flexShrink: 0, flexWrap: 'wrap' }}>
+        <input className="input" style={{ width: 180 }} placeholder="Host / IP"   value={host}      onChange={e => setHost(e.target.value)} />
+        <input className="input" style={{ width: 66 }}  placeholder="Port"        value={port}      onChange={e => setPort(e.target.value)} />
+        <input className="input" style={{ width: 100 }} placeholder="Community"   value={community} onChange={e => setCommunity(e.target.value)} />
+        <select className="input" style={{ width: 86 }} value={version} onChange={e => setVersion(e.target.value)}>
+          <option value="1">SNMPv1</option>
+          <option value="2c">SNMPv2c</option>
+        </select>
+        <input className="input" style={{ flex: 1, minWidth: 160 }} placeholder="OID  e.g. 1.3.6.1.2.1.1"
+          value={oid} onChange={e => setOid(e.target.value)} onKeyDown={e => e.key === 'Enter' && walk()} />
+        <button className="btn btn-primary" onClick={walk} disabled={loading || !host.trim()}>
+          {loading ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : 'Walk'}
+        </button>
+        <button className="btn btn-ghost" onClick={get} disabled={loading || !host.trim()}>Get</button>
+      </div>
+      <DockerHint host={host} />
+      <ErrorBanner error={error} onDismiss={() => setError(null)} />
+      {/* Set row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', flexShrink: 0, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', flexShrink: 0 }}>Set:</span>
+        <input className="input" style={{ width: 200 }} placeholder="OID" value={setOidVal} onChange={e => setSetOidVal(e.target.value)} />
+        <input className="input" style={{ flex: 1, minWidth: 100 }} placeholder="Value" value={setValStr} onChange={e => setSetValStr(e.target.value)} />
+        <select className="input" style={{ width: 120 }} value={setType} onChange={e => setSetType(e.target.value)}>
+          {SNMP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <button className="btn btn-primary" onClick={doSet} disabled={setting || !setOidVal.trim() || !host.trim()}>
+          {setting ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : 'Set'}
+        </button>
+        {setResult && (
+          <span style={{ fontSize: 11, color: setResult.ok ? '#22c55e' : '#e55353', flexShrink: 0 }}>
+            {setResult.ok ? <CheckCircle size={12} style={{ display: 'inline', marginRight: 3 }} /> : <XCircle size={12} style={{ display: 'inline', marginRight: 3 }} />}
+            {setResult.msg}
+          </span>
+        )}
+      </div>
+      <SectionLabel right={results.length > 0 && <IconBtn icon={Trash2} title="Clear results" onClick={() => setResults([])} />}>
+        Results ({results.length})
+      </SectionLabel>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {results.length === 0 ? (
+          <div style={{ padding: '16px 14px', color: 'var(--text-disabled)', fontSize: 12 }}>
+            Enter a host and OID, then click Walk or Get
+          </div>
+        ) : (
+          <table className="data-table" style={{ fontSize: 11 }}>
+            <thead><tr><th>OID</th><th>Type</th><th>Value</th></tr></thead>
+            <tbody>
+              {results.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--accent)' }}>{r.oid}</td>
+                  <td style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{r.type}</td>
+                  <td style={{ fontFamily: 'monospace', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'opc',    label: 'OPC UA',     component: OpcTab    },
-  { id: 'mqtt',   label: 'MQTT',       component: MqttTab   },
-  { id: 'modbus', label: 'Modbus TCP', component: ModbusTab },
+  { id: 'opc',      label: 'OPC UA',      component: OpcTab      },
+  { id: 'mqtt',     label: 'MQTT',         component: MqttTab     },
+  { id: 'modbus',   label: 'Modbus TCP',   component: ModbusTab   },
+  { id: 'enip',     label: 'EtherNet/IP',  component: EnipTab     },
+  { id: 'profinet', label: 'PROFINET',     component: ProfinetTab },
+  { id: 'snmp',     label: 'SNMP',         component: SnmpTab     },
 ];
 
 export default function CommTestView() {
