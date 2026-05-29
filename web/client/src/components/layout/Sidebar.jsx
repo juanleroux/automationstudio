@@ -240,7 +240,7 @@ export default function Sidebar({ activeView, onChangeView }) {
                   cursor: !enabled ? 'not-allowed' : 'pointer',
                 }}
               >
-                <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px 0' }}>
+                <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
                   <Icon size={16} />
                 </span>
                 <span className="text-sm font-medium" style={{
@@ -272,7 +272,7 @@ export default function Sidebar({ activeView, onChangeView }) {
                   cursor: 'pointer',
                 }}
               >
-                <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px 0' }}>
+                <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
                   <Icon size={16} />
                 </span>
                 <span className="text-sm font-medium" style={{
@@ -309,7 +309,7 @@ export default function Sidebar({ activeView, onChangeView }) {
                 cursor: disabled ? 'not-allowed' : 'pointer',
               }}
             >
-              <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px 0' }}>
+              <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
                 <Icon size={16} />
               </span>
               <span className="text-sm" style={{
@@ -324,7 +324,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         {/* Collapse toggle */}
         <button
           className="w-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
-          style={{ borderTop: '1px solid var(--border)', padding: '6px 0' }}
+          style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}
           onClick={() => setCollapsed(c => !c)}
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
