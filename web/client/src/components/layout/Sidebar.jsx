@@ -234,19 +234,7 @@ export default function Sidebar({ activeView, onChangeView }) {
               >
                 <Icon size={16} className="flex-shrink-0" />
                 {!collapsed && (
-                  <span className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-sm font-medium truncate">{item.label}</span>
-                    {item.beta && (
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
-                        padding: '1px 5px', borderRadius: 4, flexShrink: 0,
-                        background: 'rgba(251,146,60,0.15)', color: '#fb923c',
-                        border: '1px solid rgba(251,146,60,0.3)',
-                      }}>
-                        Beta
-                      </span>
-                    )}
-                  </span>
+                  <span className="text-sm font-medium">{item.label}</span>
                 )}
               </button>
             );

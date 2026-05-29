@@ -10,6 +10,8 @@ const VIEW_LABELS = {
   settings:    'Settings',
 };
 
+const BETA_VIEWS = new Set(['commtest']);
+
 export default function TopBar({ activeView }) {
   const { project, filename, isDirty } = useProject();
 
@@ -26,6 +28,16 @@ export default function TopBar({ activeView }) {
         <h1 className="text-sm font-semibold text-text-primary">
           {VIEW_LABELS[activeView] || activeView}
         </h1>
+        {BETA_VIEWS.has(activeView) && (
+          <span style={{
+            fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+            padding: '2px 6px', borderRadius: 4,
+            background: 'rgba(251,146,60,0.15)', color: '#fb923c',
+            border: '1px solid rgba(251,146,60,0.3)',
+          }}>
+            Beta
+          </span>
+        )}
         {project && (
           <>
             <span className="text-text-muted">/</span>
