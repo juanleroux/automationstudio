@@ -228,8 +228,11 @@ export default function Sidebar({ activeView, onChangeView }) {
                 key={item.id}
                 onClick={() => onChangeView(item.id)}
                 disabled={!enabled}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-none transition-colors"
+                className="w-full flex items-center rounded-none transition-colors py-2"
                 style={{
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  gap: collapsed ? 0 : 12,
+                  padding: collapsed ? '8px 0' : '8px 12px',
                   background: active ? 'var(--accent-bg)' : 'transparent',
                   color: active ? 'var(--accent)' : !enabled ? 'var(--text-disabled)' : 'var(--text-muted)',
                   borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
@@ -253,8 +256,11 @@ export default function Sidebar({ activeView, onChangeView }) {
               <button
                 key={item.id}
                 onClick={() => onChangeView(item.id)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-none transition-colors"
+                className="w-full flex items-center rounded-none transition-colors py-2"
                 style={{
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  gap: collapsed ? 0 : 12,
+                  padding: collapsed ? '8px 0' : '8px 12px',
                   background: active ? 'var(--accent-bg)' : 'transparent',
                   color: active ? 'var(--accent)' : 'var(--text-muted)',
                   borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
