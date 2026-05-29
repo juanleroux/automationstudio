@@ -216,8 +216,8 @@ export default function Sidebar({ activeView, onChangeView }) {
           )}
         </div>
 
-        {/* Nav items — icon always lives in a fixed 53px column so it never moves */}
-        <nav className="overflow-y-auto" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Project nav — grows to fill space */}
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           {PROJECT_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
@@ -229,7 +229,7 @@ export default function Sidebar({ activeView, onChangeView }) {
                 disabled={!enabled}
                 className="w-full flex items-center rounded-none transition-colors"
                 style={{
-                  padding: 0,
+                  padding: 0, flexShrink: 0,
                   background: active ? 'var(--accent-bg)' : 'transparent',
                   color: active ? 'var(--accent)' : !enabled ? 'var(--text-disabled)' : 'var(--text-muted)',
                   borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
@@ -243,9 +243,11 @@ export default function Sidebar({ activeView, onChangeView }) {
               </button>
             );
           })}
+        </nav>
 
-          <div style={{ flex: 1 }} />
-
+        {/* Bottom section: tool nav + project actions, all separated by a single borderTop */}
+        <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+          {/* Tool nav items */}
           {TOOL_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
@@ -269,10 +271,11 @@ export default function Sidebar({ activeView, onChangeView }) {
               </button>
             );
           })}
-        </nav>
 
-        {/* Bottom actions — same fixed-column layout */}
-        <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+          {/* Thin divider between tools and project actions */}
+          <div style={{ height: 1, background: 'var(--border)' }} />
+
+          {/* Project actions */}
           {[
             { label: 'New Project',  icon: FilePlus,   onClick: () => setShowNewDialog(true),    disabled: false,               title: 'New Project'   },
             { label: 'Open Project', icon: FolderOpen, onClick: handleOpenDialog,                disabled: false,               title: 'Open Project'  },
