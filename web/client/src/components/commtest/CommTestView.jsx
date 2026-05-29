@@ -25,6 +25,22 @@ function SectionLabel({ children, right }) {
   );
 }
 
+function DockerHint({ host }) {
+  const isLocal = /^(localhost|127\.0\.0\.1|::1)$/i.test((host || '').trim());
+  if (!isLocal) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'rgba(234,179,8,0.08)', borderBottom: '1px solid rgba(234,179,8,0.25)', fontSize: 11, color: '#ca8a04', flexShrink: 0 }}>
+      <span style={{ fontWeight: 600, flexShrink: 0 }}>Docker tip:</span>
+      <span>
+        <code style={{ background: 'rgba(234,179,8,0.15)', padding: '1px 4px', borderRadius: 3 }}>localhost</code>
+        {' '}refers to the container. To reach your host machine use{' '}
+        <code style={{ background: 'rgba(234,179,8,0.15)', padding: '1px 4px', borderRadius: 3 }}>host.docker.internal</code>
+        {' '}(Docker Desktop) or your host's LAN IP.
+      </span>
+    </div>
+  );
+}
+
 function ErrorBanner({ error, onDismiss }) {
   if (!error) return null;
   return (
@@ -205,6 +221,7 @@ function OpcTab() {
         {connected && <span style={{ fontSize: 11, color: '#22c55e' }}>Connected</span>}
       </div>
 
+      <DockerHint host={host} />
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
       {!connected ? (
@@ -329,6 +346,7 @@ function MqttTab() {
         {connected && <span style={{ fontSize: 11, color: '#22c55e' }}>Connected · {topicCount} topics seen</span>}
       </div>
 
+      <DockerHint host={host} />
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
       {!connected ? (
@@ -453,6 +471,7 @@ function ModbusTab() {
         {connected && <span style={{ fontSize: 11, color: '#22c55e' }}>Connected</span>}
       </div>
 
+      <DockerHint host={host} />
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
       {!connected ? (
