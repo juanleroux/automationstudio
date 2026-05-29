@@ -299,21 +299,21 @@ export default function Sidebar({ activeView, onChangeView }) {
           ) : (
             <div className="px-3 flex flex-col gap-1">
               <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={() => setShowNewDialog(true)}>
-                <FilePlus size={13} /> New Project
+                <FilePlus size={16} /> New Project
               </button>
               <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={handleOpenDialog}>
-                <FolderOpen size={13} /> Open Project
+                <FolderOpen size={16} /> Open Project
               </button>
               <button className="btn btn-primary w-full text-xs" style={{ padding: '5px 8px' }} onClick={handleSave} disabled={!project || isSaving}>
-                <Save size={13} /> {isSaving ? 'Saving...' : 'Save Project'}
+                <Save size={16} /> {isSaving ? 'Saving...' : 'Save Project'}
               </button>
               {project && (
                 <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={handleCloseProject}>
-                  <FolderX size={13} /> Close Project
+                  <FolderX size={16} /> Close Project
                 </button>
               )}
               <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px' }} onClick={() => onChangeView('settings')}>
-                <Settings size={13} /> Settings
+                <Settings size={16} /> Settings
               </button>
             </div>
           )}
