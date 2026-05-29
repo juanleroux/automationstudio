@@ -192,11 +192,13 @@ export default function Sidebar({ activeView, onChangeView }) {
         onChange={e => { handleImportProject(e.target.files[0]); e.target.value = ''; }}
       />
       <div
-        className="flex flex-col h-full flex-shrink-0 transition-all duration-200"
+        className="flex flex-col h-full flex-shrink-0"
         style={{
           width: collapsed ? 56 : 220,
+          transition: 'width 0.2s ease',
           background: 'var(--bg-surface)',
-          borderRight: '1px solid var(--border)'
+          borderRight: '1px solid var(--border)',
+          overflow: 'hidden',
         }}
       >
         {/* Logo */}
@@ -207,13 +209,15 @@ export default function Sidebar({ activeView, onChangeView }) {
           >
             <Zap size={18} color="var(--bg-main)" />
           </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <div className="font-bold text-text-primary text-sm leading-tight truncate">
-                Automation Studio
-              </div>
+          <div style={{
+            overflow: 'hidden', whiteSpace: 'nowrap',
+            maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
+            transition: 'max-width 0.2s ease, opacity 0.15s ease',
+          }}>
+            <div className="font-bold text-text-primary text-sm leading-tight">
+              Automation Studio
             </div>
-          )}
+          </div>
         </div>
 
         {/* Project nav — grows to fill space */}
@@ -239,7 +243,11 @@ export default function Sidebar({ activeView, onChangeView }) {
                 <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px 0' }}>
                   <Icon size={16} />
                 </span>
-                {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                <span className="text-sm font-medium" style={{
+                  overflow: 'hidden', whiteSpace: 'nowrap',
+                  maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
+                  transition: 'max-width 0.2s ease, opacity 0.15s ease',
+                }}>{item.label}</span>
               </button>
             );
           })}
@@ -267,7 +275,11 @@ export default function Sidebar({ activeView, onChangeView }) {
                 <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px 0' }}>
                   <Icon size={16} />
                 </span>
-                {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                <span className="text-sm font-medium" style={{
+                  overflow: 'hidden', whiteSpace: 'nowrap',
+                  maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
+                  transition: 'max-width 0.2s ease, opacity 0.15s ease',
+                }}>{item.label}</span>
               </button>
             );
           })}
@@ -300,7 +312,11 @@ export default function Sidebar({ activeView, onChangeView }) {
               <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '6px 0' }}>
                 <Icon size={16} />
               </span>
-              {!collapsed && <span className="text-sm">{label}</span>}
+              <span className="text-sm" style={{
+                overflow: 'hidden', whiteSpace: 'nowrap',
+                maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
+                transition: 'max-width 0.2s ease, opacity 0.15s ease',
+              }}>{label}</span>
             </button>
           ))}
         </div>
