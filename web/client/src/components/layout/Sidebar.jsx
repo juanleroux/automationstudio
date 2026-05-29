@@ -217,7 +217,8 @@ export default function Sidebar({ activeView, onChangeView }) {
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 py-2 overflow-y-auto">
+        <nav className="py-2 overflow-y-auto" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* Project-dependent items */}
           {PROJECT_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
@@ -241,8 +242,10 @@ export default function Sidebar({ activeView, onChangeView }) {
             );
           })}
 
-          <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0' }} />
+          {/* Push tool items to bottom */}
+          <div style={{ flex: 1 }} />
 
+          {/* Always-available tools */}
           {TOOL_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
