@@ -5,6 +5,7 @@ import { ToastProvider } from './components/shared/Toast';
 import Layout from './components/layout/Layout';
 import DashboardView from './components/dashboard/DashboardView';
 import EngineeringView from './components/engineering/EngineeringView';
+import CalculatorsView from './components/calculators/CalculatorsView';
 import SettingsView from './components/settings/SettingsView';
 
 function AppInner() {
@@ -14,6 +15,7 @@ function AppInner() {
     <Layout activeView={activeView} onChangeView={setActiveView}>
       {activeView === 'dashboard'   && <DashboardView />}
       {activeView === 'engineering' && <EngineeringView />}
+      {activeView === 'calculators' && <CalculatorsView />}
       {activeView === 'settings'    && <SettingsView />}
     </Layout>
   );

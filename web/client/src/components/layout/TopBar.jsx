@@ -2,10 +2,11 @@ import React from 'react';
 import { useProject } from '../../context/ProjectContext';
 
 const VIEW_LABELS = {
-  dashboard: 'Dashboard',
+  dashboard:   'Dashboard',
   engineering: 'Assets',
-  proposal: 'Proposal',
-  settings: 'Settings',
+  proposal:    'Proposal',
+  calculators: 'Calculators',
+  settings:    'Settings',
 };
 
 export default function TopBar({ activeView }) {

@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import {
   Cpu, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
-  FilePlus, FolderOpen, FolderX, Save, Zap, Trash2, Download, Upload, Edit2, Check, X
+  FilePlus, FolderOpen, FolderX, Save, Zap, Trash2, Download, Upload, Edit2, Check, X,
+  Calculator
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -10,8 +11,9 @@ import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
 
 const NAV_ITEMS = [
-  { id: 'dashboard',   label: 'Dashboard', icon: LayoutDashboard, alwaysEnabled: true },
-  { id: 'engineering', label: 'Assets',    icon: Cpu },
+  { id: 'dashboard',   label: 'Dashboard',   icon: LayoutDashboard, alwaysEnabled: true },
+  { id: 'engineering', label: 'Assets',      icon: Cpu },
+  { id: 'calculators', label: 'Calculators', icon: Calculator,      alwaysEnabled: true },
 ];
 
 export default function Sidebar({ activeView, onChangeView }) {
