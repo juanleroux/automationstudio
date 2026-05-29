@@ -217,7 +217,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         </div>
 
         {/* Nav items — icon always lives in a fixed 53px column so it never moves */}
-        <nav className="py-2 overflow-y-auto" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <nav className="overflow-y-auto" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           {PROJECT_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
@@ -272,7 +272,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         </nav>
 
         {/* Bottom actions — same fixed-column layout */}
-        <div className="flex-shrink-0 py-2" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
           {[
             { label: 'New Project',  icon: FilePlus,   onClick: () => setShowNewDialog(true),    disabled: false,               title: 'New Project'   },
             { label: 'Open Project', icon: FolderOpen, onClick: handleOpenDialog,                disabled: false,               title: 'Open Project'  },
