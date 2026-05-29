@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 
-// ─── Number formatter ────────────────────────────────────────────────────────
+// ─── Number formatter ─────────────────────────────────────────────────────────
 function fmt(v, sig = 5) {
   if (!isFinite(v)) return '—';
   if (v === 0) return '0';
@@ -9,12 +9,54 @@ function fmt(v, sig = 5) {
   return parseFloat(v.toPrecision(sig)).toString();
 }
 
-// ─── 4-20mA Scaling Calculator ───────────────────────────────────────────────
+// ─── Slider component ─────────────────────────────────────────────────────────
+function Slider({ min, max, value, onChange, minLabel, maxLabel }) {
+  const clamped = isNaN(value) ? min : Math.min(max, Math.max(min, value));
+  const pct = max !== min ? ((clamped - min) / (max - min)) * 100 : 0;
+  const step = max !== min ? (max - min) / 500 : 1;
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ position: 'relative', height: 20, display: 'flex', alignItems: 'center' }}>
+        {/* Track background */}
+        <div style={{
+          position: 'absolute', left: 0, right: 0, height: 4,
+          background: 'var(--border)', borderRadius: 2,
+        }} />
+        {/* Filled portion */}
+        <div style={{
+          position: 'absolute', left: 0, width: `${pct}%`, height: 4,
+          background: 'var(--accent)', borderRadius: 2, pointerEvents: 'none',
+        }} />
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={clamped}
+          onChange={e => onChange(e.target.value)}
+          style={{
+            position: 'absolute', left: 0, right: 0, width: '100%',
+            appearance: 'none', WebkitAppearance: 'none',
+            background: 'transparent', cursor: 'pointer', height: 20, margin: 0,
+            accentColor: 'var(--accent)',
+          }}
+        />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+        <span style={{ fontSize: 10, color: 'var(--text-disabled)' }}>{minLabel ?? min}</span>
+        <span style={{ fontSize: 10, color: 'var(--text-disabled)' }}>{maxLabel ?? max}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── 4-20mA Scaling Calculator ────────────────────────────────────────────────
 function MA420Calculator() {
-  const [mAMin, setMAMin] = useState('4');
-  const [mAMax, setMAMax] = useState('20');
-  const [euMin, setEUMin] = useState('0');
-  const [euMax, setEUMax] = useState('100');
+  const [mAMin, setMAMin]   = useState('4');
+  const [mAMax, setMAMax]   = useState('20');
+  const [euMin, setEUMin]   = useState('0');
+  const [euMax, setEUMax]   = useState('100');
   const [euUnit, setEUUnit] = useState('');
   const [mAInput, setMAInput] = useState('12');
   const [euInput, setEUInput] = useState('50');
@@ -37,10 +79,10 @@ function MA420Calculator() {
   const mA = parseFloat(mAInput);
   const eu = parseFloat(euInput);
 
-  const fwdEU   = valid && !isNaN(mA) ? mAToEU(mA)      : null;
-  const fwdPct  = valid && !isNaN(mA) ? mAToPct(mA)     : null;
-  const revMA   = valid && !isNaN(eu) ? euToMA(eu)       : null;
-  const revPct  = valid && !isNaN(eu) ? mAToPct(revMA)   : null;
+  const fwdEU  = valid && !isNaN(mA) ? mAToEU(mA)    : null;
+  const fwdPct = valid && !isNaN(mA) ? mAToPct(mA)   : null;
+  const revMA  = valid && !isNaN(eu) ? euToMA(eu)     : null;
+  const revPct = valid && !isNaN(eu) ? mAToPct(revMA) : null;
 
   const steps = valid
     ? [0, 25, 50, 75, 100].map(pct => ({
@@ -56,9 +98,7 @@ function MA420Calculator() {
     <div style={{ padding: 28, maxWidth: 720 }}>
 
       {/* Configuration */}
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
-        Configuration
-      </div>
+      <SectionLabel>Configuration</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
         <div style={panelStyle}>
           <div style={labelStyle}>Signal Range</div>
@@ -81,14 +121,13 @@ function MA420Calculator() {
       </div>
 
       {/* Converters */}
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
-        Converter
-      </div>
+      <SectionLabel>Converter</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+
         {/* Signal → EU */}
         <div style={panelStyle}>
           <div style={labelStyle}>Signal → Engineering Value</div>
-          <div className="flex items-center gap-2" style={{ marginBottom: 14 }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
             <input
               className="input"
               style={{ width: 100 }}
@@ -97,25 +136,36 @@ function MA420Calculator() {
             />
             <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>mA</span>
           </div>
-          {fwdEU !== null ? (
-            <>
-              <div style={{ fontSize: 30, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>
-                {fmt(fwdEU)}{' '}
-                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>{unitLabel}</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-                {fmt(fwdPct, 4)}% of span
-              </div>
-            </>
-          ) : (
-            <span style={{ fontSize: 13, color: 'var(--text-disabled)' }}>Enter a value above</span>
+          {valid && (
+            <Slider
+              min={s0} max={s1}
+              value={mA}
+              onChange={setMAInput}
+              minLabel={`${s0} mA`}
+              maxLabel={`${s1} mA`}
+            />
           )}
+          <div style={{ marginTop: 14 }}>
+            {fwdEU !== null ? (
+              <>
+                <div style={{ fontSize: 30, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>
+                  {fmt(fwdEU)}{' '}
+                  <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>{unitLabel}</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                  {fmt(fwdPct, 4)}% of span
+                </div>
+              </>
+            ) : (
+              <span style={{ fontSize: 13, color: 'var(--text-disabled)' }}>Enter a value above</span>
+            )}
+          </div>
         </div>
 
         {/* EU → Signal */}
         <div style={panelStyle}>
           <div style={labelStyle}>Engineering Value → Signal</div>
-          <div className="flex items-center gap-2" style={{ marginBottom: 14 }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
             <input
               className="input"
               style={{ width: 100 }}
@@ -124,28 +174,37 @@ function MA420Calculator() {
             />
             <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{unitLabel}</span>
           </div>
-          {revMA !== null ? (
-            <>
-              <div style={{ fontSize: 30, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>
-                {fmt(revMA)}{' '}
-                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>mA</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-                {fmt(revPct, 4)}% of span
-              </div>
-            </>
-          ) : (
-            <span style={{ fontSize: 13, color: 'var(--text-disabled)' }}>Enter a value above</span>
+          {valid && (
+            <Slider
+              min={e0} max={e1}
+              value={eu}
+              onChange={setEUInput}
+              minLabel={`${e0} ${unitLabel}`}
+              maxLabel={`${e1} ${unitLabel}`}
+            />
           )}
+          <div style={{ marginTop: 14 }}>
+            {revMA !== null ? (
+              <>
+                <div style={{ fontSize: 30, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>
+                  {fmt(revMA)}{' '}
+                  <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>mA</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                  {fmt(revPct, 4)}% of span
+                </div>
+              </>
+            ) : (
+              <span style={{ fontSize: 13, color: 'var(--text-disabled)' }}>Enter a value above</span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Reference Table */}
       {valid && (
         <>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
-            Reference Table
-          </div>
+          <SectionLabel>Reference Table</SectionLabel>
           <table className="data-table">
             <thead>
               <tr>
@@ -174,15 +233,13 @@ function MA420Calculator() {
 
 // ─── Unit Conversion Calculator ───────────────────────────────────────────────
 
-// Temperature: base = Kelvin, non-linear conversions
 const TEMP_UNITS = [
-  { id: '°C',  toK: v => v + 273.15,          fromK: v => v - 273.15 },
-  { id: '°F',  toK: v => (v + 459.67) * 5/9,  fromK: v => v * 9/5 - 459.67 },
-  { id: 'K',   toK: v => v,                    fromK: v => v },
-  { id: '°R',  toK: v => v * 5/9,              fromK: v => v * 9/5 },
+  { id: '°C', toK: v => v + 273.15,         fromK: v => v - 273.15 },
+  { id: '°F', toK: v => (v + 459.67) * 5/9, fromK: v => v * 9/5 - 459.67 },
+  { id: 'K',  toK: v => v,                   fromK: v => v },
+  { id: '°R', toK: v => v * 5/9,             fromK: v => v * 9/5 },
 ];
 
-// Linear conversion categories — factors convert TO the base unit (first in list)
 const LINEAR_CATEGORIES = {
   pressure: {
     label: 'Pressure',
@@ -194,7 +251,7 @@ const LINEAR_CATEGORIES = {
       { id: 'mbar',   f: 1e2 },
       { id: 'psi',    f: 6894.757 },
       { id: 'atm',    f: 101325 },
-      { id: 'inH₂O', f: 249.089 },
+      { id: 'inH₂O',  f: 249.089 },
       { id: 'mmHg',   f: 133.322 },
       { id: 'inHg',   f: 3386.39 },
     ],
@@ -230,31 +287,40 @@ const LINEAR_CATEGORIES = {
   mass: {
     label: 'Mass',
     units: [
-      { id: 'g',       f: 1e-3 },
-      { id: 'kg',      f: 1 },
-      { id: 't',       f: 1e3 },
-      { id: 'lb',      f: 0.453592 },
-      { id: 'oz',      f: 0.0283495 },
-      { id: 'ton(US)', f: 907.185 },
+      { id: 'g',        f: 1e-3 },
+      { id: 'kg',       f: 1 },
+      { id: 't',        f: 1e3 },
+      { id: 'lb',       f: 0.453592 },
+      { id: 'oz',       f: 0.0283495 },
+      { id: 'ton(US)',   f: 907.185 },
     ],
   },
 };
 
 const CATEGORY_ORDER = ['temperature', 'pressure', 'flow', 'length', 'mass'];
 
-function UnitConverter() {
-  const [category, setCategory] = useState('temperature');
-  const [inputVal, setInputVal] = useState('100');
-  const [fromUnit, setFromUnit] = useState('°C');
+// Sensible slider defaults per category (in the first unit of that category)
+const SLIDER_DEFAULTS = {
+  temperature: { min: '-40', max: '200' },
+  pressure:    { min: '0',   max: '1000000' },
+  flow:        { min: '0',   max: '1' },
+  length:      { min: '0',   max: '100' },
+  mass:        { min: '0',   max: '1000' },
+};
 
-  // Reset from-unit when category changes
+function UnitConverter() {
+  const [category, setCategory]   = useState('temperature');
+  const [inputVal, setInputVal]   = useState('100');
+  const [fromUnit, setFromUnit]   = useState('°C');
+  const [sliderMin, setSliderMin] = useState(SLIDER_DEFAULTS.temperature.min);
+  const [sliderMax, setSliderMax] = useState(SLIDER_DEFAULTS.temperature.max);
+
   const handleCategoryChange = (cat) => {
     setCategory(cat);
-    if (cat === 'temperature') {
-      setFromUnit('°C');
-    } else {
-      setFromUnit(LINEAR_CATEGORIES[cat].units[0].id);
-    }
+    const defaults = SLIDER_DEFAULTS[cat];
+    setSliderMin(defaults.min);
+    setSliderMax(defaults.max);
+    setFromUnit(cat === 'temperature' ? '°C' : LINEAR_CATEGORIES[cat].units[0].id);
   };
 
   const units = category === 'temperature'
@@ -264,30 +330,29 @@ function UnitConverter() {
   const results = useMemo(() => {
     const v = parseFloat(inputVal);
     if (isNaN(v)) return [];
-
     if (category === 'temperature') {
       const src = TEMP_UNITS.find(u => u.id === fromUnit);
       if (!src) return [];
       const kelvin = src.toK(v);
       return TEMP_UNITS.map(u => ({ unit: u.id, value: u.fromK(kelvin) }));
-    } else {
-      const cat = LINEAR_CATEGORIES[category];
-      const src = cat.units.find(u => u.id === fromUnit);
-      if (!src) return [];
-      const base = v * src.f;
-      return cat.units.map(u => ({ unit: u.id, value: base / u.f }));
     }
+    const cat = LINEAR_CATEGORIES[category];
+    const src = cat.units.find(u => u.id === fromUnit);
+    if (!src) return [];
+    const base = v * src.f;
+    return cat.units.map(u => ({ unit: u.id, value: base / u.f }));
   }, [category, fromUnit, inputVal]);
 
+  const sMin = parseFloat(sliderMin);
+  const sMax = parseFloat(sliderMax);
+  const sliderValid = !isNaN(sMin) && !isNaN(sMax) && sMax > sMin;
   const catLabel = category === 'temperature' ? 'Temperature' : LINEAR_CATEGORIES[category].label;
 
   return (
     <div style={{ padding: 28, maxWidth: 560 }}>
 
-      {/* Category tabs */}
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
-        Category
-      </div>
+      {/* Category */}
+      <SectionLabel>Category</SectionLabel>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 24 }}>
         {CATEGORY_ORDER.map(cat => {
           const label = cat === 'temperature' ? 'Temperature' : LINEAR_CATEGORIES[cat].label;
@@ -313,12 +378,10 @@ function UnitConverter() {
         })}
       </div>
 
-      {/* Input */}
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
-        Input
-      </div>
+      {/* Input + slider */}
+      <SectionLabel>Input</SectionLabel>
       <div style={{ ...panelStyle, marginBottom: 20 }}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ marginBottom: 10 }}>
           <input
             className="input"
             style={{ width: 160, fontSize: 16, fontWeight: 600 }}
@@ -334,14 +397,41 @@ function UnitConverter() {
             {units.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
         </div>
+
+        {sliderValid && (
+          <Slider
+            min={sMin} max={sMax}
+            value={parseFloat(inputVal)}
+            onChange={setInputVal}
+          />
+        )}
+
+        {/* Slider range controls */}
+        <div className="flex items-center gap-2" style={{ marginTop: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Slider range:</span>
+          <input
+            className="input"
+            style={{ width: 80 }}
+            value={sliderMin}
+            onChange={e => setSliderMin(e.target.value)}
+            placeholder="min"
+          />
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>to</span>
+          <input
+            className="input"
+            style={{ width: 80 }}
+            value={sliderMax}
+            onChange={e => setSliderMax(e.target.value)}
+            placeholder="max"
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fromUnit}</span>
+        </div>
       </div>
 
-      {/* Results */}
+      {/* Results table */}
       {results.length > 0 && (
         <>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
-            {catLabel} Conversions
-          </div>
+          <SectionLabel>{catLabel} Conversions</SectionLabel>
           <table className="data-table">
             <thead>
               <tr>
@@ -353,7 +443,9 @@ function UnitConverter() {
               {results.map(r => (
                 <tr
                   key={r.unit}
-                  style={r.unit === fromUnit ? { background: 'rgba(var(--accent-rgb, 59,130,246), 0.08)' } : {}}
+                  style={r.unit === fromUnit
+                    ? { background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }
+                    : {}}
                 >
                   <td style={{ fontWeight: r.unit === fromUnit ? 600 : 400 }}>{r.unit}</td>
                   <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, fontWeight: r.unit === fromUnit ? 600 : 400 }}>
@@ -369,7 +461,15 @@ function UnitConverter() {
   );
 }
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+function SectionLabel({ children }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
+      {children}
+    </div>
+  );
+}
+
 const panelStyle = {
   background: 'var(--bg-main)',
   border: '1px solid var(--border)',
@@ -387,18 +487,8 @@ const labelStyle = {
 
 // ─── Calculator registry ──────────────────────────────────────────────────────
 const CALCULATORS = [
-  {
-    id: 'ma420',
-    label: '4-20mA Scaling',
-    desc: 'Signal & process range converter',
-    component: MA420Calculator,
-  },
-  {
-    id: 'unit',
-    label: 'Unit Conversion',
-    desc: 'Engineering units, pressure, temperature, flow',
-    component: UnitConverter,
-  },
+  { id: 'ma420', label: '4-20mA Scaling',   desc: 'Signal & process range converter',             component: MA420Calculator },
+  { id: 'unit',  label: 'Unit Conversion',  desc: 'Engineering units, pressure, temperature, flow', component: UnitConverter },
 ];
 
 // ─── Main view ────────────────────────────────────────────────────────────────
@@ -409,14 +499,11 @@ export default function CalculatorsView() {
 
   return (
     <div className="flex h-full">
-      {/* Left nav */}
       <div style={{
-        width: 210,
-        flexShrink: 0,
+        width: 210, flexShrink: 0,
         background: 'var(--bg-surface)',
         borderRight: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
+        display: 'flex', flexDirection: 'column',
       }}>
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
@@ -430,17 +517,13 @@ export default function CalculatorsView() {
               key={c.id}
               onClick={() => setActiveCalc(c.id)}
               style={{
-                padding: '10px 14px',
-                textAlign: 'left',
+                padding: '10px 14px', textAlign: 'left', cursor: 'pointer',
                 background: isActive ? 'var(--bg-active, rgba(59,130,246,0.08))' : 'transparent',
-                borderTop: 'none',
-                borderRight: 'none',
-                borderBottom: 'none',
+                borderTop: 'none', borderRight: 'none', borderBottom: 'none',
                 borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-                cursor: 'pointer',
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--text-primary)' : 'var(--text-primary)' }}>
+              <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: 'var(--text-primary)' }}>
                 {c.label}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{c.desc}</div>
@@ -449,7 +532,6 @@ export default function CalculatorsView() {
         })}
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg-main)' }}>
         {ActiveComponent && <ActiveComponent />}
       </div>
