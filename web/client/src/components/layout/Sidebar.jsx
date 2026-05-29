@@ -246,7 +246,7 @@ export default function Sidebar({ activeView, onChangeView }) {
         </nav>
 
         {/* Bottom section: tool nav + project actions, all separated by a single borderTop */}
-        <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex-shrink-0">
           {/* Tool nav items */}
           {TOOL_NAV.map(item => {
             const Icon = item.icon;
