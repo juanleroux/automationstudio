@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import {
   connectOpc, browseOpc, readOpc, disconnectOpc,
-  connectMqtt, mqttMessages, disconnectMqtt,
+  connectMqtt, mqttMessages, publishMqtt, disconnectMqtt,
   connectModbus, readModbus, disconnectModbus,
 } from '../../api/client';
 
@@ -147,7 +147,7 @@ function OpcTree({ sessionId, onAddMonitor }) {
 }
 
 function OpcTab() {
-  const [host, setHost]         = useState('');
+  const [host, setHost]         = useState('host.docker.internal');
   const [port, setPort]         = useState('4840');
   const [path, setPath]         = useState('');
   const [username, setUsername] = useState('');
@@ -279,7 +279,7 @@ function OpcTab() {
 // ─── MQTT tab ─────────────────────────────────────────────────────────────────
 
 function MqttTab() {
-  const [host, setHost]         = useState('');
+  const [host, setHost]         = useState('host.docker.internal');
   const [port, setPort]         = useState('1883');
   const [clientId, setClientId] = useState('');
   const [username, setUsername] = useState('');
@@ -290,6 +290,12 @@ function MqttTab() {
   const [messages, setMessages]     = useState([]);
   const [filter, setFilter]         = useState('');
   const [topicCount, setTopicCount] = useState(0);
+  const [pubTopic, setPubTopic]     = useState('');
+  const [pubPayload, setPubPayload] = useState('');
+  const [pubQos, setPubQos]         = useState('0');
+  const [pubRetain, setPubRetain]   = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [pubResult, setPubResult]   = useState(null); // { ok, msg }
   const pollRef = useRef(null);
 
   const connected = !!sessionId;
@@ -317,6 +323,17 @@ function MqttTab() {
       if (r.success) { setMessages(r.messages); setTopicCount(r.topicCount); }
     } catch {}
   }, [sessionId, filter]);
+
+  const publish = async () => {
+    if (!sessionId || !pubTopic.trim()) return;
+    setPublishing(true); setPubResult(null);
+    try {
+      const r = await publishMqtt({ sessionId, topic: pubTopic.trim(), payload: pubPayload, qos: parseInt(pubQos), retain: pubRetain });
+      setPubResult({ ok: r.success, msg: r.success ? 'Published' : (r.error || 'Failed') });
+    } catch (e) { setPubResult({ ok: false, msg: e.message }); }
+    setPublishing(false);
+    setTimeout(() => setPubResult(null), 3000);
+  };
 
   useEffect(() => {
     if (!connected) return;
@@ -355,6 +372,35 @@ function MqttTab() {
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Publish panel */}
+          <div style={{ borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            <SectionLabel>Publish</SectionLabel>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', flexWrap: 'wrap' }}>
+              <input className="input" style={{ width: 200 }} placeholder="Topic" value={pubTopic} onChange={e => setPubTopic(e.target.value)} />
+              <input className="input" style={{ flex: 1, minWidth: 120 }} placeholder="Payload" value={pubPayload} onChange={e => setPubPayload(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && publish()} />
+              <select className="input" style={{ width: 80 }} value={pubQos} onChange={e => setPubQos(e.target.value)}>
+                <option value="0">QoS 0</option>
+                <option value="1">QoS 1</option>
+                <option value="2">QoS 2</option>
+              </select>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}>
+                <input type="checkbox" checked={pubRetain} onChange={e => setPubRetain(e.target.checked)} style={{ cursor: 'pointer' }} />
+                Retain
+              </label>
+              <button className="btn btn-primary" onClick={publish} disabled={publishing || !pubTopic.trim()} style={{ flexShrink: 0 }}>
+                {publishing ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : 'Publish'}
+              </button>
+              {pubResult && (
+                <span style={{ fontSize: 11, color: pubResult.ok ? '#22c55e' : '#e55353', flexShrink: 0 }}>
+                  {pubResult.ok ? <CheckCircle size={12} style={{ display: 'inline', marginRight: 3 }} /> : <XCircle size={12} style={{ display: 'inline', marginRight: 3 }} />}
+                  {pubResult.msg}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Messages */}
           <SectionLabel right={
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <input
@@ -398,7 +444,7 @@ function MqttTab() {
 const FC_LABELS = { 1: 'FC01 — Read Coils', 2: 'FC02 — Read Discrete Inputs', 3: 'FC03 — Read Holding Registers', 4: 'FC04 — Read Input Registers' };
 
 function ModbusTab() {
-  const [host, setHost]     = useState('');
+  const [host, setHost]     = useState('host.docker.internal');
   const [port, setPort]     = useState('502');
   const [unitId, setUnitId] = useState('1');
   const [connecting, setConnecting] = useState(false);

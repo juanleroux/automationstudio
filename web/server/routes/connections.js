@@ -220,6 +220,20 @@ router.post('/mqtt/subscribe', (req, res) => {
   }
 });
 
+router.post('/mqtt/publish', (req, res) => {
+  const { sessionId, topic, payload, qos = 0, retain = false } = req.body;
+  const s = store.get(sessionId);
+  if (!s || s.type !== 'mqtt') return res.status(404).json({ error: 'Session not found' });
+  if (!topic) return res.status(400).json({ error: 'Topic required' });
+  s.lastUsed = Date.now();
+  try {
+    s.client.publish(topic, String(payload ?? ''), { qos: parseInt(qos), retain: !!retain });
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 router.post('/mqtt/disconnect', (req, res) => {
   const { sessionId } = req.body;
   const s = store.get(sessionId);

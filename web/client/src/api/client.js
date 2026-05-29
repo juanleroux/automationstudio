@@ -35,6 +35,7 @@ export const disconnectOpc  = (d) => api.post('/connections/opc/disconnect',  d)
 export const connectMqtt    = (d) => api.post('/connections/mqtt/connect',    d).then(r => r.data);
 export const mqttMessages   = (p) => api.get('/connections/mqtt/messages', { params: p }).then(r => r.data);
 export const subscribeMqtt  = (d) => api.post('/connections/mqtt/subscribe',  d).then(r => r.data);
+export const publishMqtt    = (d) => api.post('/connections/mqtt/publish',    d).then(r => r.data);
 export const disconnectMqtt = (d) => api.post('/connections/mqtt/disconnect', d).then(r => r.data);
 
 export const connectModbus    = (d) => api.post('/connections/modbus/connect',    d).then(r => r.data);
