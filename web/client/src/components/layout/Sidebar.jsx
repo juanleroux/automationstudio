@@ -10,11 +10,14 @@ import { listProjects, createProject, loadProject, saveProject, deleteProject, r
 import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
 
-const NAV_ITEMS = [
-  { id: 'dashboard',   label: 'Dashboard',   icon: LayoutDashboard, alwaysEnabled: true },
-  { id: 'engineering', label: 'Assets',      icon: Cpu },
-  { id: 'calculators', label: 'Calculators', icon: Calculator,      alwaysEnabled: true },
-  { id: 'commtest',    label: 'Connections',    icon: Network,         alwaysEnabled: true, beta: true },
+const PROJECT_NAV = [
+  { id: 'dashboard',   label: 'Dashboard', icon: LayoutDashboard, alwaysEnabled: true },
+  { id: 'engineering', label: 'Assets',    icon: Cpu },
+];
+
+const TOOL_NAV = [
+  { id: 'calculators', label: 'Calculators', icon: Calculator },
+  { id: 'commtest',    label: 'Connections', icon: Network    },
 ];
 
 export default function Sidebar({ activeView, onChangeView }) {
@@ -215,7 +218,7 @@ export default function Sidebar({ activeView, onChangeView }) {
 
         {/* Nav items */}
         <nav className="flex-1 py-2 overflow-y-auto">
-          {NAV_ITEMS.map(item => {
+          {PROJECT_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
             const enabled = item.alwaysEnabled || !!project;
@@ -233,9 +236,30 @@ export default function Sidebar({ activeView, onChangeView }) {
                 }}
               >
                 <Icon size={16} className="flex-shrink-0" />
-                {!collapsed && (
-                  <span className="text-sm font-medium">{item.label}</span>
-                )}
+                {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+              </button>
+            );
+          })}
+
+          <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0' }} />
+
+          {TOOL_NAV.map(item => {
+            const Icon = item.icon;
+            const active = activeView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onChangeView(item.id)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-none transition-colors"
+                style={{
+                  background: active ? 'var(--accent-bg)' : 'transparent',
+                  color: active ? 'var(--accent)' : 'var(--text-muted)',
+                  borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icon size={16} className="flex-shrink-0" />
+                {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
               </button>
             );
           })}
