@@ -297,24 +297,30 @@ export default function Sidebar({ activeView, onChangeView }) {
               </button>
             </div>
           ) : (
-            <div className="px-3 flex flex-col gap-1">
-              <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={() => setShowNewDialog(true)}>
-                <FilePlus size={16} /> New Project
-              </button>
-              <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={handleOpenDialog}>
-                <FolderOpen size={16} /> Open Project
-              </button>
-              <button className="btn btn-primary w-full text-xs" style={{ padding: '5px 8px' }} onClick={handleSave} disabled={!project || isSaving}>
-                <Save size={16} /> {isSaving ? 'Saving...' : 'Save Project'}
-              </button>
-              {project && (
-                <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px', color: 'var(--text-muted)' }} onClick={handleCloseProject}>
-                  <FolderX size={16} /> Close Project
+            <div className="flex flex-col">
+              {[
+                { label: 'New Project',   icon: FilePlus,   onClick: () => setShowNewDialog(true), disabled: false },
+                { label: 'Open Project',  icon: FolderOpen, onClick: handleOpenDialog,             disabled: false },
+                { label: isSaving ? 'Saving…' : 'Save Project', icon: Save, onClick: handleSave,  disabled: !project || isSaving },
+                ...(project ? [{ label: 'Close Project', icon: FolderX, onClick: handleCloseProject, disabled: false }] : []),
+                { label: 'Settings',      icon: Settings,   onClick: () => onChangeView('settings'), disabled: false },
+              ].map(({ label, icon: Icon, onClick, disabled }) => (
+                <button key={label}
+                  className="w-full flex items-center gap-3 rounded-none transition-colors text-sm"
+                  style={{
+                    padding: '8px 12px',
+                    borderLeft: '3px solid transparent',
+                    color: disabled ? 'var(--text-disabled)' : 'var(--text-muted)',
+                    background: 'transparent',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                  }}
+                  onClick={onClick}
+                  disabled={disabled}
+                >
+                  <Icon size={16} className="flex-shrink-0" />
+                  <span>{label}</span>
                 </button>
-              )}
-              <button className="btn btn-ghost w-full text-xs" style={{ padding: '5px 8px' }} onClick={() => onChangeView('settings')}>
-                <Settings size={16} /> Settings
-              </button>
+              ))}
             </div>
           )}
         </div>
