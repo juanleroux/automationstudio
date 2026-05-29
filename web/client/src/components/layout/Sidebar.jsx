@@ -216,9 +216,8 @@ export default function Sidebar({ activeView, onChangeView }) {
           )}
         </div>
 
-        {/* Nav items */}
+        {/* Nav items — icon always lives in a fixed 53px column so it never moves */}
         <nav className="py-2 overflow-y-auto" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {/* Project-dependent items */}
           {PROJECT_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
@@ -228,27 +227,25 @@ export default function Sidebar({ activeView, onChangeView }) {
                 key={item.id}
                 onClick={() => onChangeView(item.id)}
                 disabled={!enabled}
-                className="w-full flex items-center rounded-none transition-colors py-2"
+                className="w-full flex items-center rounded-none transition-colors"
                 style={{
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  gap: collapsed ? 0 : 12,
-                  padding: collapsed ? '8px 0' : '8px 12px',
+                  padding: 0,
                   background: active ? 'var(--accent-bg)' : 'transparent',
                   color: active ? 'var(--accent)' : !enabled ? 'var(--text-disabled)' : 'var(--text-muted)',
                   borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
                   cursor: !enabled ? 'not-allowed' : 'pointer',
                 }}
               >
-                <Icon size={16} className="flex-shrink-0" />
+                <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
+                  <Icon size={16} />
+                </span>
                 {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
               </button>
             );
           })}
 
-          {/* Push tool items to bottom */}
           <div style={{ flex: 1 }} />
 
-          {/* Always-available tools */}
           {TOOL_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
@@ -256,73 +253,53 @@ export default function Sidebar({ activeView, onChangeView }) {
               <button
                 key={item.id}
                 onClick={() => onChangeView(item.id)}
-                className="w-full flex items-center rounded-none transition-colors py-2"
+                className="w-full flex items-center rounded-none transition-colors"
                 style={{
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  gap: collapsed ? 0 : 12,
-                  padding: collapsed ? '8px 0' : '8px 12px',
+                  padding: 0,
                   background: active ? 'var(--accent-bg)' : 'transparent',
                   color: active ? 'var(--accent)' : 'var(--text-muted)',
                   borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
                   cursor: 'pointer',
                 }}
               >
-                <Icon size={16} className="flex-shrink-0" />
+                <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
+                  <Icon size={16} />
+                </span>
                 {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
               </button>
             );
           })}
         </nav>
 
-        {/* Bottom actions */}
+        {/* Bottom actions — same fixed-column layout */}
         <div className="flex-shrink-0 py-2" style={{ borderTop: '1px solid var(--border)' }}>
-          {collapsed ? (
-            <div className="flex flex-col items-center gap-1 px-2">
-              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={() => setShowNewDialog(true)} title="New Project" style={{ color: 'var(--text-muted)' }}>
-                <FilePlus size={16} />
-              </button>
-              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleOpenDialog} title="Open Project" style={{ color: 'var(--text-muted)' }}>
-                <FolderOpen size={16} />
-              </button>
-              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleSave} disabled={!project || isSaving} title="Save">
-                <Save size={16} />
-              </button>
-              {project && (
-                <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={handleCloseProject} title="Close Project" style={{ color: 'var(--text-muted)' }}>
-                  <FolderX size={16} />
-                </button>
-              )}
-              <button className="btn btn-ghost btn-icon w-full flex items-center justify-center" onClick={() => onChangeView('settings')} title="Settings">
-                <Settings size={16} />
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col">
-              {[
-                { label: 'New Project',   icon: FilePlus,   onClick: () => setShowNewDialog(true), disabled: false },
-                { label: 'Open Project',  icon: FolderOpen, onClick: handleOpenDialog,             disabled: false },
-                { label: isSaving ? 'Saving…' : 'Save Project', icon: Save, onClick: handleSave,  disabled: !project || isSaving },
-                ...(project ? [{ label: 'Close Project', icon: FolderX, onClick: handleCloseProject, disabled: false }] : []),
-                { label: 'Settings',      icon: Settings,   onClick: () => onChangeView('settings'), disabled: false },
-              ].map(({ label, icon: Icon, onClick, disabled }) => (
-                <button key={label}
-                  className="w-full flex items-center gap-3 rounded-none transition-colors text-sm"
-                  style={{
-                    padding: '8px 12px',
-                    borderLeft: '3px solid transparent',
-                    color: disabled ? 'var(--text-disabled)' : 'var(--text-muted)',
-                    background: 'transparent',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                  }}
-                  onClick={onClick}
-                  disabled={disabled}
-                >
-                  <Icon size={16} className="flex-shrink-0" />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {[
+            { label: 'New Project',  icon: FilePlus,   onClick: () => setShowNewDialog(true),    disabled: false,               title: 'New Project'   },
+            { label: 'Open Project', icon: FolderOpen, onClick: handleOpenDialog,                disabled: false,               title: 'Open Project'  },
+            { label: isSaving ? 'Saving…' : 'Save Project', icon: Save, onClick: handleSave,    disabled: !project || isSaving, title: 'Save Project'  },
+            ...(project ? [{ label: 'Close Project', icon: FolderX, onClick: handleCloseProject, disabled: false,               title: 'Close Project' }] : []),
+            { label: 'Settings',     icon: Settings,   onClick: () => onChangeView('settings'),  disabled: false,               title: 'Settings'      },
+          ].map(({ label, icon: Icon, onClick, disabled, title }) => (
+            <button
+              key={title}
+              title={collapsed ? title : undefined}
+              onClick={onClick}
+              disabled={disabled}
+              className="w-full flex items-center rounded-none transition-colors"
+              style={{
+                padding: 0,
+                background: 'transparent',
+                color: disabled ? 'var(--text-disabled)' : 'var(--text-muted)',
+                borderLeft: '3px solid transparent',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
+                <Icon size={16} />
+              </span>
+              {!collapsed && <span className="text-sm">{label}</span>}
+            </button>
+          ))}
         </div>
 
         {/* Collapse toggle */}
