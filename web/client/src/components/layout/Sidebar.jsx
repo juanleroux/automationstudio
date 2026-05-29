@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { id: 'dashboard',   label: 'Dashboard',   icon: LayoutDashboard, alwaysEnabled: true },
   { id: 'engineering', label: 'Assets',      icon: Cpu },
   { id: 'calculators', label: 'Calculators', icon: Calculator,      alwaysEnabled: true },
-  { id: 'commtest',    label: 'Communications', icon: Network,         alwaysEnabled: true, beta: true },
+  { id: 'commtest',    label: 'Connections',    icon: Network,         alwaysEnabled: true, beta: true },
 ];
 
 export default function Sidebar({ activeView, onChangeView }) {
