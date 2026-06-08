@@ -21,6 +21,10 @@ export default function SettingsView() {
       enableIgnitionMenuItems: true
     }
   );
+  const [projectDetails, setProjectDetails] = useState({
+    name: project?.name || '',
+    description: project?.description || '',
+  });
   const [siemens, setSiemens] = useState(
     project?.siemens || {
       tiaVersion: 'V21',
@@ -53,7 +57,13 @@ export default function SettingsView() {
     setSaving(true);
     try {
       if (project) {
-        updateProject({ ...project, engineering, siemens });
+        updateProject({
+          ...project,
+          name: projectDetails.name.trim() || project.name,
+          description: projectDetails.description,
+          engineering,
+          siemens,
+        });
       }
       if (config) {
         await saveConfig(config);
@@ -149,6 +159,39 @@ export default function SettingsView() {
           {/* General tab */}
           {activeTab === 'general' && (
             <div className="flex flex-col gap-6">
+
+              {/* Project Details */}
+              {project ? (
+                <div>
+                  <label className="block text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>Project Details</label>
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="block text-xs text-text-muted mb-1">Project Name</label>
+                      <input
+                        type="text"
+                        value={projectDetails.name}
+                        onChange={e => setProjectDetails(p => ({ ...p, name: e.target.value }))}
+                        placeholder="My Project"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-muted mb-1">Description</label>
+                      <textarea
+                        value={projectDetails.description}
+                        onChange={e => setProjectDetails(p => ({ ...p, description: e.target.value }))}
+                        placeholder="Optional project description"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-md text-sm" style={{ background: 'rgba(255,193,7,0.08)', border: '1px solid rgba(255,193,7,0.2)', color: 'var(--text-muted)' }}>
+                  Open a project to edit project details
+                </div>
+              )}
+
+              {/* Appearance */}
               <div>
                 <label className="block text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>Appearance</label>
                 <div className="flex gap-3">
@@ -177,6 +220,7 @@ export default function SettingsView() {
                   })}
                 </div>
               </div>
+
             </div>
           )}
 
