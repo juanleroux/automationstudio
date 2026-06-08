@@ -3,10 +3,10 @@ import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, Sun, Moon, Cpu, Folde
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, saveProject, testIgnitionConnection } from '../../api/client';
+import { loadConfig, saveConfig, testIgnitionConnection } from '../../api/client';
 
 export default function SettingsView() {
-  const { project, filename, updateProject } = useProject();
+  const { project, updateProject } = useProject();
   const { theme, setTheme } = useTheme();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('general');
@@ -52,10 +52,8 @@ export default function SettingsView() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (project && filename) {
-        const updatedProject = { ...project, engineering, siemens };
-        updateProject(updatedProject);
-        await saveProject(filename, updatedProject);
+      if (project) {
+        updateProject({ ...project, engineering, siemens });
       }
       if (config) {
         await saveConfig(config);

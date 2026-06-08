@@ -1,47 +1,149 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { loadProject, saveProject } from '../api/client';
 
 const ProjectContext = createContext(null);
 
-export function ProjectProvider({ children }) {
-  const [project, setProject] = useState(null);
-  const [filename, setFilename] = useState(null);
-  const [isDirty, setIsDirty] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+export const supportsFileSystemAccess =
+  typeof window !== 'undefined' && 'showOpenFilePicker' in window;
 
-  const openProject = useCallback(async (fname) => {
-    const data = await loadProject(fname);
+const FILE_TYPES = [{
+  description: 'Automation Studio Project',
+  accept: { 'application/json': ['.atsproj.json', '.json'] },
+}];
+
+function blankProject(name) {
+  return {
+    name,
+    description: '',
+    templates: [],
+    areas: [{ id: 1, name: 'Area 1', description: '', lastModification: new Date().toISOString() }],
+    engineering: { ignitionGateway: '', apiKey: '', folderPath: '', enableIgnitionMenuItems: false },
+    proposal: {
+      folderPath: '',
+      clientDetails: {
+        name: '', description: '', companyName: '', contactName: '',
+        phoneNumber: '', emailAddress: '', address: '', taxNumber: '', logoFilePath: '',
+      },
+      topics: [],
+    },
+  };
+}
+
+function suggestedFilename(project) {
+  return (project.name || 'project').replace(/[^a-z0-9_-]/gi, '_') + '.atsproj.json';
+}
+
+function triggerDownload(project) {
+  const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = suggestedFilename(project);
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function ProjectProvider({ children }) {
+  const [project, setProject]       = useState(null);
+  const [fileHandle, setFileHandle] = useState(null); // FileSystemFileHandle | null
+  const [filename, setFilename]     = useState(null); // display name only
+  const [isDirty, setIsDirty]       = useState(false);
+  const [isSaving, setIsSaving]     = useState(false);
+
+  // Create a blank project in memory (no file association yet)
+  const newProject = useCallback((name) => {
+    setProject(blankProject(name));
+    setFileHandle(null);
+    setFilename(null);
+    setIsDirty(true);
+  }, []);
+
+  // Open via File System Access API — throws AbortError if user cancels
+  const openProject = useCallback(async () => {
+    const [handle] = await window.showOpenFilePicker({ types: FILE_TYPES, multiple: false });
+    const file = await handle.getFile();
+    const data = JSON.parse(await file.text());
     setProject(data);
-    setFilename(fname);
+    setFileHandle(handle);
+    setFilename(file.name);
+    setIsDirty(false);
+    return data;
+  }, []);
+
+  // Load from already-read data (fallback for browsers without File System Access API)
+  const loadProjectData = useCallback((data, fname) => {
+    setProject(data);
+    setFileHandle(null);
+    setFilename(fname || null);
     setIsDirty(false);
   }, []);
 
   const updateProject = useCallback((updater) => {
-    setProject(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      return next;
-    });
+    setProject(prev => (typeof updater === 'function' ? updater(prev) : updater));
     setIsDirty(true);
   }, []);
 
+  // Save to existing handle, or fall back to Save As
   const saveCurrentProject = useCallback(async () => {
-    if (!filename || !project) return;
+    if (!project) return;
     setIsSaving(true);
     try {
-      await saveProject(filename, project);
-      setIsDirty(false);
+      if (fileHandle) {
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(project, null, 2));
+        await writable.close();
+        setIsDirty(false);
+      } else if (supportsFileSystemAccess) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: suggestedFilename(project),
+          types: FILE_TYPES,
+        });
+        const writable = await handle.createWritable();
+        await writable.write(JSON.stringify(project, null, 2));
+        await writable.close();
+        setFileHandle(handle);
+        setFilename(handle.name);
+        setIsDirty(false);
+      } else {
+        triggerDownload(project);
+        setIsDirty(false);
+      }
     } finally {
       setIsSaving(false);
     }
-  }, [filename, project]);
+  }, [project, fileHandle]);
+
+  // Always prompt for a new location
+  const saveProjectAs = useCallback(async () => {
+    if (!project) return;
+    setIsSaving(true);
+    try {
+      if (supportsFileSystemAccess) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: suggestedFilename(project),
+          types: FILE_TYPES,
+        });
+        const writable = await handle.createWritable();
+        await writable.write(JSON.stringify(project, null, 2));
+        await writable.close();
+        setFileHandle(handle);
+        setFilename(handle.name);
+        setIsDirty(false);
+      } else {
+        triggerDownload(project);
+        setIsDirty(false);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [project]);
 
   const closeProject = useCallback(() => {
     setProject(null);
+    setFileHandle(null);
     setFilename(null);
     setIsDirty(false);
   }, []);
 
-  // Template helpers
   const getTemplate = useCallback((templateId) => {
     if (!project) return null;
     return project.templates.find(t => t.id === templateId) || null;
@@ -59,17 +161,10 @@ export function ProjectProvider({ children }) {
 
   return (
     <ProjectContext.Provider value={{
-      project,
-      filename,
-      isDirty,
-      isSaving,
-      openProject,
-      updateProject,
-      saveCurrentProject,
-      closeProject,
-      getTemplate,
-      nextTemplateId,
-      nextAreaId
+      project, filename, isDirty, isSaving,
+      newProject, openProject, loadProjectData,
+      updateProject, saveCurrentProject, saveProjectAs,
+      closeProject, getTemplate, nextTemplateId, nextAreaId,
     }}>
       {children}
     </ProjectContext.Provider>

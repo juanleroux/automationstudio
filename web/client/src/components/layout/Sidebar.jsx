@@ -1,12 +1,11 @@
 import React, { useState, useRef } from 'react';
 import {
   Cpu, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
-  FilePlus, FolderOpen, FolderX, Save, Zap, Trash2, Download, Upload, Edit2, Check, X,
+  FilePlus, FolderOpen, FolderX, Save, SaveAll, Zap,
   Calculator, Network
 } from 'lucide-react';
-import { useProject } from '../../context/ProjectContext';
+import { useProject, supportsFileSystemAccess } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
-import { listProjects, createProject, loadProject, saveProject, deleteProject, renameProject } from '../../api/client';
 import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
 
@@ -21,142 +20,67 @@ const TOOL_NAV = [
 ];
 
 export default function Sidebar({ activeView, onChangeView }) {
-  const { project, filename, isDirty, isSaving, openProject, saveCurrentProject, closeProject } = useProject();
+  const {
+    project, isDirty, isSaving,
+    newProject, openProject, loadProjectData,
+    saveCurrentProject, saveProjectAs, closeProject,
+  } = useProject();
   const toast = useToast();
-  const [collapsed, setCollapsed] = useState(true);
-  const [showNewDialog, setShowNewDialog] = useState(false);
-  const [showOpenDialog, setShowOpenDialog] = useState(false);
-  const [projects, setProjects] = useState([]);
-  const [newName, setNewName] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [confirmDeleteProject, setConfirmDeleteProject] = useState(null);
-  const [confirmClose, setConfirmClose] = useState(false);
-  const [editingProject, setEditingProject] = useState(null); // { filename, name, description }
-  const [savingEdit, setSavingEdit] = useState(false);
-  const importProjectRef = useRef(null);
 
-  const handleNewProject = async () => {
+  const [collapsed, setCollapsed]         = useState(true);
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [newName, setNewName]             = useState('');
+  const [creating, setCreating]           = useState(false);
+  const [confirmClose, setConfirmClose]   = useState(false);
+
+  // Hidden file input — fallback for browsers without File System Access API
+  const openFileRef = useRef(null);
+
+  const handleNewProject = () => {
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      const result = await createProject(newName.trim());
-      await openProject(result.filename);
-      setShowNewDialog(false);
-      setNewName('');
+      newProject(newName.trim());
       toast.success(`Project "${newName.trim()}" created`);
       onChangeView('dashboard');
-    } catch (err) {
-      toast.error('Failed to create project: ' + (err.response?.data?.error || err.message));
+      setShowNewDialog(false);
+      setNewName('');
     } finally {
       setCreating(false);
     }
   };
 
-  const handleOpenDialog = async () => {
-    try {
-      const list = await listProjects();
-      setProjects(list);
-      setShowOpenDialog(true);
-    } catch (err) {
-      toast.error('Failed to load projects: ' + err.message);
-    }
-  };
-
-  const handleOpenProject = async (proj) => {
-    try {
-      await openProject(proj.filename);
-      setShowOpenDialog(false);
-      setEditingProject(null);
-      toast.success(`Opened "${proj.name}"`);
-      onChangeView('dashboard');
-    } catch (err) {
-      toast.error('Failed to open project: ' + err.message);
-    }
-  };
-
-  const handleExportProject = async (proj, e) => {
-    e.stopPropagation();
-    try {
-      const data = await loadProject(proj.filename);
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = proj.filename;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`Exported "${proj.name}"`);
-    } catch (err) {
-      toast.error('Export failed: ' + err.message);
-    }
-  };
-
-  const handleStartEdit = async (proj, e) => {
-    e.stopPropagation();
-    try {
-      const data = await loadProject(proj.filename);
-      setEditingProject({ filename: proj.filename, name: data.name || proj.name, description: data.description || '' });
-    } catch (err) {
-      toast.error('Failed to load project: ' + err.message);
-    }
-  };
-
-  const handleSaveEdit = async (e) => {
-    e?.stopPropagation();
-    if (!editingProject || !editingProject.name.trim()) return;
-    setSavingEdit(true);
-    try {
-      const result = await renameProject(
-        editingProject.filename,
-        editingProject.name.trim(),
-        editingProject.description,
-      );
-      setProjects(ps => ps.map(p =>
-        p.filename === editingProject.filename
-          ? { ...p, name: editingProject.name.trim(), filename: result.filename }
-          : p
-      ));
-      toast.success('Project renamed');
-      setEditingProject(null);
-    } catch (err) {
-      toast.error('Failed to save: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
-  const handleDeleteProject = async () => {
-    const proj = confirmDeleteProject;
-    try {
-      await deleteProject(proj.filename);
-      setProjects(ps => ps.filter(p => p.filename !== proj.filename));
-      toast.success(`Deleted "${proj.name}"`);
-    } catch (err) {
-      toast.error('Delete failed: ' + err.message);
-    } finally {
-      setConfirmDeleteProject(null);
-    }
-  };
-
-  const handleImportProject = (file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (e) => {
+  const handleOpenProject = async () => {
+    if (supportsFileSystemAccess) {
       try {
-        const data = JSON.parse(e.target.result);
-        const name = data.name || file.name.replace(/\.json$/i, '').replace(/\.atsproj$/i, '');
-        const result = await createProject(name);
-        await saveProject(result.filename, { ...data, name });
-        await openProject(result.filename);
-        setShowOpenDialog(false);
-        setShowNewDialog(false);
-        toast.success(`Imported "${name}"`);
+        const data = await openProject();
+        toast.success(`Opened "${data.name}"`);
         onChangeView('dashboard');
       } catch (err) {
-        toast.error('Import failed: ' + err.message);
+        if (err.name !== 'AbortError') toast.error('Failed to open: ' + err.message);
+      }
+    } else {
+      openFileRef.current?.click();
+    }
+  };
+
+  // Fallback: read file via <input type="file">
+  const handleFileInputChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        loadProjectData(data, file.name);
+        toast.success(`Opened "${data.name || file.name}"`);
+        onChangeView('dashboard');
+      } catch {
+        toast.error('Invalid project file');
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleSave = async () => {
@@ -164,16 +88,22 @@ export default function Sidebar({ activeView, onChangeView }) {
       await saveCurrentProject();
       toast.success('Project saved');
     } catch (err) {
-      toast.error('Save failed: ' + err.message);
+      if (err.name !== 'AbortError') toast.error('Save failed: ' + err.message);
+    }
+  };
+
+  const handleSaveAs = async () => {
+    try {
+      await saveProjectAs();
+      toast.success('Project saved');
+    } catch (err) {
+      if (err.name !== 'AbortError') toast.error('Save failed: ' + err.message);
     }
   };
 
   const handleCloseProject = () => {
-    if (isDirty) {
-      setConfirmClose(true);
-    } else {
-      doClose();
-    }
+    if (isDirty) setConfirmClose(true);
+    else doClose();
   };
 
   const doClose = () => {
@@ -182,15 +112,23 @@ export default function Sidebar({ activeView, onChangeView }) {
     setConfirmClose(false);
   };
 
+  const labelStyle = (collapsed) => ({
+    overflow: 'hidden', whiteSpace: 'nowrap',
+    maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
+    transition: 'max-width 0.2s ease, opacity 0.15s ease',
+  });
+
   return (
     <>
+      {/* Fallback file picker for browsers without File System Access API */}
       <input
-        ref={importProjectRef}
+        ref={openFileRef}
         type="file"
-        accept=".json"
+        accept=".json,.atsproj.json"
         style={{ display: 'none' }}
-        onChange={e => { handleImportProject(e.target.files[0]); e.target.value = ''; }}
+        onChange={handleFileInputChange}
       />
+
       <div
         className="flex flex-col h-full flex-shrink-0"
         style={{
@@ -209,11 +147,7 @@ export default function Sidebar({ activeView, onChangeView }) {
           >
             <Zap size={18} color="var(--bg-main)" />
           </div>
-          <div style={{
-            overflow: 'hidden', whiteSpace: 'nowrap',
-            maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
-            transition: 'max-width 0.2s ease, opacity 0.15s ease',
-          }}>
+          <div style={labelStyle(collapsed)}>
             <div className="font-bold text-text-primary text-sm leading-tight">
               Automation Studio
             </div>
@@ -243,19 +177,14 @@ export default function Sidebar({ activeView, onChangeView }) {
                 <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
                   <Icon size={16} />
                 </span>
-                <span className="text-sm font-medium" style={{
-                  overflow: 'hidden', whiteSpace: 'nowrap',
-                  maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
-                  transition: 'max-width 0.2s ease, opacity 0.15s ease',
-                }}>{item.label}</span>
+                <span className="text-sm font-medium" style={labelStyle(collapsed)}>{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        {/* Bottom section: tool nav + project actions, all separated by a single borderTop */}
+        {/* Bottom section: tool nav + project actions */}
         <div className="flex-shrink-0">
-          {/* Tool nav items */}
           {TOOL_NAV.map(item => {
             const Icon = item.icon;
             const active = activeView === item.id;
@@ -275,25 +204,22 @@ export default function Sidebar({ activeView, onChangeView }) {
                 <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
                   <Icon size={16} />
                 </span>
-                <span className="text-sm font-medium" style={{
-                  overflow: 'hidden', whiteSpace: 'nowrap',
-                  maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
-                  transition: 'max-width 0.2s ease, opacity 0.15s ease',
-                }}>{item.label}</span>
+                <span className="text-sm font-medium" style={labelStyle(collapsed)}>{item.label}</span>
               </button>
             );
           })}
 
-          {/* Thin divider between tools and project actions */}
+          {/* Divider between tools and project actions */}
           <div style={{ height: 1, background: 'var(--border)' }} />
 
           {/* Project actions */}
           {[
-            { label: 'New Project',  icon: FilePlus,   onClick: () => setShowNewDialog(true),    disabled: false,               title: 'New Project'   },
-            { label: 'Open Project', icon: FolderOpen, onClick: handleOpenDialog,                disabled: false,               title: 'Open Project'  },
-            { label: isSaving ? 'Saving…' : 'Save Project', icon: Save, onClick: handleSave,    disabled: !project || isSaving, title: 'Save Project'  },
-            ...(project ? [{ label: 'Close Project', icon: FolderX, onClick: handleCloseProject, disabled: false,               title: 'Close Project' }] : []),
-            { label: 'Settings',     icon: Settings,   onClick: () => onChangeView('settings'),  disabled: false,               title: 'Settings'      },
+            { label: 'New Project',  icon: FilePlus,  onClick: () => setShowNewDialog(true), disabled: false,                title: 'New Project'  },
+            { label: 'Open Project', icon: FolderOpen, onClick: handleOpenProject,            disabled: false,                title: 'Open Project' },
+            { label: isSaving ? 'Saving…' : 'Save',   icon: Save,    onClick: handleSave,    disabled: !project || isSaving, title: 'Save'         },
+            { label: 'Save As',      icon: SaveAll,   onClick: handleSaveAs,                  disabled: !project || isSaving, title: 'Save As'      },
+            ...(project ? [{ label: 'Close Project', icon: FolderX, onClick: handleCloseProject, disabled: false, title: 'Close Project' }] : []),
+            { label: 'Settings',     icon: Settings,  onClick: () => onChangeView('settings'), disabled: false,               title: 'Settings'     },
           ].map(({ label, icon: Icon, onClick, disabled, title }) => (
             <button
               key={title}
@@ -312,11 +238,7 @@ export default function Sidebar({ activeView, onChangeView }) {
               <span style={{ width: 53, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '8px 0' }}>
                 <Icon size={16} />
               </span>
-              <span className="text-sm" style={{
-                overflow: 'hidden', whiteSpace: 'nowrap',
-                maxWidth: collapsed ? 0 : 160, opacity: collapsed ? 0 : 1,
-                transition: 'max-width 0.2s ease, opacity 0.15s ease',
-              }}>{label}</span>
+              <span className="text-sm" style={labelStyle(collapsed)}>{label}</span>
             </button>
           ))}
         </div>
@@ -324,14 +246,14 @@ export default function Sidebar({ activeView, onChangeView }) {
         {/* Collapse toggle */}
         <button
           className="w-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
-          style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}
+          style={{ borderTop: '1px solid var(--border)', padding: '6px 0' }}
           onClick={() => setCollapsed(c => !c)}
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
       </div>
 
-      {/* New Project Dialog */}
+      {/* New Project dialog */}
       {showNewDialog && (
         <Modal
           title="New Project"
@@ -339,10 +261,6 @@ export default function Sidebar({ activeView, onChangeView }) {
           width={400}
           footer={
             <>
-              <button className="btn btn-secondary flex items-center gap-2" onClick={() => importProjectRef.current?.click()}>
-                <Upload size={13} /> Import
-              </button>
-              <div style={{ flex: 1 }} />
               <button className="btn btn-secondary" onClick={() => { setShowNewDialog(false); setNewName(''); }}>Cancel</button>
               <button className="btn btn-primary" onClick={handleNewProject} disabled={!newName.trim() || creating}>
                 {creating ? 'Creating...' : 'Create'}
@@ -362,119 +280,6 @@ export default function Sidebar({ activeView, onChangeView }) {
             />
           </div>
         </Modal>
-      )}
-
-      {/* Open Project Dialog */}
-      {showOpenDialog && (
-        <Modal
-          title="Open Project"
-          onClose={() => { setShowOpenDialog(false); setEditingProject(null); }}
-          width={500}
-          footer={
-            <button className="btn btn-secondary flex items-center gap-2" onClick={() => importProjectRef.current?.click()}>
-              <Upload size={13} /> Import Project
-            </button>
-          }
-        >
-          {projects.length === 0 ? (
-            <div className="text-center py-8 text-text-muted">
-              <FolderOpen size={32} className="mx-auto mb-2 opacity-40" />
-              <p>No projects found</p>
-              <p className="text-xs mt-1">Create a new project to get started</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {projects.map(proj => {
-                const isEditing = editingProject?.filename === proj.filename;
-                return (
-                  <div
-                    key={proj.filename}
-                    className="flex flex-col p-3 rounded-md transition-colors"
-                    style={{ background: 'var(--bg-main)', border: `1px solid ${isEditing ? 'var(--accent)' : 'var(--border)'}` }}
-                    onMouseEnter={e => { if (!isEditing) e.currentTarget.style.borderColor = 'var(--accent)'; }}
-                    onMouseLeave={e => { if (!isEditing) e.currentTarget.style.borderColor = 'var(--border)'; }}
-                  >
-                    {isEditing ? (
-                      /* Edit mode */
-                      <div className="flex flex-col gap-2" onClick={e => e.stopPropagation()}>
-                        <div>
-                          <label className="block text-xs text-text-muted mb-1">Name</label>
-                          <input
-                            type="text"
-                            value={editingProject.name}
-                            onChange={e => setEditingProject(p => ({ ...p, name: e.target.value }))}
-                            style={{ fontSize: 13, padding: '4px 8px' }}
-                            autoFocus
-                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingProject(null); }}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-text-muted mb-1">Description</label>
-                          <input
-                            type="text"
-                            value={editingProject.description}
-                            onChange={e => setEditingProject(p => ({ ...p, description: e.target.value }))}
-                            placeholder="Optional description"
-                            style={{ fontSize: 13, padding: '4px 8px' }}
-                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingProject(null); }}
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2 mt-1">
-                          <button className="btn btn-secondary text-xs" style={{ padding: '3px 10px' }} onClick={() => setEditingProject(null)}>
-                            <X size={12} /> Cancel
-                          </button>
-                          <button
-                            className="btn btn-primary text-xs"
-                            style={{ padding: '3px 10px' }}
-                            onClick={handleSaveEdit}
-                            disabled={!editingProject.name.trim() || savingEdit}
-                          >
-                            <Check size={12} /> {savingEdit ? 'Saving...' : 'Save'}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Normal mode */
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProject(proj)}>
-                          <div className="text-sm font-medium text-text-primary">{proj.name}</div>
-                          <div className="text-xs text-text-muted mt-0.5">{proj.filename}</div>
-                        </div>
-                        <div className="text-xs text-text-muted flex-shrink-0">
-                          {new Date(proj.modified).toLocaleDateString()}
-                        </div>
-                        <button className="btn btn-ghost btn-icon flex-shrink-0" title="Rename" onClick={e => handleStartEdit(proj, e)}>
-                          <Edit2 size={13} />
-                        </button>
-                        <button className="btn btn-ghost btn-icon flex-shrink-0" title="Export project" onClick={e => handleExportProject(proj, e)}>
-                          <Download size={13} />
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-icon flex-shrink-0"
-                          title="Delete project"
-                          style={{ color: '#e55353' }}
-                          onClick={e => { e.stopPropagation(); setConfirmDeleteProject(proj); }}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Modal>
-      )}
-
-      {confirmDeleteProject && (
-        <ConfirmDialog
-          title="Delete Project"
-          message={`Delete "${confirmDeleteProject.name}"? This cannot be undone.`}
-          danger
-          onConfirm={handleDeleteProject}
-          onCancel={() => setConfirmDeleteProject(null)}
-        />
       )}
 
       {confirmClose && (
