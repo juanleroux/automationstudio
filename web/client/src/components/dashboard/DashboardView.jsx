@@ -212,7 +212,7 @@ export default function DashboardView() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-main)' }}>
         {subToolbar}
-        <GraphView templates={m.templates} areas={m.areas} counts={m} />
+        <GraphView templates={m.templates} areas={m.areas} counts={m} projectName={project.name} />
       </div>
     );
   }

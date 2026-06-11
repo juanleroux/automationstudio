@@ -1,13 +1,19 @@
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const REPULSION        = 1800;
-const REPULSION_CUTOFF = 180;   // skip pairs beyond this distance — prevents cluster mass from ejecting far nodes
+const REPULSION        = 1600;
+const REPULSION_CUTOFF = 160;   // skip pairs beyond this — prevents cluster mass ejecting far nodes
 const SPRING_K         = 0.10;
 const DAMPING          = 0.80;
-const GRAVITY          = 0.005;
+const GRAVITY          = 0.001; // very low — springs maintain hierarchy; gravity only corrals orphans
 const MAX_VEL          = 8;
-const SPRING_LENS      = { 'tpl-inst': 65, 'inst-area': 100, 'area-area': 90 };
+const GOLDEN           = 2.39996; // golden angle (rad) for spiral instance placement
+const SPRING_LENS = {
+  'project-tpl': 130,
+  'tpl-inst':     65,
+  'inst-area':   105,
+  'area-area':    90,
+};
 
 const TEMPLATE_PALETTE = [
   '#4d9eff','#4dcc8a','#e06c75','#c678dd',
@@ -15,14 +21,17 @@ const TEMPLATE_PALETTE = [
   '#98c379','#e8a23a',
 ];
 
+const PROJECT_COLOR = '#a78bfa'; // distinctive purple — visible in both themes
+
 function nodeRadius(type, connCount = 0) {
-  if (type === 'template') return 10 + Math.min(Math.sqrt(connCount) * 1.5, 8);
-  if (type === 'area')     return 8  + Math.min(Math.sqrt(connCount) * 1.0, 5);
+  if (type === 'project')  return 16;
+  if (type === 'template') return 10 + Math.min(Math.sqrt(connCount) * 1.4, 8);
+  if (type === 'area')     return  7 + Math.min(Math.sqrt(connCount) * 0.9, 5);
   return 5;
 }
 
 // ── GraphView ─────────────────────────────────────────────────────────────────
-export default function GraphView({ templates, areas, counts }) {
+export default function GraphView({ templates, areas, counts, projectName }) {
   const containerRef = useRef(null);
   const canvasRef    = useRef(null);
   const simRef       = useRef(null);
@@ -32,25 +41,25 @@ export default function GraphView({ templates, areas, counts }) {
   const hoverIdRef   = useRef(null);
   const animRef      = useRef(null);
   const themeRef     = useRef('dark');
-  const countsRef    = useRef(counts);   // keep legend counts current without restarting loop
+  const countsRef    = useRef(counts);
+  const projectNameRef = useRef(projectName);
 
   const [tooltip, setTooltip] = useState(null);
   const [cursor, setCursor]   = useState('grab');
 
-  // Update countsRef whenever counts prop changes
-  useEffect(() => { countsRef.current = counts; }, [counts]);
+  useEffect(() => { countsRef.current = counts; },      [counts]);
+  useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
 
-  // ── Filter active nodes only ──────────────────────────────────────────────
+  // ── Filter active nodes ───────────────────────────────────────────────────
   const { activeTemplates, activeAreas } = useMemo(() => {
-    const allInst = templates.flatMap(t => t.instances || []);
+    const allInst        = templates.flatMap(t => t.instances || []);
     const activeTemplates = templates.filter(t => (t.instances?.length || 0) > 0);
-    const activeAreaIds   = new Set(allInst.map(i => i.areaId).filter(Boolean));
-    const activeAreas     = areas.filter(a => activeAreaIds.has(a.id));
+    const activeAreaIds  = new Set(allInst.map(i => i.areaId).filter(Boolean));
+    const activeAreas    = areas.filter(a => activeAreaIds.has(a.id));
     return { activeTemplates, activeAreas };
   }, [templates, areas]);
 
-  // ── Build initial graph layout ────────────────────────────────────────────
-  // Instances are fanned around their template's angle so clusters are clear
+  // ── Build initial layout ──────────────────────────────────────────────────
   const { initNodes, initEdges } = useMemo(() => {
     const initNodes = [];
     const initEdges = [];
@@ -58,33 +67,41 @@ export default function GraphView({ templates, areas, counts }) {
     activeTemplates.forEach((t, i) => {
       tColor[t.id] = TEMPLATE_PALETTE[i % TEMPLATE_PALETTE.length];
     });
-
     const connCount = {};
     const bump = id => { connCount[id] = (connCount[id] || 0) + 1; };
 
+    // ── Project node — pinned at origin ──────────────────────────────────
+    initNodes.push({
+      id: 'project', type: 'project',
+      label: projectName || 'Project',
+      x: 0, y: 0, vx: 0, vy: 0,
+      pinned: true,
+      color: PROJECT_COLOR,
+      meta: {},
+    });
+
+    // ── Templates on inner ring ───────────────────────────────────────────
     const tCount = Math.max(1, activeTemplates.length);
-
-    const GOLDEN = 2.39996;   // golden angle in radians
-
     activeTemplates.forEach((t, i) => {
       const tAng = (i / tCount) * Math.PI * 2;
-      const tR   = tCount === 1 ? 0 : 110;
-      const tx   = Math.cos(tAng) * tR;
-      const ty   = Math.sin(tAng) * tR;
+      const tx   = Math.cos(tAng) * SPRING_LENS['project-tpl'];
+      const ty   = Math.sin(tAng) * SPRING_LENS['project-tpl'];
 
       initNodes.push({
         id: `t_${t.id}`, type: 'template', label: t.name,
-        x: tx + (Math.random() - 0.5) * 8,
-        y: ty + (Math.random() - 0.5) * 8,
+        x: tx + (Math.random() - 0.5) * 10,
+        y: ty + (Math.random() - 0.5) * 10,
         vx: 0, vy: 0, pinned: false, color: tColor[t.id],
         meta: { instances: t.instances?.length || 0, attributes: t.attributes?.length || 0 },
       });
 
-      // Instances placed in a golden-angle spiral centred on the template —
-      // regardless of instance count they start close to their owner.
+      initEdges.push({ from: 'project', to: `t_${t.id}`, kind: 'project-tpl' });
+      bump('project'); bump(`t_${t.id}`);
+
+      // ── Instances in a golden-angle spiral around their template ─────
       const insts = t.instances || [];
       insts.forEach((inst, j) => {
-        const spiralR   = 22 + Math.sqrt(j + 1) * 14;
+        const spiralR   = 20 + Math.sqrt(j + 1) * 13;
         const spiralAng = j * GOLDEN;
         initNodes.push({
           id: `i_${inst.id}`, type: 'instance', label: inst.name,
@@ -99,14 +116,14 @@ export default function GraphView({ templates, areas, counts }) {
       });
     });
 
-    // Areas — outer ring
+    // ── Areas on outer ring ───────────────────────────────────────────────
     const activeAreaSet = new Set(activeAreas.map(a => a.id));
     activeAreas.forEach((a, i) => {
       const ang = (i / Math.max(1, activeAreas.length)) * Math.PI * 2;
       initNodes.push({
         id: `a_${a.id}`, type: 'area', label: a.name,
-        x: Math.cos(ang) * 280 + (Math.random() - 0.5) * 20,
-        y: Math.sin(ang) * 280 + (Math.random() - 0.5) * 20,
+        x: Math.cos(ang) * 300 + (Math.random() - 0.5) * 20,
+        y: Math.sin(ang) * 300 + (Math.random() - 0.5) * 20,
         vx: 0, vy: 0, pinned: false, color: '#e8a23a', meta: {},
       });
     });
@@ -131,18 +148,17 @@ export default function GraphView({ templates, areas, counts }) {
 
     initNodes.forEach(n => { n.r = nodeRadius(n.type, connCount[n.id] || 0); });
     return { initNodes, initEdges };
-  }, [activeTemplates, activeAreas]);
+  }, [activeTemplates, activeAreas, projectName]);
 
-  // ── Reinit simulation when graph data changes ─────────────────────────────
+  // ── Reinit simulation when graph topology changes ─────────────────────────
   useEffect(() => {
     const nodes   = initNodes.map(n => ({ ...n }));
     const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
     simRef.current = { nodes, edges: initEdges, nodeMap };
-    // Reset pan/zoom when graph topology changes
     transformRef.current = { x: 0, y: 0, scale: 1 };
   }, [initNodes, initEdges]);
 
-  // ── Resize: update canvas attrs + sizeRef directly (no React state) ───────
+  // ── Resize ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -164,7 +180,7 @@ export default function GraphView({ templates, areas, counts }) {
     return () => ro.disconnect();
   }, []);
 
-  // ── Track theme changes ───────────────────────────────────────────────────
+  // ── Theme tracking ────────────────────────────────────────────────────────
   useEffect(() => {
     const update = () => {
       themeRef.current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
@@ -175,7 +191,7 @@ export default function GraphView({ templates, areas, counts }) {
     return () => obs.disconnect();
   }, []);
 
-  // ── Animation loop — starts once on mount, never restarts ────────────────
+  // ── Animation loop — starts once on mount ────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -186,11 +202,9 @@ export default function GraphView({ templates, areas, counts }) {
       if (!sim) return;
       const { nodes, edges, nodeMap } = sim;
       const { w, h } = sizeRef.current;
-      // Soft boundary: keep nodes inside ~38% of the smaller canvas dimension
-      const br = Math.max(150, Math.min(w, h) * 0.38);
+      const br = Math.max(200, Math.min(w, h) * 0.44);
 
-      // Repulsion — only applied within cutoff distance so the central cluster
-      // cannot "eject" nodes that are already far away.
+      // Repulsion (with cutoff)
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const a = nodes[i], b = nodes[j];
@@ -198,7 +212,7 @@ export default function GraphView({ templates, areas, counts }) {
           let d2 = dx*dx + dy*dy || 0.01;
           let d  = Math.sqrt(d2);
           if (d > REPULSION_CUTOFF) continue;
-          const minD = a.r + b.r + 16;
+          const minD = a.r + b.r + 14;
           if (d < minD) { dx = dx/d*minD; dy = dy/d*minD; d = minD; d2 = d*d; }
           const f = REPULSION / d2;
           const fx = dx/d*f, fy = dy/d*f;
@@ -222,25 +236,18 @@ export default function GraphView({ templates, areas, counts }) {
       // Gravity + soft boundary + damping + integrate
       for (const n of nodes) {
         if (n.pinned) continue;
-        // Center gravity
         n.vx -= n.x * GRAVITY;
         n.vy -= n.y * GRAVITY;
-        // Soft boundary: push back if too far from center
         const dist = Math.sqrt(n.x*n.x + n.y*n.y);
         if (dist > br) {
           const excess = dist - br;
-          n.vx -= (n.x / dist) * excess * 0.06;
-          n.vy -= (n.y / dist) * excess * 0.06;
+          n.vx -= (n.x / dist) * excess * 0.07;
+          n.vy -= (n.y / dist) * excess * 0.07;
         }
-        // Damping
-        n.vx *= DAMPING;
-        n.vy *= DAMPING;
-        // Velocity clamp
+        n.vx *= DAMPING; n.vy *= DAMPING;
         const spd = Math.sqrt(n.vx*n.vx + n.vy*n.vy);
         if (spd > MAX_VEL) { n.vx = n.vx/spd*MAX_VEL; n.vy = n.vy/spd*MAX_VEL; }
-        // Integrate
-        n.x += n.vx;
-        n.y += n.vy;
+        n.x += n.vx; n.y += n.vy;
       }
     }
 
@@ -249,14 +256,14 @@ export default function GraphView({ templates, areas, counts }) {
       const { w, h } = sizeRef.current;
       if (!w || !h) return;
 
-      const dark    = themeRef.current !== 'light';
-      const BG      = dark ? '#161616' : '#f0f0f0';
+      const dark     = themeRef.current !== 'light';
+      const BG       = dark ? '#161616' : '#f0f0f0';
       const EDGE_DIM = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.10)';
       const EDGE_LIT = dark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.30)';
-      const LABEL   = dark ? 'rgba(255,255,255,0.75)'  : 'rgba(0,0,0,0.75)';
-      const LEG_BG  = dark ? 'rgba(0,0,0,0.55)'        : 'rgba(255,255,255,0.80)';
-      const LEG_TXT = dark ? 'rgba(255,255,255,0.72)'  : 'rgba(0,0,0,0.72)';
-      const HINT    = dark ? 'rgba(255,255,255,0.20)'  : 'rgba(0,0,0,0.22)';
+      const LABEL    = dark ? 'rgba(255,255,255,0.75)'  : 'rgba(0,0,0,0.75)';
+      const LEG_BG   = dark ? 'rgba(0,0,0,0.55)'        : 'rgba(255,255,255,0.80)';
+      const LEG_TXT  = dark ? 'rgba(255,255,255,0.72)'  : 'rgba(0,0,0,0.72)';
+      const HINT     = dark ? 'rgba(255,255,255,0.20)'  : 'rgba(0,0,0,0.22)';
 
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = BG;
@@ -272,7 +279,7 @@ export default function GraphView({ templates, areas, counts }) {
       ctx.translate(cx + tx, cy + ty);
       ctx.scale(sc, sc);
 
-      // Edges — template-instance edges drawn thicker/brighter
+      // Edges
       for (const { from, to, kind } of edges) {
         const a = nodeMap[from], b = nodeMap[to];
         if (!a || !b) continue;
@@ -280,9 +287,12 @@ export default function GraphView({ templates, areas, counts }) {
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
-        if (kind === 'tpl-inst') {
+        if (kind === 'project-tpl') {
+          ctx.strokeStyle = lit ? PROJECT_COLOR + 'cc' : PROJECT_COLOR + '55';
+          ctx.lineWidth   = (lit ? 1.8 : 1.2) / sc;
+        } else if (kind === 'tpl-inst') {
           ctx.strokeStyle = lit ? a.color + 'cc' : a.color + '44';
-          ctx.lineWidth   = (lit ? 1.6 : 1.0) / sc;
+          ctx.lineWidth   = (lit ? 1.4 : 0.9) / sc;
         } else {
           ctx.strokeStyle = lit ? EDGE_LIT : EDGE_DIM;
           ctx.lineWidth   = (lit ? 1.2 : 0.6) / sc;
@@ -293,21 +303,38 @@ export default function GraphView({ templates, areas, counts }) {
       // Nodes
       for (const n of nodes) {
         const isHov = hov === n.id;
-        if (isHov || n.isFlagged) {
-          const gr = ctx.createRadialGradient(n.x, n.y, n.r * 0.4, n.x, n.y, n.r * 3.5);
-          gr.addColorStop(0, n.isFlagged ? 'rgba(229,83,83,0.35)' : `${n.color}44`);
+        const isProj = n.type === 'project';
+
+        // Halo
+        if (isHov || n.isFlagged || isProj) {
+          const haloR = n.r * (isProj ? 2.8 : 3.5);
+          const gr = ctx.createRadialGradient(n.x, n.y, n.r * 0.4, n.x, n.y, haloR);
+          gr.addColorStop(0, n.isFlagged ? 'rgba(229,83,83,0.35)' : `${n.color}${isProj ? '33' : '44'}`);
           gr.addColorStop(1, 'transparent');
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.r * 3.5, 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, haloR, 0, Math.PI * 2);
           ctx.fillStyle = gr;
           ctx.fill();
         }
+
+        // Fill
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
         ctx.fillStyle = n.color;
-        ctx.globalAlpha = isHov ? 1 : 0.88;
+        ctx.globalAlpha = isHov || isProj ? 1 : 0.88;
         ctx.fill();
         ctx.globalAlpha = 1;
+
+        // Project ring
+        if (isProj) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.r + 3/sc, 0, Math.PI * 2);
+          ctx.strokeStyle = PROJECT_COLOR + '88';
+          ctx.lineWidth = 2 / sc;
+          ctx.stroke();
+        }
+
+        // Flagged ring
         if (n.isFlagged) {
           ctx.beginPath();
           ctx.arc(n.x, n.y, n.r + 2.5/sc, 0, Math.PI * 2);
@@ -315,9 +342,14 @@ export default function GraphView({ templates, areas, counts }) {
           ctx.lineWidth = 1.8 / sc;
           ctx.stroke();
         }
-        if (n.type !== 'instance' || sc > 0.65) {
-          const fSize = Math.max(10, Math.min(13, 12/sc));
-          ctx.font = `${fSize}px system-ui,sans-serif`;
+
+        // Labels
+        const showLabel = isProj || n.type === 'template' || (n.type !== 'instance') || sc > 0.65;
+        if (showLabel) {
+          const fSize = isProj
+            ? Math.max(11, Math.min(14, 13/sc))
+            : Math.max(10, Math.min(13, 12/sc));
+          ctx.font = `${isProj ? 600 : 400} ${fSize}px system-ui,sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillStyle = LABEL;
           ctx.fillText(n.label, n.x, n.y + n.r + 13/sc);
@@ -325,12 +357,13 @@ export default function GraphView({ templates, areas, counts }) {
       }
       ctx.restore();
 
-      // Legend (screen space) — reads countsRef so values stay current
+      // Legend
       const c = countsRef.current;
       const legendItems = [
-        { color: TEMPLATE_PALETTE[0], label: 'Templates', count: c?.templateCount },
-        { color: '#888888',           label: 'Instances',  count: c?.instanceCount },
-        { color: '#e8a23a',           label: 'Areas',      count: c?.areaCount     },
+        { color: PROJECT_COLOR,        label: 'Project',   count: undefined },
+        { color: TEMPLATE_PALETTE[0],  label: 'Templates', count: c?.templateCount },
+        { color: '#888888',            label: 'Instances', count: c?.instanceCount },
+        { color: '#e8a23a',            label: 'Areas',     count: c?.areaCount     },
       ];
       const LX = 14, LY_BOT = h - 14;
       const ROW_H = 22, PAD = 10, ITEM_W = 144;
@@ -340,9 +373,8 @@ export default function GraphView({ templates, areas, counts }) {
       ctx.save();
       ctx.fillStyle = LEG_BG;
       ctx.beginPath();
-      const rx = LX - 6, ry = boxY - 2, rw = ITEM_W, rh = boxH + 4;
-      if (ctx.roundRect) ctx.roundRect(rx, ry, rw, rh, 7);
-      else ctx.rect(rx, ry, rw, rh);
+      if (ctx.roundRect) ctx.roundRect(LX - 6, boxY - 2, ITEM_W, boxH + 4, 7);
+      else ctx.rect(LX - 6, boxY - 2, ITEM_W, boxH + 4);
       ctx.fill();
 
       legendItems.forEach(({ color, label, count }, i) => {
@@ -376,7 +408,7 @@ export default function GraphView({ templates, areas, counts }) {
     }
     animRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animRef.current);
-  }, []); // empty deps — loop starts once, never restarts
+  }, []);
 
   // ── Input helpers ─────────────────────────────────────────────────────────
   const toSim = useCallback((ex, ey) => {
@@ -399,10 +431,10 @@ export default function GraphView({ templates, areas, counts }) {
     if (e.button !== 0) return;
     const [sx, sy] = toSim(e.clientX, e.clientY);
     const n = nodeAt(sx, sy);
-    if (n) {
+    if (n && !n.pinned) {
       n.pinned = true;
       dragRef.current = { kind: 'node', n, ox: sx - n.x, oy: sy - n.y };
-    } else {
+    } else if (!n) {
       const { x, y } = transformRef.current;
       dragRef.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, ox: x, oy: y };
     }
@@ -491,8 +523,15 @@ export default function GraphView({ templates, areas, counts }) {
         }}>
           <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{tooltip.n.label}</div>
           <div style={{ color: 'var(--text-muted)', textTransform: 'capitalize', fontSize: 11 }}>{tooltip.n.type}</div>
+          {tooltip.n.type === 'project' && (
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+              {counts?.templateCount} templates · {counts?.instanceCount} instances
+            </div>
+          )}
           {tooltip.n.meta?.instances !== undefined && (
-            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{tooltip.n.meta.instances} instances · {tooltip.n.meta.attributes} attributes</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+              {tooltip.n.meta.instances} instances · {tooltip.n.meta.attributes} attributes
+            </div>
           )}
           {tooltip.n.meta?.template && (
             <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{tooltip.n.meta.template}</div>
