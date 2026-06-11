@@ -1,7 +1,8 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
-import { Layers, Database, Map, Cpu, AlertTriangle, Clock, ChevronRight, ChevronDown } from 'lucide-react';
+import { Layers, Database, Map, Cpu, AlertTriangle, Clock, ChevronRight, ChevronDown, LayoutDashboard, Network } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import NoProjectOpen from '../shared/NoProjectOpen';
+import GraphView from './GraphView';
 
 function StatCard({ icon: Icon, label, value, sub, warn }) {
   return (
@@ -107,6 +108,7 @@ export default function DashboardView() {
   const templatesRef = useRef(null);
   const [areasCardHeight, setAreasCardHeight] = useState(null);
   const [collapsedAreas, setCollapsedAreas] = useState(new Set());
+  const [view, setView] = useState('tiles'); // 'tiles' | 'graph'
 
   const toggleArea = useCallback((id) => {
     setCollapsedAreas(prev => {
@@ -161,6 +163,8 @@ export default function DashboardView() {
       areaTree,
       flagged,
       recent: recentItems.slice(0, 10),
+      templates,
+      areas,
     };
   }, [project]);
 
@@ -183,17 +187,62 @@ export default function DashboardView() {
     return <NoProjectOpen />;
   }
 
+  // View toggle button style helper
+  const toggleBtn = (id) => ({
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 30, height: 30, borderRadius: 6, cursor: 'pointer', border: 'none',
+    background: view === id ? 'var(--accent-bg)' : 'transparent',
+    color: view === id ? 'var(--accent)' : 'var(--text-muted)',
+    transition: 'background 0.15s, color 0.15s',
+  });
+
+  if (view === 'graph') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-main)' }}>
+        {/* Stat bar + toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, flex: 1, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Templates', value: m.templateCount },
+              { label: 'Instances', value: m.instanceCount },
+              { label: 'Areas',     value: m.areaCount     },
+              { label: 'Attributes',value: m.attributeCount},
+              ...(m.flaggedCount > 0 ? [{ label: 'Flagged', value: m.flaggedCount, warn: true }] : []),
+            ].map(({ label, value, warn }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: warn ? '#e55353' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{label}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: warn ? '#e55353' : 'var(--text-primary)' }}>{value}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 2 }}>
+            <button style={toggleBtn('tiles')} onClick={() => setView('tiles')} title="Tile view"><LayoutDashboard size={15} /></button>
+            <button style={toggleBtn('graph')} onClick={() => setView('graph')} title="Graph view"><Network size={15} /></button>
+          </div>
+        </div>
+        <GraphView templates={m.templates} areas={m.areas} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto" style={{ padding: 24, background: 'var(--bg-main)' }}>
 
-      {/* Stat cards */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
-        <StatCard icon={Layers}        label="Templates"  value={m.templateCount} />
-        <StatCard icon={Database}      label="Instances"  value={m.instanceCount}
-          sub={m.unassigned > 0 ? `${m.unassigned} unassigned` : null} />
-        <StatCard icon={Map}           label="Areas"      value={m.areaCount} />
-        <StatCard icon={Cpu}           label="Attributes" value={m.attributeCount} />
-        <StatCard icon={AlertTriangle} label="Flagged"    value={m.flaggedCount} warn />
+      {/* Stat cards + toggle */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flex: 1 }}>
+          <StatCard icon={Layers}        label="Templates"  value={m.templateCount} />
+          <StatCard icon={Database}      label="Instances"  value={m.instanceCount}
+            sub={m.unassigned > 0 ? `${m.unassigned} unassigned` : null} />
+          <StatCard icon={Map}           label="Areas"      value={m.areaCount} />
+          <StatCard icon={Cpu}           label="Attributes" value={m.attributeCount} />
+          <StatCard icon={AlertTriangle} label="Flagged"    value={m.flaggedCount} warn />
+        </div>
+        {/* View toggle */}
+        <div style={{ display: 'flex', gap: 2, flexShrink: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, padding: 3 }}>
+          <button style={toggleBtn('tiles')} onClick={() => setView('tiles')} title="Tile view"><LayoutDashboard size={15} /></button>
+          <button style={toggleBtn('graph')} onClick={() => setView('graph')} title="Graph view"><Network size={15} /></button>
+        </div>
       </div>
 
       {/* Two-column layout — Templates natural height; Areas matches via measurement */}
