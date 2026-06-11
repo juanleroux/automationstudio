@@ -196,41 +196,51 @@ export default function DashboardView() {
     transition: 'background 0.15s, color 0.15s',
   });
 
+  const subToolbar = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-main)' }}>
+      {/* View label */}
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0, minWidth: 90 }}>
+        {view === 'graph' ? 'Graph View' : 'Dashboard'}
+      </span>
+      {/* Compact stats */}
+      <div style={{ display: 'flex', gap: 14, flex: 1, flexWrap: 'wrap' }}>
+        {[
+          { label: 'Templates',  value: m.templateCount  },
+          { label: 'Instances',  value: m.instanceCount  },
+          { label: 'Areas',      value: m.areaCount      },
+          { label: 'Attributes', value: m.attributeCount },
+          ...(m.flaggedCount > 0 ? [{ label: 'Flagged', value: m.flaggedCount, warn: true }] : []),
+        ].map(({ label, value, warn }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: 10, color: warn ? '#e55353' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: warn ? '#e55353' : 'var(--text-primary)' }}>{value}</span>
+          </div>
+        ))}
+      </div>
+      {/* Toggle */}
+      <div style={{ display: 'flex', gap: 2, flexShrink: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, padding: 3 }}>
+        <button style={toggleBtn('tiles')} onClick={() => setView('tiles')} title="Tile view"><LayoutDashboard size={15} /></button>
+        <button style={toggleBtn('graph')} onClick={() => setView('graph')} title="Graph view"><Network size={15} /></button>
+      </div>
+    </div>
+  );
+
   if (view === 'graph') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-main)' }}>
-        {/* Stat bar + toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 10, flex: 1, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Templates', value: m.templateCount },
-              { label: 'Instances', value: m.instanceCount },
-              { label: 'Areas',     value: m.areaCount     },
-              { label: 'Attributes',value: m.attributeCount},
-              ...(m.flaggedCount > 0 ? [{ label: 'Flagged', value: m.flaggedCount, warn: true }] : []),
-            ].map(({ label, value, warn }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11, color: warn ? '#e55353' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: warn ? '#e55353' : 'var(--text-primary)' }}>{value}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 2 }}>
-            <button style={toggleBtn('tiles')} onClick={() => setView('tiles')} title="Tile view"><LayoutDashboard size={15} /></button>
-            <button style={toggleBtn('graph')} onClick={() => setView('graph')} title="Graph view"><Network size={15} /></button>
-          </div>
-        </div>
-        <GraphView templates={m.templates} areas={m.areas} />
+        {subToolbar}
+        <GraphView templates={m.templates} areas={m.areas} counts={m} />
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto" style={{ padding: 24, background: 'var(--bg-main)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-main)' }}>
+      {subToolbar}
+      <div className="h-full overflow-y-auto" style={{ padding: 24 }}>
 
-      {/* Stat cards + toggle */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20 }}>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flex: 1 }}>
+      {/* Stat cards */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
           <StatCard icon={Layers}        label="Templates"  value={m.templateCount} />
           <StatCard icon={Database}      label="Instances"  value={m.instanceCount}
             sub={m.unassigned > 0 ? `${m.unassigned} unassigned` : null} />
@@ -238,12 +248,6 @@ export default function DashboardView() {
           <StatCard icon={Cpu}           label="Attributes" value={m.attributeCount} />
           <StatCard icon={AlertTriangle} label="Flagged"    value={m.flaggedCount} warn />
         </div>
-        {/* View toggle */}
-        <div style={{ display: 'flex', gap: 2, flexShrink: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, padding: 3 }}>
-          <button style={toggleBtn('tiles')} onClick={() => setView('tiles')} title="Tile view"><LayoutDashboard size={15} /></button>
-          <button style={toggleBtn('graph')} onClick={() => setView('graph')} title="Graph view"><Network size={15} /></button>
-        </div>
-      </div>
 
       {/* Two-column layout — Templates natural height; Areas matches via measurement */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
@@ -350,6 +354,7 @@ export default function DashboardView() {
           </div>
         </Card>
       )}
+      </div>
     </div>
   );
 }
