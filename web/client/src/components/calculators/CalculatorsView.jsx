@@ -504,14 +504,14 @@ const tdStyle = {
 
 // ─── Project Estimator ────────────────────────────────────────────────────────
 const DEFAULT_IO = [
-  { id: 'di',    label: 'Digital Inputs',         plc: 15, scada: 10, mes: 5  },
-  { id: 'do',    label: 'Digital Outputs',         plc: 15, scada: 10, mes: 5  },
-  { id: 'ai',    label: 'Analogue Inputs',         plc: 20, scada: 15, mes: 8  },
-  { id: 'ao',    label: 'Analogue Outputs',        plc: 20, scada: 15, mes: 8  },
+  { id: 'di',    label: 'Digital Inputs',         plc: 15, scada: 10, mes: 10 },
+  { id: 'do',    label: 'Digital Outputs',         plc: 15, scada: 10, mes: 10 },
+  { id: 'ai',    label: 'Analogue Inputs',         plc: 20, scada: 15, mes: 10 },
+  { id: 'ao',    label: 'Analogue Outputs',        plc: 20, scada: 15, mes: 10 },
   { id: 'vsd',   label: 'VSDs on Comms',           plc: 30, scada: 20, mes: 10 },
   { id: 'field', label: 'Field Devices on Comms',  plc: 30, scada: 20, mes: 10 },
-  { id: 'pid',   label: 'PID Loops',               plc: 45, scada: 25, mes: 15 },
-  { id: 'seq',   label: 'Sequences',               plc: 60, scada: 30, mes: 20 },
+  { id: 'pid',   label: 'PID Loops',               plc: 45, scada: 25, mes: 10 },
+  { id: 'seq',   label: 'Sequences',               plc: 60, scada: 30, mes: 10 },
 ];
 
 const SYS_LABELS = { plc: 'PLC', scada: 'SCADA', mes: 'MES' };
