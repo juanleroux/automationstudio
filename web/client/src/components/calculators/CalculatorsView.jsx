@@ -484,11 +484,292 @@ const labelStyle = {
   color: 'var(--text-muted)',
   marginBottom: 10,
 };
+const thStyle = {
+  padding: '8px 12px',
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: 'var(--text-muted)',
+  textAlign: 'left',
+  borderBottom: '1px solid var(--border)',
+  whiteSpace: 'nowrap',
+};
+const tdStyle = {
+  padding: '5px 12px',
+  fontSize: 13,
+  color: 'var(--text-secondary)',
+  borderBottom: '1px solid var(--border-subtle)',
+};
+
+// ─── Project Estimator ────────────────────────────────────────────────────────
+const DEFAULT_IO = [
+  { id: 'di',    label: 'Digital Inputs',         plc: 15, scada: 10, mes: 5  },
+  { id: 'do',    label: 'Digital Outputs',         plc: 15, scada: 10, mes: 5  },
+  { id: 'ai',    label: 'Analogue Inputs',         plc: 20, scada: 15, mes: 8  },
+  { id: 'ao',    label: 'Analogue Outputs',        plc: 20, scada: 15, mes: 8  },
+  { id: 'vsd',   label: 'VSDs on Comms',           plc: 30, scada: 20, mes: 10 },
+  { id: 'field', label: 'Field Devices on Comms',  plc: 30, scada: 20, mes: 10 },
+  { id: 'pid',   label: 'PID Loops',               plc: 45, scada: 25, mes: 15 },
+  { id: 'seq',   label: 'Sequences',               plc: 60, scada: 30, mes: 20 },
+];
+
+const SYS_LABELS = { plc: 'PLC', scada: 'SCADA', mes: 'MES' };
+const SYS_COLORS = { plc: '#4d9eff', scada: '#4dcc8a', mes: '#e8a23a' };
+
+function ProjectEstimator() {
+  const [rows, setRows]           = useState(DEFAULT_IO.map(r => ({ ...r, qty: '' })));
+  const [systems, setSystems]     = useState({ plc: true, scada: true, mes: false });
+  const [hourlyRate, setHourlyRate] = useState('150');
+  const [contingency, setContingency] = useState('20');
+  const [currency, setCurrency]   = useState('$');
+
+  const setRow = (id, field, value) =>
+    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+
+  const activeSystems = Object.keys(systems).filter(k => systems[k]);
+
+  const totals = useMemo(() => {
+    const bySystem = { plc: 0, scada: 0, mes: 0 };
+    const byRow = rows.map(row => {
+      const qty = parseFloat(row.qty) || 0;
+      let rowTotal = 0;
+      const sysTotal = {};
+      for (const sys of ['plc', 'scada', 'mes']) {
+        const mins = systems[sys] ? qty * (parseFloat(row[sys]) || 0) : 0;
+        sysTotal[sys] = mins;
+        bySystem[sys] += mins;
+        rowTotal += mins;
+      }
+      return { ...sysTotal, total: rowTotal };
+    });
+    const totalMins = bySystem.plc + bySystem.scada + bySystem.mes;
+    const totalHrs = totalMins / 60;
+    const cont = parseFloat(contingency) || 0;
+    const totalWithCont = totalHrs * (1 + cont / 100);
+    const rate = parseFloat(hourlyRate) || 0;
+    const cost = totalWithCont * rate;
+    return { bySystem, byRow, totalHrs, totalWithCont, cost };
+  }, [rows, systems, contingency, hourlyRate]);
+
+  const fmtHrs = (mins) => {
+    if (!mins) return '—';
+    const h = mins / 60;
+    return h < 1 ? `${Math.round(mins)}m` : `${h.toFixed(1)}h`;
+  };
+
+  const fmtCost = (n) => {
+    if (!isFinite(n) || n === 0) return '—';
+    return currency + n.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  return (
+    <div style={{ padding: '24px 28px', maxWidth: 920 }}>
+      <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+        Development Estimation
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+        Estimate development effort and cost based on I/O count and system scope.
+      </div>
+
+      {/* Config */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 24, alignItems: 'flex-start' }}>
+        <div style={panelStyle}>
+          <div style={labelStyle}>System Scope</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {Object.entries(SYS_LABELS).map(([key, label]) => {
+              const on = systems[key];
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSystems(p => ({ ...p, [key]: !p[key] }))}
+                  style={{
+                    padding: '5px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    border: `2px solid ${on ? SYS_COLORS[key] : 'var(--border)'}`,
+                    background: on ? `${SYS_COLORS[key]}22` : 'transparent',
+                    color: on ? SYS_COLORS[key] : 'var(--text-disabled)',
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ ...panelStyle, display: 'flex', gap: 20, alignItems: 'flex-end' }}>
+          <div>
+            <div style={labelStyle}>Currency</div>
+            <input className="input" style={{ width: 52 }} value={currency} onChange={e => setCurrency(e.target.value)} maxLength={3} />
+          </div>
+          <div>
+            <div style={labelStyle}>Hourly Rate</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{currency}</span>
+              <input className="input" style={{ width: 90 }} value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <div style={labelStyle}>Contingency</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input className="input" style={{ width: 70 }} value={contingency} onChange={e => setContingency(e.target.value)} />
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* I/O Table */}
+      <div style={{ ...panelStyle, padding: 0, overflow: 'hidden', marginBottom: 20 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-surface)' }}>
+              <th style={thStyle}>I/O Type</th>
+              <th style={{ ...thStyle, width: 72, textAlign: 'center' }}>Qty</th>
+              {activeSystems.includes('plc')   && <th style={{ ...thStyle, width: 110, textAlign: 'center', color: SYS_COLORS.plc   }}>PLC (min/pt)</th>}
+              {activeSystems.includes('scada') && <th style={{ ...thStyle, width: 120, textAlign: 'center', color: SYS_COLORS.scada }}>SCADA (min/pt)</th>}
+              {activeSystems.includes('mes')   && <th style={{ ...thStyle, width: 110, textAlign: 'center', color: SYS_COLORS.mes   }}>MES (min/pt)</th>}
+              <th style={{ ...thStyle, width: 90, textAlign: 'right', paddingRight: 16 }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const rt = totals.byRow[i];
+              const hasQty = parseFloat(row.qty) > 0;
+              return (
+                <tr key={row.id} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--bg-surface)' }}>
+                  <td style={{ ...tdStyle, fontWeight: 500, color: 'var(--text-primary)' }}>{row.label}</td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      style={{ width: 60, textAlign: 'center', padding: '3px 6px' }}
+                      value={row.qty}
+                      onChange={e => setRow(row.id, 'qty', e.target.value)}
+                      placeholder="0"
+                    />
+                  </td>
+                  {activeSystems.includes('plc') && (
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        style={{ width: 64, textAlign: 'center', padding: '3px 6px' }}
+                        value={row.plc}
+                        onChange={e => setRow(row.id, 'plc', e.target.value)}
+                      />
+                    </td>
+                  )}
+                  {activeSystems.includes('scada') && (
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        style={{ width: 64, textAlign: 'center', padding: '3px 6px' }}
+                        value={row.scada}
+                        onChange={e => setRow(row.id, 'scada', e.target.value)}
+                      />
+                    </td>
+                  )}
+                  {activeSystems.includes('mes') && (
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        style={{ width: 64, textAlign: 'center', padding: '3px 6px' }}
+                        value={row.mes}
+                        onChange={e => setRow(row.id, 'mes', e.target.value)}
+                      />
+                    </td>
+                  )}
+                  <td style={{
+                    ...tdStyle, textAlign: 'right', paddingRight: 16,
+                    fontWeight: hasQty ? 600 : 400,
+                    color: hasQty ? 'var(--text-primary)' : 'var(--text-disabled)',
+                  }}>
+                    {fmtHrs(rt.total)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Per-system summary cards */}
+      {activeSystems.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${activeSystems.length}, 1fr)`, gap: 12, marginBottom: 14 }}>
+          {activeSystems.map(sys => (
+            <div key={sys} style={{ ...panelStyle, borderTop: `3px solid ${SYS_COLORS[sys]}` }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: SYS_COLORS[sys], marginBottom: 6 }}>
+                {SYS_LABELS[sys]}
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {(totals.bySystem[sys] / 60).toFixed(1)}h
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                {totals.bySystem[sys].toFixed(0)} minutes
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Grand total */}
+      <div style={{ ...panelStyle, display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <div style={labelStyle}>Base Total</div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)' }}>
+            {totals.totalHrs.toFixed(1)}h
+          </div>
+        </div>
+        {parseFloat(contingency) > 0 && (
+          <>
+            <div style={{ color: 'var(--border)', fontSize: 22 }}>+</div>
+            <div>
+              <div style={labelStyle}>Contingency ({contingency}%)</div>
+              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-muted)' }}>
+                {(totals.totalWithCont - totals.totalHrs).toFixed(1)}h
+              </div>
+            </div>
+            <div style={{ color: 'var(--border)', fontSize: 22 }}>=</div>
+            <div>
+              <div style={labelStyle}>Total Incl. Contingency</div>
+              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--accent)' }}>
+                {totals.totalWithCont.toFixed(1)}h
+              </div>
+            </div>
+          </>
+        )}
+        {parseFloat(hourlyRate) > 0 && totals.cost > 0 && (
+          <>
+            <div style={{ flex: 1 }} />
+            <div style={{ textAlign: 'right' }}>
+              <div style={labelStyle}>Estimated Cost</div>
+              <div style={{ fontSize: 30, fontWeight: 700, color: 'var(--accent)' }}>
+                {fmtCost(totals.cost)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                @ {currency}{parseFloat(hourlyRate || 0).toFixed(2)}/hr
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Calculator registry ──────────────────────────────────────────────────────
 const CALCULATORS = [
-  { id: 'ma420', label: '4-20mA Scaling',   desc: 'Signal range converter',             component: MA420Calculator },
-  { id: 'unit',  label: 'Unit Conversion',  desc: 'Engineering unit converter',                    component: UnitConverter },
+  { id: 'ma420',     label: '4-20mA Scaling',     desc: 'Signal range converter',              component: MA420Calculator  },
+  { id: 'unit',      label: 'Unit Conversion',     desc: 'Engineering unit converter',          component: UnitConverter    },
+  { id: 'estimator', label: 'Project Estimator',   desc: 'Development effort & cost estimate',  component: ProjectEstimator },
 ];
 
 // ─── Main view ────────────────────────────────────────────────────────────────
