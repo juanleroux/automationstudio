@@ -931,7 +931,7 @@ function ProjectEstimator() {
 // ─── Calculator registry ──────────────────────────────────────────────────────
 const CALCULATORS = [
   { id: 'ma420',     label: '4-20mA Scaling',     desc: 'Signal range converter',              component: MA420Calculator  },
-  { id: 'rl',        label: 'Reduced Level',       desc: '4-20mA signal to RL elevation',       component: RLCalculator     },
+  { id: 'rl',        label: 'Reduced Level',       desc: 'Signal range to RL elevation',       component: RLCalculator     },
   { id: 'unit',      label: 'Unit Conversion',     desc: 'Engineering unit converter',          component: UnitConverter    },
   { id: 'estimator', label: 'Project Estimator',   desc: 'Time effort & cost estimate',  component: ProjectEstimator },
 ];
