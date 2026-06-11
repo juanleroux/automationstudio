@@ -461,7 +461,170 @@ function UnitConverter() {
   );
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// ─── Reduced Level (RL) Calculator ───────────────────────────────────────────
+function RLCalculator() {
+  const [sigMin,   setSigMin]   = useState('4');
+  const [sigMax,   setSigMax]   = useState('20');
+  const [lrv,      setLrv]      = useState('95.000');
+  const [urv,      setUrv]      = useState('100.000');
+  const [unit,     setUnit]     = useState('m');
+  const [sigInput, setSigInput] = useState('12');
+  const [rlInput,  setRlInput]  = useState('');
+
+  const cfg = useMemo(() => {
+    const s0  = parseFloat(sigMin);
+    const s1  = parseFloat(sigMax);
+    const rl0 = parseFloat(lrv);
+    const rl1 = parseFloat(urv);
+    const valid = !isNaN(s0) && !isNaN(s1) && s1 !== s0 && !isNaN(rl0) && !isNaN(rl1);
+    return { s0, s1, rl0, rl1, valid };
+  }, [sigMin, sigMax, lrv, urv]);
+
+  const { s0, s1, rl0, rl1, valid } = cfg;
+
+  function sigToRL(sig) { return rl0 + ((sig - s0) / (s1 - s0)) * (rl1 - rl0); }
+  function rlToSig(rl)  { return s0  + ((rl  - rl0) / (rl1 - rl0)) * (s1 - s0); }
+  function sigToPct(sig) { return ((sig - s0) / (s1 - s0)) * 100; }
+
+  const sig    = parseFloat(sigInput);
+  const rl     = parseFloat(rlInput);
+  const fwdRL  = valid && !isNaN(sig)  ? sigToRL(sig)     : null;
+  const fwdPct = valid && !isNaN(sig)  ? sigToPct(sig)    : null;
+  const revSig = valid && !isNaN(rl)   ? rlToSig(rl)      : null;
+  const revPct = valid && !isNaN(rl)   ? sigToPct(revSig) : null;
+
+  const steps = valid
+    ? [0, 25, 50, 75, 100].map(pct => ({
+        pct,
+        sigVal: s0  + (pct / 100) * (s1  - s0),
+        rlVal:  rl0 + (pct / 100) * (rl1 - rl0),
+      }))
+    : [];
+
+  const unitLabel = unit.trim() || 'RL';
+
+  return (
+    <div style={{ padding: 28, maxWidth: 720 }}>
+
+      <SectionLabel>Transmitter Configuration</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+        <div style={panelStyle}>
+          <div style={labelStyle}>Signal Range</div>
+          <div className="flex items-center gap-2">
+            <input className="input" style={{ width: 72 }} value={sigMin} onChange={e => setSigMin(e.target.value)} />
+            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>to</span>
+            <input className="input" style={{ width: 72 }} value={sigMax} onChange={e => setSigMax(e.target.value)} />
+            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>mA</span>
+          </div>
+        </div>
+        <div style={panelStyle}>
+          <div style={labelStyle}>RL Range (LRV → URV)</div>
+          <div className="flex items-center gap-2">
+            <input className="input" style={{ width: 90 }} value={lrv} onChange={e => setLrv(e.target.value)} placeholder="LRV" />
+            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>to</span>
+            <input className="input" style={{ width: 90 }} value={urv} onChange={e => setUrv(e.target.value)} placeholder="URV" />
+            <input className="input" style={{ width: 64 }} placeholder="unit" value={unit} onChange={e => setUnit(e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+        {/* Signal → RL */}
+        <div style={panelStyle}>
+          <div style={labelStyle}>Signal → Reduced Level</div>
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              className="input"
+              style={{ width: 90 }}
+              value={sigInput}
+              onChange={e => setSigInput(e.target.value)}
+              placeholder="mA"
+            />
+            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>mA</span>
+          </div>
+          {valid && !isNaN(sig) ? (
+            <>
+              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--accent)', marginBottom: 2 }}>
+                {fmt(fwdRL)} {unitLabel}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {fmt(fwdPct)}% of span
+              </div>
+              <Slider
+                min={s0} max={s1} value={sig}
+                onChange={v => setSigInput(String(parseFloat(v).toFixed(3)))}
+                minLabel={`${s0} mA`} maxLabel={`${s1} mA`}
+              />
+            </>
+          ) : (
+            <div style={{ color: 'var(--text-disabled)', fontSize: 13 }}>—</div>
+          )}
+        </div>
+
+        {/* RL → Signal */}
+        <div style={panelStyle}>
+          <div style={labelStyle}>Reduced Level → Signal</div>
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              className="input"
+              style={{ width: 90 }}
+              value={rlInput}
+              onChange={e => setRlInput(e.target.value)}
+              placeholder={unitLabel}
+            />
+            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{unitLabel}</span>
+          </div>
+          {valid && !isNaN(rl) ? (
+            <>
+              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--accent)', marginBottom: 2 }}>
+                {fmt(revSig)} mA
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {fmt(revPct)}% of span
+              </div>
+              <Slider
+                min={rl0} max={rl1} value={rl}
+                onChange={v => setRlInput(String(parseFloat(v).toFixed(3)))}
+                minLabel={`${rl0} ${unitLabel}`} maxLabel={`${rl1} ${unitLabel}`}
+              />
+            </>
+          ) : (
+            <div style={{ color: 'var(--text-disabled)', fontSize: 13 }}>—</div>
+          )}
+        </div>
+      </div>
+
+      {/* Reference table */}
+      {steps.length > 0 && (
+        <>
+          <SectionLabel>Reference Table</SectionLabel>
+          <div style={{ ...panelStyle, padding: 0, overflow: 'hidden' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Span (%)</th>
+                  <th>Signal (mA)</th>
+                  <th>Reduced Level ({unitLabel})</th>
+                </tr>
+              </thead>
+              <tbody>
+                {steps.map(({ pct, sigVal, rlVal }) => (
+                  <tr key={pct}>
+                    <td style={{ color: 'var(--text-muted)' }}>{pct}%</td>
+                    <td>{fmt(sigVal)} mA</td>
+                    <td style={{ fontWeight: 600 }}>{fmt(rlVal)} {unitLabel}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
 function SectionLabel({ children }) {
   return (
     <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
@@ -768,6 +931,7 @@ function ProjectEstimator() {
 // ─── Calculator registry ──────────────────────────────────────────────────────
 const CALCULATORS = [
   { id: 'ma420',     label: '4-20mA Scaling',     desc: 'Signal range converter',              component: MA420Calculator  },
+  { id: 'rl',        label: 'Reduced Level',       desc: '4-20mA signal to RL elevation',       component: RLCalculator     },
   { id: 'unit',      label: 'Unit Conversion',     desc: 'Engineering unit converter',          component: UnitConverter    },
   { id: 'estimator', label: 'Project Estimator',   desc: 'Time effort & cost estimate',  component: ProjectEstimator },
 ];
