@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen } from 'lucide-react';
+import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
@@ -8,6 +9,8 @@ import { loadConfig, saveConfig, testIgnitionConnection } from '../../api/client
 export default function SettingsView() {
   const { project, updateProject } = useProject();
   const { theme, setTheme, accentColor, setAccentColor, resetAccentColor } = useTheme();
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const accentSwatchRef = useRef(null);
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('general');
   const [config, setConfig] = useState(null);
@@ -226,24 +229,28 @@ export default function SettingsView() {
                       >
                         <RotateCcw size={15} />
                       </button>
-                      <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                        <div style={{
-                          width: 28, height: 28, borderRadius: '50%',
+                      <button
+                        ref={accentSwatchRef}
+                        onClick={() => setColorPickerOpen(o => !o)}
+                        style={{
+                          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
                           background: accentColor,
                           border: '2px solid var(--border)',
                           boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+                          cursor: 'pointer',
                           transition: 'transform 0.1s',
                         }}
-                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
-                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-                        />
-                        <input
-                          type="color"
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      />
+                      {colorPickerOpen && (
+                        <ColorPicker
                           value={accentColor}
-                          onChange={e => setAccentColor(e.target.value)}
-                          style={{ display: 'none' }}
+                          onChange={setAccentColor}
+                          anchorRef={accentSwatchRef}
+                          onClose={() => setColorPickerOpen(false)}
                         />
-                      </label>
+                      )}
                     </div>
                   </div>
                 </div>
