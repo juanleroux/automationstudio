@@ -198,26 +198,9 @@ export default function DashboardView() {
 
   const subToolbar = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-main)' }}>
-      {/* View label */}
-      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0, minWidth: 90 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', flex: 1 }}>
         {view === 'graph' ? 'Graph View' : 'Dashboard'}
       </span>
-      {/* Compact stats */}
-      <div style={{ display: 'flex', gap: 14, flex: 1, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Templates',  value: m.templateCount  },
-          { label: 'Instances',  value: m.instanceCount  },
-          { label: 'Areas',      value: m.areaCount      },
-          { label: 'Attributes', value: m.attributeCount },
-          ...(m.flaggedCount > 0 ? [{ label: 'Flagged', value: m.flaggedCount, warn: true }] : []),
-        ].map(({ label, value, warn }) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ fontSize: 10, color: warn ? '#e55353' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{label}</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: warn ? '#e55353' : 'var(--text-primary)' }}>{value}</span>
-          </div>
-        ))}
-      </div>
-      {/* Toggle */}
       <div style={{ display: 'flex', gap: 2, flexShrink: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, padding: 3 }}>
         <button style={toggleBtn('tiles')} onClick={() => setView('tiles')} title="Tile view"><LayoutDashboard size={15} /></button>
         <button style={toggleBtn('graph')} onClick={() => setView('graph')} title="Graph view"><Network size={15} /></button>
