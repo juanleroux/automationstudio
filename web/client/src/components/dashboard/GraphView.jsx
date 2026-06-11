@@ -1,12 +1,13 @@
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const REPULSION   = 2800;
-const SPRING_K    = 0.06;
-const DAMPING     = 0.82;
-const GRAVITY     = 0.003;
-const MAX_VEL     = 12;
-const SPRING_LENS = { 'tpl-inst': 80, 'inst-area': 110, 'area-area': 90 };
+const REPULSION        = 1800;
+const REPULSION_CUTOFF = 180;   // skip pairs beyond this distance — prevents cluster mass from ejecting far nodes
+const SPRING_K         = 0.10;
+const DAMPING          = 0.80;
+const GRAVITY          = 0.005;
+const MAX_VEL          = 8;
+const SPRING_LENS      = { 'tpl-inst': 65, 'inst-area': 100, 'area-area': 90 };
 
 const TEMPLATE_PALETTE = [
   '#4d9eff','#4dcc8a','#e06c75','#c678dd',
@@ -63,29 +64,32 @@ export default function GraphView({ templates, areas, counts }) {
 
     const tCount = Math.max(1, activeTemplates.length);
 
+    const GOLDEN = 2.39996;   // golden angle in radians
+
     activeTemplates.forEach((t, i) => {
       const tAng = (i / tCount) * Math.PI * 2;
-      // Template on inner ring
+      const tR   = tCount === 1 ? 0 : 110;
+      const tx   = Math.cos(tAng) * tR;
+      const ty   = Math.sin(tAng) * tR;
+
       initNodes.push({
         id: `t_${t.id}`, type: 'template', label: t.name,
-        x: Math.cos(tAng) * 90 + (Math.random() - 0.5) * 10,
-        y: Math.sin(tAng) * 90 + (Math.random() - 0.5) * 10,
+        x: tx + (Math.random() - 0.5) * 8,
+        y: ty + (Math.random() - 0.5) * 8,
         vx: 0, vy: 0, pinned: false, color: tColor[t.id],
         meta: { instances: t.instances?.length || 0, attributes: t.attributes?.length || 0 },
       });
 
-      // Instances fanned around the template's angle — sector width proportional to count
+      // Instances placed in a golden-angle spiral centred on the template —
+      // regardless of instance count they start close to their owner.
       const insts = t.instances || [];
-      const sectorHalf = Math.min(Math.PI * 0.8, (Math.PI * 2 / tCount) * 0.45);
       insts.forEach((inst, j) => {
-        const instAng = insts.length === 1
-          ? tAng
-          : tAng + (j / (insts.length - 1) - 0.5) * sectorHalf * 2;
-        const r = 175 + (Math.random() - 0.5) * 25;
+        const spiralR   = 22 + Math.sqrt(j + 1) * 14;
+        const spiralAng = j * GOLDEN;
         initNodes.push({
           id: `i_${inst.id}`, type: 'instance', label: inst.name,
-          x: Math.cos(instAng) * r,
-          y: Math.sin(instAng) * r,
+          x: tx + Math.cos(spiralAng) * spiralR,
+          y: ty + Math.sin(spiralAng) * spiralR,
           vx: 0, vy: 0, pinned: false, color: tColor[t.id],
           isFlagged: inst.isFlagged,
           meta: { template: t.name, areaId: inst.areaId },
@@ -182,16 +186,18 @@ export default function GraphView({ templates, areas, counts }) {
       if (!sim) return;
       const { nodes, edges, nodeMap } = sim;
       const { w, h } = sizeRef.current;
-      // Soft boundary radius: keep nodes inside ~45% of the smaller canvas dimension
-      const br = Math.max(200, Math.min(w, h) * 0.44);
+      // Soft boundary: keep nodes inside ~38% of the smaller canvas dimension
+      const br = Math.max(150, Math.min(w, h) * 0.38);
 
-      // Repulsion
+      // Repulsion — only applied within cutoff distance so the central cluster
+      // cannot "eject" nodes that are already far away.
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const a = nodes[i], b = nodes[j];
           let dx = b.x - a.x, dy = b.y - a.y;
           let d2 = dx*dx + dy*dy || 0.01;
           let d  = Math.sqrt(d2);
+          if (d > REPULSION_CUTOFF) continue;
           const minD = a.r + b.r + 16;
           if (d < minD) { dx = dx/d*minD; dy = dy/d*minD; d = minD; d2 = d*d; }
           const f = REPULSION / d2;
