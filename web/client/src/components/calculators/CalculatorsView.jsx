@@ -769,7 +769,7 @@ function ProjectEstimator() {
 const CALCULATORS = [
   { id: 'ma420',     label: '4-20mA Scaling',     desc: 'Signal range converter',              component: MA420Calculator  },
   { id: 'unit',      label: 'Unit Conversion',     desc: 'Engineering unit converter',          component: UnitConverter    },
-  { id: 'estimator', label: 'Project Estimator',   desc: 'Development effort & cost estimate',  component: ProjectEstimator },
+  { id: 'estimator', label: 'Project Estimator',   desc: 'Time effort & cost estimate',  component: ProjectEstimator },
 ];
 
 // ─── Main view ────────────────────────────────────────────────────────────────
