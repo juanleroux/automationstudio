@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, Sun, Moon, Cpu, FolderOpen } from 'lucide-react';
+import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
@@ -7,7 +7,7 @@ import { loadConfig, saveConfig, testIgnitionConnection } from '../../api/client
 
 export default function SettingsView() {
   const { project, updateProject } = useProject();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, accentColor, setAccentColor, resetAccentColor } = useTheme();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('general');
   const [config, setConfig] = useState(null);
@@ -194,30 +194,58 @@ export default function SettingsView() {
               {/* Appearance */}
               <div>
                 <label className="block text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>Appearance</label>
-                <div className="flex gap-3">
-                  {[
-                    { value: 'dark', label: 'Dark', Icon: Moon },
-                    { value: 'light', label: 'Light', Icon: Sun },
-                  ].map(({ value, label, Icon }) => {
-                    const active = theme === value;
-                    return (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                  {/* Base color scheme */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Base color scheme</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Choose the application color scheme.</div>
+                    </div>
+                    <select
+                      value={theme}
+                      onChange={e => setTheme(e.target.value)}
+                      style={{ width: 'auto', minWidth: 160 }}
+                    >
+                      <option value="system">Adapt to system</option>
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
+                    </select>
+                  </div>
+
+                  {/* Accent color */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Accent color</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Choose the accent color used throughout the app.</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <button
-                        key={value}
-                        onClick={() => setTheme(value)}
-                        className="flex flex-col items-center gap-2 p-4 rounded-lg transition-all"
-                        style={{
-                          flex: 1,
-                          border: active ? '2px solid var(--accent)' : '2px solid var(--border)',
-                          background: active ? 'var(--accent-bg)' : 'var(--bg-card)',
-                          color: active ? 'var(--accent)' : 'var(--text-muted)',
-                          cursor: 'pointer',
-                        }}
+                        onClick={resetAccentColor}
+                        title="Reset to default"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }}
                       >
-                        <Icon size={22} />
-                        <span className="text-sm font-medium">{label}</span>
+                        <RotateCcw size={15} />
                       </button>
-                    );
-                  })}
+                      <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        <div style={{
+                          width: 28, height: 28, borderRadius: '50%',
+                          background: accentColor,
+                          border: '2px solid var(--border)',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+                          transition: 'transform 0.1s',
+                        }}
+                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                        />
+                        <input
+                          type="color"
+                          value={accentColor}
+                          onChange={e => setAccentColor(e.target.value)}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
 
