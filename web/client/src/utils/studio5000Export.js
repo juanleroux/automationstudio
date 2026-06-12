@@ -156,41 +156,56 @@ ${rungsXml}
 }
 
 // ── Project L5X parser ────────────────────────────────────────────────────────
-// Extracts AOI definitions and their tag instances from a controller-level L5X.
+// Extracts AOI definitions (with their visible Input/Output parameters) and
+// tag instances from a controller-level L5X file.
 export function parseProjectL5X(xmlContent) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlContent, 'application/xml');
 
-  // Collect all defined AOI names
-  const aoiNames = new Set(
-    [...doc.querySelectorAll('AddOnInstructionDefinition')]
-      .map(el => el.getAttribute('Name'))
-      .filter(Boolean)
-  );
-  if (!aoiNames.size) return [];
+  const aoiDefs = [...doc.querySelectorAll('AddOnInstructionDefinition')];
+  if (!aoiDefs.length) return [];
 
+  // Build aoiName → visible parameters (Input + Output)
+  const aoiParamsMap = new Map();
+  for (const def of aoiDefs) {
+    const name = def.getAttribute('Name');
+    if (!name) continue;
+    const params = [...def.querySelectorAll('Parameter')]
+      .filter(p => p.getAttribute('Visible') === 'true')
+      .map(p => ({
+        name: p.getAttribute('Name'),
+        dataType: p.getAttribute('DataType') || 'BOOL',
+        usage: p.getAttribute('Usage'), // 'Input' or 'Output'
+      }));
+    aoiParamsMap.set(name, params);
+  }
+
+  const aoiNames = new Set(aoiParamsMap.keys());
   const allTags = [...doc.querySelectorAll('Tag')];
-  // Tags whose DataType matches an AOI (the "storage" tags)
   const baseTags = allTags.filter(t =>
     t.getAttribute('TagType') === 'Base' &&
     aoiNames.has(t.getAttribute('DataType'))
   );
-  // Alias tags may give meaningful names to array elements
   const aliasTags = allTags.filter(t => t.getAttribute('TagType') === 'Alias');
 
-  const aoiMap = new Map(); // aoiName → { aoiName, instances }
+  const aoiMap = new Map(); // aoiName → { aoiName, parameters, instances }
 
   for (const baseTag of baseTags) {
     const aoiName = baseTag.getAttribute('DataType');
     const tagName = baseTag.getAttribute('Name');
     const dimensions = baseTag.getAttribute('Dimensions');
 
-    if (!aoiMap.has(aoiName)) aoiMap.set(aoiName, { aoiName, instances: [] });
+    if (!aoiMap.has(aoiName)) {
+      aoiMap.set(aoiName, {
+        aoiName,
+        parameters: aoiParamsMap.get(aoiName) || [],
+        instances: [],
+      });
+    }
     const group = aoiMap.get(aoiName);
 
     if (dimensions) {
       const count = parseInt(dimensions, 10);
-      // Build index → alias-name map
       const indexAliases = new Map();
       const escaped = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       for (const alias of aliasTags) {

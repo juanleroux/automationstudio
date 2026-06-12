@@ -1484,7 +1484,18 @@ export default function TemplateTree({ selected, onSelect }) {
                       let tpl = tmpls.find(t => t.name === aoiName);
                       if (!tpl) {
                         maxTplId++;
-                        tpl = { id: maxTplId, name: aoiName, description: '', color: '#3b82f6', attributes: [], instances: [], profiles: [], lastModification: now };
+                        // Build template attributes from AOI Input/Output parameters
+                        const group = s5kGroups.find(g => g.aoiName === aoiName);
+                        const attrs = (group?.parameters || []).map((param, idx) => ({
+                          id: idx + 1,
+                          name: param.name,
+                          description: param.usage || '',
+                          dataType: param.dataType,
+                          value: '',
+                          parameter: true,
+                          lastModification: now,
+                        }));
+                        tpl = { id: maxTplId, name: aoiName, description: '', color: '#3b82f6', attributes: attrs, instances: [], profiles: [], lastModification: now };
                         tmpls.push(tpl);
                       }
                       const existingNames = new Set(tpl.instances.map(i => i.name));
