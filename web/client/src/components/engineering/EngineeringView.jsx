@@ -341,6 +341,47 @@ export default function EngineeringView() {
     setSelectedPaths(new Set());
   }, []);
 
+  const handleImportFolders = useCallback(() => {
+    if (!folderModal?.folders || selectedPaths.size === 0) return;
+    const now = new Date().toISOString();
+    const newAreas = [];
+    let counter = 1;
+    const pathToLocalId = {};
+
+    function walk(node, parentPath) {
+      const selected = selectedPaths.has(node.path);
+      const localId = selected ? counter++ : null;
+      if (selected) {
+        pathToLocalId[node.path] = localId;
+        const parentLocalId = parentPath != null ? (pathToLocalId[parentPath] ?? null) : null;
+        newAreas.push({ _localId: localId, _parentLocalId: parentLocalId, name: node.name, description: '' });
+      }
+      if (node.children?.length) {
+        node.children.forEach(c => walk(c, selected ? node.path : parentPath));
+      }
+    }
+    folderModal.folders.forEach(f => walk(f, null));
+
+    if (!newAreas.length) return;
+
+    updateProject(p => {
+      const existing = p.areas || [];
+      const maxId = existing.length ? Math.max(...existing.map(a => a.id)) : 0;
+      const mapped = newAreas.map(a => ({
+        id: maxId + a._localId,
+        name: a.name,
+        description: a.description,
+        parentId: a._parentLocalId != null ? maxId + a._parentLocalId : null,
+        lastModification: now,
+      }));
+      return { ...p, areas: [...existing, ...mapped] };
+    });
+
+    toast.success(`Imported ${newAreas.length} folder${newAreas.length !== 1 ? 's' : ''} as areas`);
+    setFolderModal(null);
+    setSelectedPaths(new Set());
+  }, [folderModal, selectedPaths, updateProject, toast]);
+
   if (!project) {
     return <NoProjectOpen />;
   }
@@ -379,10 +420,7 @@ export default function EngineeringView() {
                 <button
                   className="btn btn-primary"
                   disabled={selectedPaths.size === 0}
-                  onClick={() => {
-                    toast.success(`${selectedPaths.size} folder${selectedPaths.size !== 1 ? 's' : ''} selected`);
-                    setFolderModal(null);
-                  }}
+                  onClick={handleImportFolders}
                 >
                   <Download size={13} /> Import
                 </button>
