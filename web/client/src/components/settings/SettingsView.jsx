@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen } from 'lucide-react';
+import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw } from 'lucide-react';
 import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword } from '../../api/client';
+import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword, ignitionGatewayControl } from '../../api/client';
 
 export default function SettingsView() {
   const { project, updateProject } = useProject();
@@ -43,6 +43,7 @@ export default function SettingsView() {
   const [resetPassword, setResetPassword] = useState('');
   const [resetting, setResetting] = useState(false);
   const [resetResult, setResetResult] = useState(null); // { success, output, exitCode }
+  const [gatewayAction, setGatewayAction] = useState(null); // 'start'|'stop'|'restart' while in progress
   const tiaProjectFileRef = useRef(null);
 
   useEffect(() => {
@@ -99,6 +100,18 @@ export default function SettingsView() {
       setSiemensTestResult({ success: false, message: err.response?.data?.error || err.message });
     } finally {
       setSiemensTesting(false);
+    }
+  };
+
+  const handleGatewayControl = async (action) => {
+    setGatewayAction(action);
+    try {
+      const result = await ignitionGatewayControl(action);
+      toast.success(result.message || `Gateway ${action} successful`);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err.message);
+    } finally {
+      setGatewayAction(null);
     }
   };
 
@@ -388,6 +401,45 @@ export default function SettingsView() {
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--danger)', marginBottom: 2 }}>Danger Zone</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>These actions are irreversible and affect the running Ignition instance.</div>
                   </div>
+                  {/* Gateway controls */}
+                  <div style={{ padding: '14px', borderBottom: '1px solid rgba(229,83,83,0.2)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Gateway Control</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                      Start, stop, or restart the Ignition gateway container.
+                      Stop uses <code style={{ fontSize: 11, background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: 3 }}>gwcmd --quit</code> for a graceful shutdown.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, gap: 6 }}
+                        disabled={!!gatewayAction}
+                        onClick={() => handleGatewayControl('start')}
+                      >
+                        <Play size={13} />
+                        {gatewayAction === 'start' ? 'Starting…' : 'Start'}
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, gap: 6 }}
+                        disabled={!!gatewayAction}
+                        onClick={() => handleGatewayControl('stop')}
+                      >
+                        <Square size={13} />
+                        {gatewayAction === 'stop' ? 'Stopping…' : 'Stop'}
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, gap: 6 }}
+                        disabled={!!gatewayAction}
+                        onClick={() => handleGatewayControl('restart')}
+                      >
+                        <RefreshCw size={13} />
+                        {gatewayAction === 'restart' ? 'Restarting…' : 'Restart'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Reset password */}
                   <div style={{ padding: '14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 3 }}>Reset Administrator Password</div>

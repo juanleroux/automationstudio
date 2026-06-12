@@ -222,6 +222,94 @@ router.post('/test', async (req, res) => {
   }
 });
 
+// POST /api/ignition/gateway-control — start / stop / restart the Ignition container
+router.post('/gateway-control', async (req, res) => {
+  const { action } = req.body; // 'start' | 'stop' | 'restart'
+  if (!['start', 'stop', 'restart'].includes(action)) {
+    return res.status(400).json({ error: 'action must be start, stop, or restart' });
+  }
+
+  try {
+    // Find the Ignition container (include stopped containers for start)
+    const listRes = await dockerGet('/containers/json?all=true');
+    if (listRes.status !== 200) {
+      return res.status(502).json({ error: `Docker socket error ${listRes.status}` });
+    }
+    const container = listRes.data.find(c =>
+      (c.Names || []).some(n => n.toLowerCase().includes('ignition'))
+    );
+    if (!container) {
+      return res.status(404).json({ error: 'No Ignition container found' });
+    }
+
+    const containerId = container.Id;
+    const containerName = (container.Names[0] || containerId).replace(/^\//, '');
+    console.log(`[Ignition gateway-control] action=${action} container=${containerName}`);
+
+    if (action === 'start') {
+      // Container must be stopped — use Docker API to start it
+      const r = await dockerPost(`/containers/${containerId}/start`, {});
+      // 204 = started, 304 = already running
+      if (r.status !== 204 && r.status !== 304) {
+        return res.status(502).json({ error: `Docker start failed (HTTP ${r.status})`, detail: r.data });
+      }
+      return res.json({ success: true, action, container: containerName, message: r.status === 304 ? 'Container already running' : 'Container started' });
+    }
+
+    if (action === 'restart') {
+      // Docker API restart — graceful with 10s timeout before forced kill
+      const r = await dockerPost(`/containers/${containerId}/restart?t=10`, {});
+      if (r.status !== 204) {
+        return res.status(502).json({ error: `Docker restart failed (HTTP ${r.status})`, detail: r.data });
+      }
+      return res.json({ success: true, action, container: containerName, message: 'Container restarting…' });
+    }
+
+    if (action === 'stop') {
+      // Use gwcmd.sh --quit for a graceful gateway shutdown (preferred over Docker stop)
+      // First find gwcmd.sh path
+      let gwcmdPath = '/usr/local/bin/ignition/gwcmd.sh';
+      const testExec = await dockerPost(`/containers/${containerId}/exec`, {
+        AttachStdout: true, AttachStderr: true, Cmd: ['test', '-f', gwcmdPath],
+      });
+      if (testExec.data?.Id) {
+        await dockerPost(`/exec/${testExec.data.Id}/start`, { Detach: false, Tty: false });
+        const inspect = await dockerGet(`/exec/${testExec.data.Id}/json`);
+        if (inspect.data?.ExitCode !== 0) {
+          const findExec = await dockerPost(`/containers/${containerId}/exec`, {
+            AttachStdout: true, AttachStderr: true,
+            Cmd: ['find', '/', '-name', 'gwcmd.sh', '-maxdepth', '8'],
+          });
+          const findOutput = await dockerExecAttached(findExec.data.Id);
+          gwcmdPath = findOutput.split('\n').find(l => l.trim()) || '';
+        }
+      }
+
+      if (gwcmdPath) {
+        // Run gwcmd.sh --quit in background (Detach:true) — it will stop the container
+        const quitExec = await dockerPost(`/containers/${containerId}/exec`, {
+          AttachStdout: false, AttachStderr: false,
+          Cmd: [gwcmdPath, '--quit'],
+        });
+        if (quitExec.data?.Id) {
+          await dockerPost(`/exec/${quitExec.data.Id}/start`, { Detach: true });
+          return res.json({ success: true, action, container: containerName, message: 'Gateway shutdown initiated via gwcmd --quit' });
+        }
+      }
+
+      // Fallback: Docker API stop
+      const r = await dockerPost(`/containers/${containerId}/stop?t=10`, {});
+      if (r.status !== 204 && r.status !== 304) {
+        return res.status(502).json({ error: `Docker stop failed (HTTP ${r.status})` });
+      }
+      return res.json({ success: true, action, container: containerName, message: 'Container stopped' });
+    }
+  } catch (err) {
+    console.error(`[Ignition gateway-control] error:`, err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/ignition/reset-password — run gwcmd.sh -p inside the Ignition Docker container
 router.post('/reset-password', async (req, res) => {
   const { newPassword } = req.body;
