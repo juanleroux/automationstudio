@@ -77,6 +77,57 @@ router.get('/export', async (req, res) => {
   }
 });
 
+// GET /api/ignition/folders — export only folder structure from Ignition
+router.get('/folders', async (req, res) => {
+  const { gatewayUrl, apiKey, provider = 'default', folderPath } = req.query;
+
+  if (!gatewayUrl) return res.status(400).json({ error: 'Gateway URL required' });
+
+  const base = normalizeUrl(gatewayUrl);
+  let url = `${base}/data/api/v1/tags/export?provider=${encodeURIComponent(provider)}&type=json`;
+  if (folderPath) url += `&path=${encodeURIComponent(folderPath)}`;
+
+  console.log('[Ignition folders] GET', url);
+
+  function extractFolders(node, parentPath) {
+    const path = parentPath ? `${parentPath}/${node.name}` : node.name;
+    const result = { name: node.name, path, children: [] };
+    if (Array.isArray(node.tags)) {
+      for (const child of node.tags) {
+        if (child.tagType === 'Folder') {
+          result.children.push(extractFolders(child, path));
+        }
+      }
+    }
+    return result;
+  }
+
+  try {
+    const response = await axios.get(url, { headers: ignitionHeaders(apiKey), timeout: 30000 });
+    const root = response.data;
+    // root is the top-level object; extract its folder children
+    const folders = [];
+    if (Array.isArray(root.tags)) {
+      for (const child of root.tags) {
+        if (child.tagType === 'Folder') {
+          folders.push(extractFolders(child, ''));
+        }
+      }
+    }
+    res.json({ success: true, folders });
+  } catch (err) {
+    if (err.response) {
+      const raw = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
+      const message = raw.includes('<html') ? stripHtml(raw) : raw;
+      console.error('[Ignition folders] error', err.response.status, message.slice(0, 300));
+      res.status(err.response.status).json({ error: message, url });
+    } else {
+      console.error('[Ignition folders] network error', err.message);
+      res.status(502).json({ error: err.message, url });
+    }
+  }
+});
+
 // POST /api/ignition/test — verify gateway connectivity
 router.post('/test', async (req, res) => {
   const { gatewayUrl, apiKey, provider = 'default' } = req.body;

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Cpu, Plus, Zap, Printer } from 'lucide-react';
+import { Cpu, Plus, Zap, Printer, Download, Folder, ChevronRight, ChevronDown, Loader } from 'lucide-react';
 import NoProjectOpen from '../shared/NoProjectOpen';
 import { VERSION } from '../../version';
 import TemplateTree from './TemplateTree';
@@ -9,6 +9,37 @@ import Modal from '../shared/Modal';
 import { useProject } from '../../context/ProjectContext';
 import AreasView from '../areas/AreasView';
 import { openCommissioningReport } from '../../utils/commissioningReport';
+import { getFoldersFromIgnition } from '../../api/client';
+import { useToast } from '../shared/Toast';
+
+function FolderNode({ node, depth = 0 }) {
+  const [open, setOpen] = useState(depth < 2);
+  const hasChildren = node.children && node.children.length > 0;
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          paddingLeft: depth * 16 + 4, paddingTop: 3, paddingBottom: 3,
+          cursor: hasChildren ? 'pointer' : 'default',
+          borderRadius: 3,
+        }}
+        className="tree-node"
+        onClick={() => hasChildren && setOpen(o => !o)}
+      >
+        {hasChildren
+          ? (open ? <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} /> : <ChevronRight size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />)
+          : <span style={{ width: 12, flexShrink: 0 }} />
+        }
+        <Folder size={13} style={{ flexShrink: 0, color: 'var(--accent)' }} />
+        <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{node.name}</span>
+      </div>
+      {open && hasChildren && node.children.map((child, i) => (
+        <FolderNode key={i} node={child} depth={depth + 1} />
+      ))}
+    </div>
+  );
+}
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
@@ -150,12 +181,15 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
 
 export default function EngineeringView() {
   const { project, updateProject } = useProject();
+  const toast = useToast();
   const [assetTab, setAssetTab] = useState('derivation');
   const [selected, setSelected] = useState(null);
   const [paneWidth, setPaneWidth] = useState(DEFAULT_WIDTH);
   const dragging = useRef(false);
   const startX = useRef(0);
   const startW = useRef(0);
+  const [ctxMenu, setCtxMenu] = useState(null); // { x, y }
+  const [folderModal, setFolderModal] = useState(null); // null | { loading, folders, error }
 
   const onMouseDown = (e) => {
     dragging.current = true;
@@ -233,12 +267,91 @@ export default function EngineeringView() {
     }));
   }, [selectedTemplate, updateProject]);
 
+  const handleContextMenu = useCallback((e) => {
+    // Only fire on direct background click, not on interactive children
+    if (e.target !== e.currentTarget && e.target.closest('[data-interactive]')) return;
+    e.preventDefault();
+    setCtxMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [ctxMenu]);
+
+  const handleDownloadFolders = useCallback(async () => {
+    setCtxMenu(null);
+    const eng = project?.engineering;
+    if (!eng?.ignitionGateway) {
+      toast.error('Configure Ignition gateway in Settings first');
+      return;
+    }
+    setFolderModal({ loading: true, folders: null, error: null });
+    try {
+      const result = await getFoldersFromIgnition({
+        gatewayUrl: eng.ignitionGateway,
+        apiKey: eng.apiKey,
+        provider: eng.provider || 'default',
+        folderPath: eng.folderPath || undefined,
+      });
+      setFolderModal({ loading: false, folders: result.folders || [], error: null });
+    } catch (err) {
+      const msg = err?.response?.data?.error || err.message || 'Unknown error';
+      setFolderModal({ loading: false, folders: null, error: msg });
+    }
+  }, [project, toast]);
+
   if (!project) {
     return <NoProjectOpen />;
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onContextMenu={handleContextMenu}>
+      {/* Context menu */}
+      {ctxMenu && (
+        <div
+          className="context-menu"
+          style={{ top: ctxMenu.y, left: ctxMenu.x }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <div className="context-menu-item" onClick={handleDownloadFolders}>
+            <Download size={14} />
+            Download Folder Structure from Ignition
+          </div>
+        </div>
+      )}
+
+      {/* Folder structure modal */}
+      {folderModal && (
+        <Modal
+          title="Ignition Folder Structure"
+          onClose={() => setFolderModal(null)}
+          width={420}
+          footer={<button className="btn btn-secondary" onClick={() => setFolderModal(null)}>Close</button>}
+        >
+          {folderModal.loading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '24px 0', justifyContent: 'center', color: 'var(--text-muted)' }}>
+              <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              Fetching folders from Ignition…
+            </div>
+          )}
+          {folderModal.error && (
+            <div style={{ color: 'var(--danger)', padding: '12px 0', fontSize: 13 }}>
+              {folderModal.error}
+            </div>
+          )}
+          {folderModal.folders && !folderModal.loading && (
+            folderModal.folders.length === 0
+              ? <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '12px 0' }}>No folders found.</div>
+              : <div style={{ maxHeight: 400, overflowY: 'auto', overflowX: 'hidden' }}>
+                  {folderModal.folders.map((f, i) => <FolderNode key={i} node={f} depth={0} />)}
+                </div>
+          )}
+        </Modal>
+      )}
+
       {/* View tab bar */}
       <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
         {['derivation', 'model'].map(tab => (

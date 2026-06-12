@@ -21,6 +21,7 @@ export const saveConfig = (data) => api.put('/config', data).then(r => r.data);
 // Ignition
 export const uploadToIgnition = (payload) => api.post('/ignition/upload', payload).then(r => r.data);
 export const exportFromIgnition = (params) => api.get('/ignition/export', { params }).then(r => r.data);
+export const getFoldersFromIgnition = (params) => api.get('/ignition/folders', { params }).then(r => r.data);
 export const testIgnitionConnection = (data) => api.post('/ignition/test', data).then(r => r.data);
 
 // Siemens TIA Portal bridge
