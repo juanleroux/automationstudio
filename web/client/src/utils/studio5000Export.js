@@ -155,6 +155,68 @@ ${rungsXml}
 </RSLogix5000Content>`;
 }
 
+// ── Project L5X parser ────────────────────────────────────────────────────────
+// Extracts AOI definitions and their tag instances from a controller-level L5X.
+export function parseProjectL5X(xmlContent) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlContent, 'application/xml');
+
+  // Collect all defined AOI names
+  const aoiNames = new Set(
+    [...doc.querySelectorAll('AddOnInstructionDefinition')]
+      .map(el => el.getAttribute('Name'))
+      .filter(Boolean)
+  );
+  if (!aoiNames.size) return [];
+
+  const allTags = [...doc.querySelectorAll('Tag')];
+  // Tags whose DataType matches an AOI (the "storage" tags)
+  const baseTags = allTags.filter(t =>
+    t.getAttribute('TagType') === 'Base' &&
+    aoiNames.has(t.getAttribute('DataType'))
+  );
+  // Alias tags may give meaningful names to array elements
+  const aliasTags = allTags.filter(t => t.getAttribute('TagType') === 'Alias');
+
+  const aoiMap = new Map(); // aoiName → { aoiName, instances }
+
+  for (const baseTag of baseTags) {
+    const aoiName = baseTag.getAttribute('DataType');
+    const tagName = baseTag.getAttribute('Name');
+    const dimensions = baseTag.getAttribute('Dimensions');
+
+    if (!aoiMap.has(aoiName)) aoiMap.set(aoiName, { aoiName, instances: [] });
+    const group = aoiMap.get(aoiName);
+
+    if (dimensions) {
+      const count = parseInt(dimensions, 10);
+      // Build index → alias-name map
+      const indexAliases = new Map();
+      const escaped = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      for (const alias of aliasTags) {
+        const aliasFor = alias.getAttribute('AliasFor') || '';
+        const m = aliasFor.match(new RegExp(`^${escaped}\\[(\\d+)\\]$`));
+        if (m) {
+          const idx = parseInt(m[1], 10);
+          if (!indexAliases.has(idx)) indexAliases.set(idx, alias.getAttribute('Name'));
+        }
+      }
+      for (let i = 0; i < count; i++) {
+        const alias = indexAliases.get(i);
+        group.instances.push({
+          name: alias || `${tagName}[${i}]`,
+          tagRef: `${tagName}[${i}]`,
+          isNamed: !!alias,
+        });
+      }
+    } else {
+      group.instances.push({ name: tagName, tagRef: tagName, isNamed: true });
+    }
+  }
+
+  return [...aoiMap.values()];
+}
+
 export function downloadStudio5000Routine({ template, aoiConfig, controllerName }) {
   const xml = generateStudio5000Routine({ template, aoiConfig, controllerName });
   const blob = new Blob([xml], { type: 'application/xml' });

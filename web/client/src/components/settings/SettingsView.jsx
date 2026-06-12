@@ -41,6 +41,7 @@ export default function SettingsView() {
   };
   const [templateListKey, setTemplateListKey] = useState(0);
   const studio5000FileRef = useRef(null);
+  const studio5000ProjectFileRef = useRef(null);
   const [studio5000PendingTemplateId, setStudio5000PendingTemplateId] = useState(null);
   const [siemens, setSiemens] = useState(
     project?.siemens || {
@@ -624,6 +625,73 @@ export default function SettingsView() {
                   Open a project to configure Studio 5000 settings
                 </div>
               )}
+
+              {/* Profile File Location */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Profile File Location</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                  Select a Studio 5000 project L5X file. When Studio 5000 menu items are enabled, this unlocks
+                  an "Import from Studio 5000" option in the Assets view to pull AOIs and instances directly
+                  from your PLC project.
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={studio5000.projectL5X?.fileName || ''}
+                    placeholder="No project file selected"
+                    readOnly
+                    disabled={!project}
+                    style={{ flex: 1, fontSize: 12, cursor: 'default' }}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => studio5000ProjectFileRef.current?.click()}
+                    disabled={!project}
+                    title="Browse for Studio 5000 project L5X"
+                    style={{ flexShrink: 0, padding: '0 10px' }}
+                  >
+                    <FolderOpen size={14} />
+                  </button>
+                  {studio5000.projectL5X && (
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => updateStudio5000(prev => ({ ...prev, projectL5X: null }))}
+                      disabled={!project}
+                      title="Clear project file"
+                      style={{ flexShrink: 0, padding: '0 8px', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1 }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {studio5000.projectL5X && (
+                  <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <FileCode size={12} />
+                    {studio5000.projectL5X.fileName}
+                  </div>
+                )}
+                {/* Hidden file input for project L5X */}
+                <input
+                  ref={studio5000ProjectFileRef}
+                  type="file"
+                  accept=".L5X,.l5x"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                      updateStudio5000(prev => ({
+                        ...prev,
+                        projectL5X: { fileName: file.name, content: ev.target.result },
+                      }));
+                      toast.success(`Project file "${file.name}" loaded`);
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
 
               <div className="flex items-center justify-between">
                 <div>

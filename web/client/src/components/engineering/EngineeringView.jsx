@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Cpu, Plus, Zap, Printer, Download, Folder, ChevronRight, ChevronDown, Loader } from 'lucide-react';
+import { Cpu, Plus, Zap, Printer, Download, Folder, ChevronRight, ChevronDown, Loader, FileCode } from 'lucide-react';
+import { parseProjectL5X } from '../../utils/studio5000Export';
 import NoProjectOpen from '../shared/NoProjectOpen';
 import { VERSION } from '../../version';
 import TemplateTree from './TemplateTree';
@@ -56,6 +57,66 @@ function FolderNode({ node, depth = 0, selected, onToggle }) {
       {open && hasChildren && node.children.map((child, i) => (
         <FolderNode key={i} node={child} depth={depth + 1} selected={selected} onToggle={onToggle} />
       ))}
+    </div>
+  );
+}
+
+function AOIGroup({ group, s5kSelected, onToggleAOI, onToggleInstance }) {
+  const [expanded, setExpanded] = useState(true);
+  const allSelected = group.instances.every(i => s5kSelected.has(`${group.aoiName}::${i.name}`));
+  const someSelected = !allSelected && group.instances.some(i => s5kSelected.has(`${group.aoiName}::${i.name}`));
+  const checkRef = useRef(null);
+  useEffect(() => { if (checkRef.current) checkRef.current.indeterminate = someSelected; }, [someSelected]);
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', background: 'var(--bg-surface)', borderRadius: 5 }}>
+        <input
+          type="checkbox"
+          ref={checkRef}
+          checked={allSelected}
+          onChange={() => onToggleAOI(group.aoiName, !allSelected)}
+          style={{ width: 13, height: 13, flexShrink: 0, cursor: 'pointer' }}
+        />
+        <span
+          style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => setExpanded(e => !e)}
+        >
+          {expanded
+            ? <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+            : <ChevronRight size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />}
+          <FileCode size={13} style={{ flexShrink: 0, color: 'var(--accent)' }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{group.aoiName}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {group.instances.length} instance{group.instances.length !== 1 ? 's' : ''}
+          </span>
+        </span>
+      </div>
+      {expanded && (
+        <div style={{ paddingLeft: 22 }}>
+          {group.instances.map((inst, i) => (
+            <div
+              key={i}
+              className="tree-node"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 4px', borderRadius: 3, cursor: 'pointer' }}
+              onClick={() => onToggleInstance(group.aoiName, inst.name)}
+            >
+              <input
+                type="checkbox"
+                checked={s5kSelected.has(`${group.aoiName}::${inst.name}`)}
+                onChange={() => onToggleInstance(group.aoiName, inst.name)}
+                onClick={e => e.stopPropagation()}
+                style={{ width: 13, height: 13, flexShrink: 0, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 12, color: inst.isNamed ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                {inst.name}
+              </span>
+              {inst.tagRef !== inst.name && (
+                <span style={{ fontSize: 11, color: 'var(--text-disabled)' }}>{inst.tagRef}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -210,6 +271,8 @@ export default function EngineeringView() {
   const [ctxMenu, setCtxMenu] = useState(null); // { x, y }
   const [folderModal, setFolderModal] = useState(null); // null | { loading, folders, error }
   const [selectedPaths, setSelectedPaths] = useState(new Set());
+  const [s5kModal, setS5kModal] = useState(null); // null | { groups: [...] } | { error: string }
+  const [s5kSelected, setS5kSelected] = useState(new Set()); // "${aoiName}::${instName}"
 
   const onMouseDown = (e) => {
     dragging.current = true;
@@ -382,6 +445,95 @@ export default function EngineeringView() {
     setSelectedPaths(new Set());
   }, [folderModal, selectedPaths, updateProject, toast]);
 
+  const handleOpenStudio5000Import = useCallback(() => {
+    setCtxMenu(null);
+    const content = project?.studio5000?.projectL5X?.content;
+    if (!content) return;
+    try {
+      const groups = parseProjectL5X(content);
+      if (!groups.length) {
+        toast.error('No AOI definitions found in the project file');
+        return;
+      }
+      // Default: select all instances
+      const all = new Set();
+      for (const g of groups) g.instances.forEach(i => all.add(`${g.aoiName}::${i.name}`));
+      setS5kSelected(all);
+      setS5kModal({ groups });
+    } catch (err) {
+      toast.error('Failed to parse project file: ' + err.message);
+    }
+  }, [project, toast]);
+
+  const handleToggleS5kAOI = useCallback((aoiName, select) => {
+    setS5kSelected(prev => {
+      const next = new Set(prev);
+      const group = s5kModal?.groups?.find(g => g.aoiName === aoiName);
+      if (!group) return next;
+      group.instances.forEach(i => {
+        const key = `${aoiName}::${i.name}`;
+        if (select) next.add(key); else next.delete(key);
+      });
+      return next;
+    });
+  }, [s5kModal]);
+
+  const handleToggleS5kInstance = useCallback((aoiName, instName) => {
+    setS5kSelected(prev => {
+      const next = new Set(prev);
+      const key = `${aoiName}::${instName}`;
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAllS5k = useCallback(() => {
+    if (!s5kModal?.groups) return;
+    const all = new Set();
+    for (const g of s5kModal.groups) g.instances.forEach(i => all.add(`${g.aoiName}::${i.name}`));
+    setS5kSelected(all);
+  }, [s5kModal]);
+
+  const handleSelectNoneS5k = useCallback(() => setS5kSelected(new Set()), []);
+
+  const handleImportStudio5000 = useCallback(() => {
+    if (!s5kModal?.groups || !s5kSelected.size) return;
+    const now = new Date().toISOString();
+    const toImport = new Map(); // aoiName → instance names[]
+    for (const group of s5kModal.groups) {
+      const selected = group.instances.filter(i => s5kSelected.has(`${group.aoiName}::${i.name}`));
+      if (selected.length) toImport.set(group.aoiName, selected.map(i => i.name));
+    }
+    if (!toImport.size) return;
+
+    updateProject(p => {
+      const templates = [...(p.templates || [])];
+      let maxTplId = templates.length ? Math.max(...templates.map(t => t.id)) : 0;
+      for (const [aoiName, instNames] of toImport) {
+        let tpl = templates.find(t => t.name === aoiName);
+        if (!tpl) {
+          maxTplId++;
+          tpl = { id: maxTplId, name: aoiName, description: '', color: '#3b82f6', attributes: [], instances: [], profiles: [], lastModification: now };
+          templates.push(tpl);
+        }
+        const existingNames = new Set(tpl.instances.map(i => i.name));
+        let maxInstId = tpl.instances.length ? Math.max(...tpl.instances.map(i => i.id)) : 0;
+        for (const name of instNames) {
+          if (!existingNames.has(name)) {
+            maxInstId++;
+            tpl.instances.push({ id: maxInstId, name, attributes: [], lastModification: now });
+          }
+        }
+      }
+      return { ...p, templates };
+    });
+
+    const total = [...toImport.values()].reduce((s, arr) => s + arr.length, 0);
+    toast.success(`Imported ${total} instance${total !== 1 ? 's' : ''} from Studio 5000`);
+    setS5kModal(null);
+    setS5kSelected(new Set());
+  }, [s5kModal, s5kSelected, updateProject, toast]);
+
   if (!project) {
     return <NoProjectOpen />;
   }
@@ -399,6 +551,12 @@ export default function EngineeringView() {
             <Download size={14} />
             Import from Ignition
           </div>
+          {project?.studio5000?.enableMenuItems && project?.studio5000?.projectL5X && (
+            <div className="context-menu-item" onClick={handleOpenStudio5000Import}>
+              <FileCode size={14} />
+              Import from Studio 5000
+            </div>
+          )}
         </div>
       )}
 
@@ -449,6 +607,53 @@ export default function EngineeringView() {
                     <FolderNode key={i} node={f} depth={0} selected={selectedPaths} onToggle={handleTogglePath} />
                   ))}
                 </div>
+          )}
+        </Modal>
+      )}
+
+      {/* Studio 5000 import modal */}
+      {s5kModal && (
+        <Modal
+          title="Import from Studio 5000"
+          onClose={() => setS5kModal(null)}
+          width={500}
+          footer={
+            s5kModal.groups ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={handleSelectAllS5k}>All</button>
+                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={handleSelectNoneS5k}>None</button>
+                <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>
+                  {s5kSelected.size} of {s5kModal.groups.reduce((n, g) => n + g.instances.length, 0)} selected
+                </span>
+                <button className="btn btn-secondary" onClick={() => setS5kModal(null)}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  disabled={s5kSelected.size === 0}
+                  onClick={handleImportStudio5000}
+                >
+                  <Download size={13} /> Import
+                </button>
+              </div>
+            ) : (
+              <button className="btn btn-secondary" onClick={() => setS5kModal(null)}>Close</button>
+            )
+          }
+        >
+          {s5kModal.error && (
+            <div style={{ color: 'var(--danger)', fontSize: 13 }}>{s5kModal.error}</div>
+          )}
+          {s5kModal.groups && (
+            <div style={{ maxHeight: 440, overflowY: 'auto', overflowX: 'hidden' }}>
+              {s5kModal.groups.map((group, i) => (
+                <AOIGroup
+                  key={i}
+                  group={group}
+                  s5kSelected={s5kSelected}
+                  onToggleAOI={handleToggleS5kAOI}
+                  onToggleInstance={handleToggleS5kInstance}
+                />
+              ))}
+            </div>
           )}
         </Modal>
       )}
