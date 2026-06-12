@@ -28,13 +28,20 @@ export default function SettingsView() {
     name: project?.name || '',
     description: project?.description || '',
   });
-  const [studio5000, setStudio5000] = useState(
-    project?.studio5000 || { enableMenuItems: false, templateAOIs: {} }
-  );
-  const [templateListKey, setTemplateListKey] = useState(0); // force re-render on refresh
+  // studio5000 reads directly from project so it persists across view changes without Save
+  const studio5000 = project?.studio5000 || { enableMenuItems: false, templateAOIs: {} };
+  const updateStudio5000 = (updater) => {
+    if (!project) return;
+    updateProject(p => ({
+      ...p,
+      studio5000: typeof updater === 'function'
+        ? updater(p.studio5000 || { enableMenuItems: false, templateAOIs: {} })
+        : updater,
+    }));
+  };
+  const [templateListKey, setTemplateListKey] = useState(0);
   const studio5000FileRef = useRef(null);
   const [studio5000PendingTemplateId, setStudio5000PendingTemplateId] = useState(null);
-
   const [siemens, setSiemens] = useState(
     project?.siemens || {
       tiaVersion: 'V21',
@@ -78,7 +85,7 @@ export default function SettingsView() {
           description: projectDetails.description,
           engineering,
           siemens,
-          studio5000,
+          // studio5000 is written directly to project on change — no need to re-apply here
         });
       }
       if (config) {
@@ -622,7 +629,7 @@ export default function SettingsView() {
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>AOI File Mapping</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    Associate an Add-On Instruction L5X file with each template. Used when exporting to Studio 5000.
+                    Associate an Add-On Instruction L5X file with each template. Used when exporting to Rockwell Automation Studio 5000.
                   </div>
                 </div>
                 <button
@@ -656,7 +663,7 @@ export default function SettingsView() {
                       const def = doc.querySelector('AddOnInstructionDefinition');
                       if (def) aoiName = def.getAttribute('Name') || aoiName;
                     } catch (_) {}
-                    setStudio5000(prev => ({
+                    updateStudio5000(prev => ({
                       ...prev,
                       templateAOIs: {
                         ...prev.templateAOIs,
@@ -733,7 +740,7 @@ export default function SettingsView() {
                   type="checkbox"
                   id="enableStudio5000"
                   checked={studio5000.enableMenuItems || false}
-                  onChange={e => setStudio5000(prev => ({ ...prev, enableMenuItems: e.target.checked }))}
+                  onChange={e => updateStudio5000(prev => ({ ...prev, enableMenuItems: e.target.checked }))}
                   disabled={!project}
                 />
                 <label htmlFor="enableStudio5000" className="text-sm text-text-primary cursor-pointer">
