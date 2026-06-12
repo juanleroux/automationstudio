@@ -599,4 +599,33 @@ router.post('/snmp/set', (req, res) => {
   });
 });
 
+// ─── Ping (TCP connect — no root required, works across most firewalls) ──────
+// Tries a TCP connection on the given port (default 80).
+// ECONNREFUSED = host is alive (port closed but reachable).
+// Timeout / EHOSTUNREACH = host is unreachable.
+router.post('/ping', (req, res) => {
+  const { host, port = 80 } = req.body;
+  if (!host) return res.status(400).json({ error: 'Host required' });
+
+  const start  = Date.now();
+  const sock   = new net.Socket();
+  let settled  = false;
+
+  const done = (alive, message) => {
+    if (settled) return;
+    settled = true;
+    try { sock.destroy(); } catch {}
+    res.json({ alive, rtt: alive ? Date.now() - start : null, message });
+  };
+
+  sock.setTimeout(2500);
+  sock.once('connect',  ()    => done(true,  `Reachable (TCP:${port} open, ${Date.now() - start}ms)`));
+  sock.once('timeout',  ()    => done(false, 'No response (timed out)'));
+  sock.once('error',    (err) => {
+    if (err.code === 'ECONNREFUSED') done(true, `Reachable (TCP:${port} refused, ${Date.now() - start}ms)`);
+    else done(false, err.message);
+  });
+  sock.connect(Number(port), host);
+});
+
 module.exports = router;

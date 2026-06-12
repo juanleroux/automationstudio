@@ -51,6 +51,8 @@ export const connectS7        = (d) => api.post('/connections/s7/connect',      
 export const readS7           = (d) => api.post('/connections/s7/read',           d).then(r => r.data);
 export const disconnectS7     = (d) => api.post('/connections/s7/disconnect',     d).then(r => r.data);
 
+export const pingNode         = (d) => api.post('/connections/ping',              d).then(r => r.data);
+
 export const snmpWalk         = (d) => api.post('/connections/snmp/walk',         d).then(r => r.data);
 export const snmpGet          = (d) => api.post('/connections/snmp/get',          d).then(r => r.data);
 export const snmpSet          = (d) => api.post('/connections/snmp/set',          d).then(r => r.data);
