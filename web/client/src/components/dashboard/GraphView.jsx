@@ -11,8 +11,6 @@ const GOLDEN           = 2.39996; // golden angle (rad) for spiral instance plac
 const SPRING_LENS = {
   'project-tpl': 130,
   'tpl-inst':     65,
-  'inst-area':   105,
-  'area-area':    90,
 };
 
 const TEMPLATE_PALETTE = [
@@ -51,13 +49,10 @@ export default function GraphView({ templates, areas, counts, projectName }) {
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
 
   // ── Filter active nodes ───────────────────────────────────────────────────
-  const { activeTemplates, activeAreas } = useMemo(() => {
-    const allInst        = templates.flatMap(t => t.instances || []);
-    const activeTemplates = templates.filter(t => (t.instances?.length || 0) > 0);
-    const activeAreaIds  = new Set(allInst.map(i => i.areaId).filter(Boolean));
-    const activeAreas    = areas.filter(a => activeAreaIds.has(a.id));
-    return { activeTemplates, activeAreas };
-  }, [templates, areas]);
+  const activeTemplates = useMemo(
+    () => templates.filter(t => (t.instances?.length || 0) > 0),
+    [templates],
+  );
 
   // ── Build initial layout ──────────────────────────────────────────────────
   const { initNodes, initEdges } = useMemo(() => {
@@ -116,39 +111,9 @@ export default function GraphView({ templates, areas, counts, projectName }) {
       });
     });
 
-    // ── Areas on outer ring ───────────────────────────────────────────────
-    const activeAreaSet = new Set(activeAreas.map(a => a.id));
-    activeAreas.forEach((a, i) => {
-      const ang = (i / Math.max(1, activeAreas.length)) * Math.PI * 2;
-      initNodes.push({
-        id: `a_${a.id}`, type: 'area', label: a.name,
-        x: Math.cos(ang) * 300 + (Math.random() - 0.5) * 20,
-        y: Math.sin(ang) * 300 + (Math.random() - 0.5) * 20,
-        vx: 0, vy: 0, pinned: false, color: '#e8a23a', meta: {},
-      });
-    });
-
-    // Instance → Area edges
-    activeTemplates.forEach(t => {
-      (t.instances || []).forEach(inst => {
-        if (inst.areaId && activeAreaSet.has(inst.areaId)) {
-          initEdges.push({ from: `i_${inst.id}`, to: `a_${inst.areaId}`, kind: 'inst-area' });
-          bump(`i_${inst.id}`); bump(`a_${inst.areaId}`);
-        }
-      });
-    });
-
-    // Area → parent area (only if parent is also active)
-    activeAreas.forEach(a => {
-      if (a.parentId && activeAreaSet.has(a.parentId)) {
-        initEdges.push({ from: `a_${a.id}`, to: `a_${a.parentId}`, kind: 'area-area' });
-        bump(`a_${a.id}`); bump(`a_${a.parentId}`);
-      }
-    });
-
     initNodes.forEach(n => { n.r = nodeRadius(n.type, connCount[n.id] || 0); });
     return { initNodes, initEdges };
-  }, [activeTemplates, activeAreas, projectName]);
+  }, [activeTemplates, projectName]);
 
   // ── Reinit simulation when graph topology changes ─────────────────────────
   useEffect(() => {
@@ -363,7 +328,6 @@ export default function GraphView({ templates, areas, counts, projectName }) {
         { color: PROJECT_COLOR,        label: 'Project',   count: undefined },
         { color: TEMPLATE_PALETTE[0],  label: 'Templates', count: c?.templateCount },
         { color: '#888888',            label: 'Instances', count: c?.instanceCount },
-        { color: '#e8a23a',            label: 'Areas',     count: c?.areaCount     },
       ];
       const LX = 14, LY_BOT = h - 14;
       const ROW_H = 22, PAD = 10, ITEM_W = 144;
