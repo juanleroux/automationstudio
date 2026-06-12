@@ -1,9 +1,78 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const execAsync = promisify(exec);
+const http = require('http'); // Docker socket API
+
+// ── Docker socket helpers ─────────────────────────────────────────────────────
+const DOCKER_SOCK = '/var/run/docker.sock';
+
+function dockerGet(path) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ socketPath: DOCKER_SOCK, path, method: 'GET' }, (res) => {
+      let body = '';
+      res.on('data', c => { body += c; });
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch { resolve({ status: res.statusCode, data: body }); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function dockerPost(path, payload) {
+  const bodyStr = JSON.stringify(payload);
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      socketPath: DOCKER_SOCK, path, method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) },
+    }, (res) => {
+      let body = '';
+      res.on('data', c => { body += c; });
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch { resolve({ status: res.statusCode, data: body }); }
+      });
+    });
+    req.on('error', reject);
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
+// Run exec and capture output via multiplexed Docker stream
+function dockerExecAttached(execId) {
+  const bodyStr = '{"Detach":false,"Tty":false}';
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      socketPath: DOCKER_SOCK,
+      path: `/exec/${execId}/start`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        // Docker multiplexed stream: 8-byte header [stream(1), 0,0,0, size(4BE)] + payload
+        const buf = Buffer.concat(chunks);
+        let output = '';
+        let offset = 0;
+        while (offset + 8 <= buf.length) {
+          const size = buf.readUInt32BE(offset + 4);
+          offset += 8;
+          if (offset + size > buf.length) break;
+          output += buf.slice(offset, offset + size).toString('utf8');
+          offset += size;
+        }
+        resolve(output.trim());
+      });
+    });
+    req.on('error', reject);
+    req.write(bodyStr);
+    req.end();
+  });
+}
 
 function normalizeUrl(gatewayUrl) {
   return (gatewayUrl || '').trim().replace(/\/+$/, '');
@@ -156,43 +225,62 @@ router.post('/test', async (req, res) => {
 // POST /api/ignition/reset-password — run gwcmd.sh -p inside the Ignition Docker container
 router.post('/reset-password', async (req, res) => {
   try {
-    // Find the Ignition container
-    const { stdout: psOut } = await execAsync('docker ps --format "{{.Names}}"', { timeout: 10000 });
-    const containers = psOut.trim().split('\n').filter(Boolean);
-    const container = containers.find(c => c.toLowerCase().includes('ignition'));
+    // List running containers via Docker socket
+    const listRes = await dockerGet('/containers/json');
+    if (listRes.status !== 200) {
+      return res.status(502).json({ error: `Docker socket error ${listRes.status}: ${JSON.stringify(listRes.data)}` });
+    }
+    const containers = listRes.data;
+    const container = containers.find(c =>
+      (c.Names || []).some(n => n.toLowerCase().includes('ignition'))
+    );
     if (!container) {
-      const list = containers.length ? containers.join(', ') : '(none running)';
-      return res.status(404).json({ error: `No Ignition container found. Running containers: ${list}` });
+      const names = containers.flatMap(c => c.Names || []).join(', ') || '(none running)';
+      return res.status(404).json({ error: `No Ignition container found. Running containers: ${names}` });
     }
 
-    console.log('[Ignition reset-password] using container:', container);
+    const containerId = container.Id;
+    const containerName = (container.Names[0] || containerId).replace(/^\//, '');
+    console.log('[Ignition reset-password] using container:', containerName);
 
-    // Locate gwcmd.sh — try known path first, fall back to find
+    // Locate gwcmd.sh — check known path first, fall back to find
     let gwcmdPath = '/usr/local/bin/ignition/gwcmd.sh';
-    try {
-      await execAsync(`docker exec ${container} test -f "${gwcmdPath}"`, { timeout: 10000 });
-    } catch {
-      const { stdout: findOut } = await execAsync(
-        `docker exec ${container} find / -name "gwcmd.sh" 2>/dev/null | head -1`,
-        { timeout: 20000 }
-      );
-      gwcmdPath = findOut.trim();
-      if (!gwcmdPath) {
-        return res.status(404).json({ error: `gwcmd.sh not found in container "${container}"` });
+    const testExec = await dockerPost(`/containers/${containerId}/exec`, {
+      AttachStdout: true, AttachStderr: true,
+      Cmd: ['test', '-f', gwcmdPath],
+    });
+    const testId = testExec.data?.Id;
+    if (testId) {
+      await dockerPost(`/exec/${testId}/start`, { Detach: false, Tty: false });
+      const inspectRes = await dockerGet(`/exec/${testId}/json`);
+      if (inspectRes.data?.ExitCode !== 0) {
+        // Not found at known path — search for it
+        const findExec = await dockerPost(`/containers/${containerId}/exec`, {
+          AttachStdout: true, AttachStderr: true,
+          Cmd: ['find', '/', '-name', 'gwcmd.sh', '-maxdepth', '8'],
+        });
+        const findOutput = await dockerExecAttached(findExec.data.Id);
+        gwcmdPath = findOutput.split('\n').find(l => l.trim()) || '';
+        if (!gwcmdPath) {
+          return res.status(404).json({ error: `gwcmd.sh not found in container "${containerName}"` });
+        }
       }
     }
 
     console.log('[Ignition reset-password] gwcmd path:', gwcmdPath);
 
     // Execute the password reset
-    const { stdout, stderr } = await execAsync(
-      `docker exec ${container} "${gwcmdPath}" -p`,
-      { timeout: 30000 }
-    );
+    const resetExec = await dockerPost(`/containers/${containerId}/exec`, {
+      AttachStdout: true, AttachStderr: true,
+      Cmd: [gwcmdPath, '-p'],
+    });
+    if (!resetExec.data?.Id) {
+      return res.status(502).json({ error: 'Failed to create exec instance', detail: resetExec.data });
+    }
 
-    const output = (stdout + stderr).trim();
+    const output = await dockerExecAttached(resetExec.data.Id);
     console.log('[Ignition reset-password] output:', output);
-    return res.json({ success: true, container, gwcmdPath, output });
+    return res.json({ success: true, container: containerName, gwcmdPath, output });
   } catch (err) {
     console.error('[Ignition reset-password] error:', err.message);
     return res.status(500).json({ error: err.message });
