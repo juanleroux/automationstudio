@@ -250,11 +250,13 @@ function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown })
 function LevelBands() {
   return (
     <>
-      {LEVELS.map(lv => {
+      {LEVELS.map((lv, i) => {
         const y = levelY(lv.id);
+        // The bottom-most band extends far down so panning never reveals a blank strip
+        const h = i === LEVELS.length - 1 ? 99999 : LEVEL_H;
         return (
           <g key={lv.id}>
-            <rect x={0} y={y} width={SVG_W} height={LEVEL_H} fill={lv.bg} />
+            <rect x={0} y={y} width={SVG_W} height={h} fill={lv.bg} />
             <rect x={0} y={y} width={LABEL_W} height={LEVEL_H} fill={lv.color} />
             <text
               x={LABEL_W / 2} y={y + 22}
@@ -821,7 +823,7 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
             ref={svgRef}
             width="100%"
             height="100%"
-            style={{ display: 'block', cursor: panRef.current?.moved ? 'grabbing' : tool === 'connect' ? 'crosshair' : 'default' }}
+            style={{ display: 'block', background: 'var(--bg-main)', cursor: panRef.current?.moved ? 'grabbing' : tool === 'connect' ? 'crosshair' : 'default' }}
             onPointerDown={handleSvgPointerDown}
             onPointerMove={(e) => { handleSvgPointerMove(e); handleNodePointerMove(e); }}
             onPointerUp={(e) => { handleSvgPointerUp(e); handleNodePointerUp(e); }}
