@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { pingNode } from '../../api/client';
+import ColorPicker from '../shared/ColorPicker';
 
 const LEVELS = [
   { id: 5, label: 'Level 5', title: 'Cloud / Enterprise',    desc: 'Enterprise Information Network',       color: '#1e3a5f', bg: 'rgba(30,58,95,0.07)'   },
@@ -171,9 +172,9 @@ function ConnectionPath({ conn, nodes, selected, onPointerDown }) {
 }
 
 function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown }) {
-  const color     = NODE_TYPES[node.type]?.color ?? '#6b7280';
+  const color     = node.color ?? NODE_TYPES[node.type]?.color ?? '#6b7280';
   const ringColor = isConnectFrom ? '#f59e0b' : selected ? 'var(--accent)' : 'transparent';
-  const IconComp  = NODE_ICON[node.type] ?? LayoutGrid;
+  const IconComp  = NODE_ICON[node.icon ?? node.type] ?? LayoutGrid;
   const iconX     = (NODE_W - 20) / 2;
 
   return (
@@ -297,11 +298,14 @@ export default function TopologyView() {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [pingState, setPingState] = useState({ status: 'idle', rtt: null, message: '' });
   const [contextMenu, setContextMenu] = useState(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [iconPickerOpen, setIconPickerOpen]   = useState(false);
 
-  const svgRef      = useRef(null);
-  const addBtnRef   = useRef(null);
-  const dragRef     = useRef(null);
-  const panRef      = useRef(null);
+  const svgRef         = useRef(null);
+  const addBtnRef      = useRef(null);
+  const dragRef        = useRef(null);
+  const panRef         = useRef(null);
+  const colorSwatchRef = useRef(null);
 
   const selectedNode = selected?.type === 'node' ? nodes.find(n => n.id === selected.id) : null;
   const selectedConn = selected?.type === 'conn' ? connections.find(c => c.id === selected.id) : null;
@@ -309,6 +313,8 @@ export default function TopologyView() {
 
   useEffect(() => {
     setPingState({ status: 'idle', rtt: null, message: '' });
+    setColorPickerOpen(false);
+    setIconPickerOpen(false);
   }, [selected?.id]);
 
   const handlePing = useCallback(async () => {
@@ -380,6 +386,7 @@ export default function TopologyView() {
     }
     const newNode = {
       id: uid(), type, level: lvl, name: type,
+      icon: type, color: null,
       description: '', ipAddress: '', vendor: '', model: '', notes: '', x, y,
     };
     updateTopology(t => ({ ...t, nodes: [...(t.nodes ?? []), newNode] }));
@@ -547,6 +554,7 @@ export default function TopologyView() {
     const dismiss = (e) => {
       setAddMenuOpen(false);
       if (!e.target.closest?.('[data-context-menu]')) setContextMenu(null);
+      if (!e.target.closest?.('[data-icon-picker]'))  setIconPickerOpen(false);
     };
     document.addEventListener('mousedown', dismiss);
     return () => document.removeEventListener('mousedown', dismiss);
@@ -830,17 +838,106 @@ export default function TopologyView() {
 
             {/* Panel body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-              {selectedNode && (
+              {selectedNode && (() => {
+                const nodeColor   = selectedNode.color ?? NODE_TYPES[selectedNode.type]?.color ?? '#6b7280';
+                const nodeIconKey = selectedNode.icon ?? selectedNode.type ?? 'Custom';
+                const NodeIconComp = NODE_ICON[nodeIconKey] ?? LayoutGrid;
+                return (
                 <>
-                  <PropField label="Type">
-                    <select
-                      value={selectedNode.type}
-                      onChange={e => updateNode(selectedNode.id, { type: e.target.value })}
-                      style={inputStyle}
+                  {/* Icon picker */}
+                  <PropField label="Icon">
+                    <button
+                      data-icon-picker="toggle"
+                      onClick={() => setIconPickerOpen(o => !o)}
+                      style={{
+                        ...inputStyle,
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        cursor: 'pointer', background: nodeColor,
+                        color: 'white', fontWeight: 600,
+                        border: '1px solid transparent',
+                      }}
                     >
-                      {Object.keys(NODE_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                      <NodeIconComp size={14} strokeWidth={2} />
+                      <span style={{ flex: 1, textAlign: 'left' }}>{nodeIconKey}</span>
+                      <ChevronDown size={12} />
+                    </button>
+                    {iconPickerOpen && (
+                      <div
+                        data-icon-picker="grid"
+                        style={{
+                          marginTop: 4,
+                          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3,
+                          background: 'var(--bg-main)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 6, padding: 6,
+                          maxHeight: 220, overflowY: 'auto',
+                        }}
+                      >
+                        {Object.entries(NODE_ICON).map(([key, Ic]) => (
+                          <button
+                            key={key}
+                            title={key}
+                            onClick={() => { updateNode(selectedNode.id, { icon: key }); setIconPickerOpen(false); }}
+                            style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                              padding: '6px 2px', borderRadius: 5,
+                              background: nodeIconKey === key ? 'var(--accent-bg)' : 'transparent',
+                              border: nodeIconKey === key ? '1px solid var(--accent)' : '1px solid transparent',
+                              cursor: 'pointer',
+                              color: nodeIconKey === key ? 'var(--accent)' : 'var(--text-muted)',
+                            }}
+                            onMouseEnter={e => { if (nodeIconKey !== key) e.currentTarget.style.background = 'var(--bg-surface)'; }}
+                            onMouseLeave={e => { if (nodeIconKey !== key) e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <Ic size={15} strokeWidth={2} />
+                            <span style={{ fontSize: 8, textAlign: 'center', lineHeight: 1.1, wordBreak: 'break-word' }}>{key}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </PropField>
+
+                  {/* Colour picker */}
+                  <PropField label="Colour">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        ref={colorSwatchRef}
+                        onClick={() => setColorPickerOpen(o => !o)}
+                        title="Pick colour"
+                        style={{
+                          width: 30, height: 30, borderRadius: 6, flexShrink: 0,
+                          background: nodeColor,
+                          border: '2px solid var(--border)',
+                          cursor: 'pointer',
+                        }}
+                      />
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace', flex: 1 }}>
+                        {nodeColor}
+                      </span>
+                      {selectedNode.color && (
+                        <button
+                          onClick={() => updateNode(selectedNode.id, { color: null })}
+                          title="Reset to default"
+                          style={{
+                            fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                            background: 'transparent', border: '1px solid var(--border)',
+                            color: 'var(--text-muted)', cursor: 'pointer',
+                          }}
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                    {colorPickerOpen && (
+                      <ColorPicker
+                        value={nodeColor}
+                        onChange={hex => updateNode(selectedNode.id, { color: hex })}
+                        anchorRef={colorSwatchRef}
+                        onClose={() => setColorPickerOpen(false)}
+                      />
+                    )}
+                  </PropField>
+
                   <PropField label="Name">
                     <input
                       type="text"
@@ -952,7 +1049,8 @@ export default function TopologyView() {
                     <Trash2 size={13} /> Delete Node
                   </button>
                 </>
-              )}
+                );
+              })()}
 
               {selectedConn && (() => {
                 const fromN = nodes.find(n => n.id === selectedConn.fromId);
