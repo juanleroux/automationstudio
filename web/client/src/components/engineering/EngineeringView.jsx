@@ -448,7 +448,10 @@ export default function EngineeringView() {
   const handleOpenStudio5000Import = useCallback(() => {
     setCtxMenu(null);
     const content = project?.studio5000?.projectL5X?.content;
-    if (!content) return;
+    if (!content) {
+      toast.error('No Studio 5000 project file set — configure it in Settings → Studio 5000');
+      return;
+    }
     try {
       const groups = parseProjectL5X(content);
       if (!groups.length) {
@@ -551,10 +554,17 @@ export default function EngineeringView() {
             <Download size={14} />
             Import from Ignition
           </div>
-          {project?.studio5000?.enableMenuItems && project?.studio5000?.projectL5X && (
-            <div className="context-menu-item" onClick={handleOpenStudio5000Import}>
+          {project?.studio5000?.enableMenuItems && (
+            <div
+              className="context-menu-item"
+              style={!project?.studio5000?.projectL5X ? { opacity: 0.45 } : {}}
+              onClick={handleOpenStudio5000Import}
+            >
               <FileCode size={14} />
               Import from Studio 5000
+              {!project?.studio5000?.projectL5X && (
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>(no file set)</span>
+              )}
             </div>
           )}
         </div>
