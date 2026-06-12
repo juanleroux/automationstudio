@@ -44,6 +44,31 @@ const CONNECTION_TYPES = [
   'Wireless HART', 'ISA100 Wireless', 'Serial (RS-232/485)', 'Custom',
 ];
 
+// stroke-dasharray and width per connection type (undefined = solid)
+const CONN_STYLE = {
+  'Ethernet':              { dash: null,          w: 2   },
+  'Ethernet/IP':           { dash: null,          w: 2   },
+  'Profinet':              { dash: '8 3',         w: 2   },
+  'Profibus':              { dash: '8 3',         w: 1.5 },
+  'Modbus TCP':            { dash: '5 4',         w: 1.5 },
+  'Modbus Serial':         { dash: '4 2 1 2',     w: 1.5 },
+  'Modbus RTU':            { dash: '4 2 1 2',     w: 1.5 },
+  'Fieldbus':              { dash: '6 3',         w: 1.5 },
+  'Foundation Fieldbus':   { dash: '6 3',         w: 2   },
+  'ASi (AS-Interface)':    { dash: '2 3',         w: 1.5 },
+  'OPC UA':                { dash: '10 4',        w: 2   },
+  'OPC DA':                { dash: '10 4',        w: 1.5 },
+  'MQTT':                  { dash: '3 4',         w: 1.5 },
+  'HART':                  { dash: '1 4',         w: 1.5 },
+  'DeviceNet':             { dash: '5 2',         w: 1.5 },
+  'DNP3':                  { dash: '7 3',         w: 1.5 },
+  'IEC 61850':             { dash: '12 3',        w: 2   },
+  'Wireless HART':         { dash: '1 5 6 5',     w: 1.5 },
+  'ISA100 Wireless':       { dash: '1 5 9 5',     w: 1.5 },
+  'Serial (RS-232/485)':   { dash: '2 5',         w: 1.5 },
+  'Custom':                { dash: '3 3 1 3',     w: 1.5 },
+};
+
 const LEVEL_H = 130;
 const LABEL_W = 90;
 const NODE_W  = 84;
@@ -68,7 +93,7 @@ function abbrev(type) {
   return type.slice(0, 6).toUpperCase();
 }
 
-function ConnectionPath({ conn, nodes, selected, onClick }) {
+function ConnectionPath({ conn, nodes, selected, onPointerDown }) {
   const from = nodes.find(n => n.id === conn.fromId);
   const to   = nodes.find(n => n.id === conn.toId);
   if (!from || !to) return null;
@@ -86,32 +111,35 @@ function ConnectionPath({ conn, nodes, selected, onClick }) {
   const midX = fc.x + dx * 0.5;
   const midY = fc.y + dy * 0.5;
 
+  const style = CONN_STYLE[conn.protocol] ?? { dash: null, w: 1.5 };
+  const strokeW = selected ? Math.max(style.w, 2) : style.w;
+  const dash    = selected ? null : style.dash;
+
+  const label = conn.name || conn.protocol || null;
+
   return (
-    <g onClick={onClick} style={{ cursor: 'pointer' }}>
-      <path
-        d={d}
-        fill="none"
-        stroke="transparent"
-        strokeWidth={12}
-      />
+    <g data-conn={conn.id} onPointerDown={onPointerDown} style={{ cursor: 'pointer' }}>
+      {/* wide transparent hit area */}
+      <path d={d} fill="none" stroke="transparent" strokeWidth={14} />
       <path
         d={d}
         fill="none"
         stroke={selected ? 'var(--accent)' : 'var(--text-muted)'}
-        strokeWidth={selected ? 2 : 1.5}
-        strokeOpacity={selected ? 1 : 0.7}
+        strokeWidth={strokeW}
+        strokeOpacity={selected ? 1 : 0.75}
+        strokeDasharray={dash ?? undefined}
         markerEnd={`url(#arrow${selected ? '-sel' : ''})`}
       />
-      {conn.protocol && (
+      {label && (
         <text
           x={midX}
-          y={midY - 6}
+          y={midY - 7}
           textAnchor="middle"
           fontSize={9}
           fill={selected ? 'var(--accent)' : 'var(--text-muted)'}
           style={{ pointerEvents: 'none', userSelect: 'none' }}
         >
-          {conn.protocol}
+          {label}
         </text>
       )}
     </g>
@@ -346,7 +374,7 @@ export default function TopologyView() {
   }, [pan, zoom]);
 
   const handleSvgPointerDown = useCallback((e) => {
-    if (e.target !== svgRef.current && e.target.closest('[data-node]')) return;
+    if (e.target !== svgRef.current && (e.target.closest('[data-node]') || e.target.closest('[data-conn]'))) return;
     if (e.button !== 0) return;
     panRef.current = {
       startX: e.clientX,
@@ -637,7 +665,11 @@ export default function TopologyView() {
                   conn={conn}
                   nodes={nodes}
                   selected={selected?.type === 'conn' && selected.id === conn.id}
-                  onClick={(e) => { e.stopPropagation(); setSelected({ type: 'conn', id: conn.id }); }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    if (e.button !== 0) return;
+                    setSelected({ type: 'conn', id: conn.id });
+                  }}
                 />
               ))}
 
