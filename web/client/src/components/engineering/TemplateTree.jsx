@@ -10,6 +10,7 @@ import { uploadToIgnition } from '../../api/client';
 import { exportFromIgnition } from '../../api/client';
 import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
+import { downloadStudio5000Routine } from '../../utils/studio5000Export';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
 
@@ -1017,6 +1018,30 @@ export default function TemplateTree({ selected, onSelect }) {
                       <Upload size={14} /> Upload to Ignition
                     </div>
                   )}
+                  {project?.studio5000?.enableMenuItems && (() => {
+                    const t = templates.find(x => x.id === contextMenu.templateId);
+                    const aoiConfig = project?.studio5000?.templateAOIs?.[contextMenu.templateId];
+                    const hasInstances = (t?.instances?.length || 0) > 0;
+                    return (
+                      <div
+                        className="context-menu-item"
+                        style={{ opacity: (!aoiConfig || !hasInstances) ? 0.4 : 1, pointerEvents: (!aoiConfig || !hasInstances) ? 'none' : 'auto' }}
+                        title={!aoiConfig ? 'Configure AOI file in Settings → Studio 5000' : !hasInstances ? 'No instances to export' : ''}
+                        onClick={() => {
+                          if (!t || !aoiConfig) return;
+                          try {
+                            downloadStudio5000Routine({ template: t, aoiConfig });
+                            toast.success(`Exported ${t.name} routine (${t.instances?.length || 0} rungs)`);
+                          } catch (err) {
+                            toast.error('Export failed: ' + err.message);
+                          }
+                          setContextMenu(null);
+                        }}
+                      >
+                        <Download size={14} /> Export to Studio 5000
+                      </div>
+                    );
+                  })()}
                   {/* Profile data exports (run each configured profile format) */}
                   {(() => {
                     const t = templates.find(x => x.id === contextMenu.templateId);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw } from 'lucide-react';
 import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,6 +28,13 @@ export default function SettingsView() {
     name: project?.name || '',
     description: project?.description || '',
   });
+  const [studio5000, setStudio5000] = useState(
+    project?.studio5000 || { enableMenuItems: false, templateAOIs: {} }
+  );
+  const [templateListKey, setTemplateListKey] = useState(0); // force re-render on refresh
+  const studio5000FileRef = useRef(null);
+  const [studio5000PendingTemplateId, setStudio5000PendingTemplateId] = useState(null);
+
   const [siemens, setSiemens] = useState(
     project?.siemens || {
       tiaVersion: 'V21',
@@ -71,6 +78,7 @@ export default function SettingsView() {
           description: projectDetails.description,
           engineering,
           siemens,
+          studio5000,
         });
       }
       if (config) {
@@ -162,6 +170,7 @@ export default function SettingsView() {
     { id: 'general', label: 'General', icon: SlidersHorizontal },
     { id: 'engineering', label: 'Ignition API', icon: Zap },
     { id: 'siemens', label: 'Siemens API', icon: Cpu },
+    { id: 'studio5000', label: 'Studio 5000', icon: FileCode },
     { id: 'company', label: 'Company', icon: Building2 },
   ];
 
@@ -597,6 +606,145 @@ export default function SettingsView() {
                   </label>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Studio 5000 tab */}
+          {activeTab === 'studio5000' && (
+            <div className="flex flex-col gap-4">
+              {!project && (
+                <div className="p-3 rounded-md text-sm text-yellow-400" style={{ background: 'rgba(255,193,7,0.1)', border: '1px solid rgba(255,193,7,0.2)' }}>
+                  Open a project to configure Studio 5000 settings
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>AOI File Mapping</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Associate an Add-On Instruction L5X file with each template. Used when exporting to Studio 5000.
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: 12, gap: 6, flexShrink: 0 }}
+                  onClick={() => setTemplateListKey(k => k + 1)}
+                  disabled={!project}
+                  title="Refresh template list"
+                >
+                  <RotateCw size={13} /> Refresh
+                </button>
+              </div>
+
+              {/* Hidden file input for AOI browsing */}
+              <input
+                ref={studio5000FileRef}
+                type="file"
+                accept=".L5X,.l5x"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file || studio5000PendingTemplateId == null) return;
+                  const reader = new FileReader();
+                  reader.onload = ev => {
+                    const content = ev.target.result;
+                    // Parse AOI name from XML
+                    let aoiName = file.name.replace(/\.l5x$/i, '');
+                    try {
+                      const parser = new DOMParser();
+                      const doc = parser.parseFromString(content, 'application/xml');
+                      const def = doc.querySelector('AddOnInstructionDefinition');
+                      if (def) aoiName = def.getAttribute('Name') || aoiName;
+                    } catch (_) {}
+                    setStudio5000(prev => ({
+                      ...prev,
+                      templateAOIs: {
+                        ...prev.templateAOIs,
+                        [studio5000PendingTemplateId]: { fileName: file.name, aoiName, content },
+                      },
+                    }));
+                    toast.success(`AOI "${aoiName}" linked to template`);
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                  setStudio5000PendingTemplateId(null);
+                }}
+              />
+
+              {/* Template table */}
+              <div key={templateListKey} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Template</th>
+                      <th>AOI File</th>
+                      <th>AOI Name</th>
+                      <th style={{ width: 90 }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project && (project.templates || []).length === 0 && (
+                      <tr>
+                        <td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>
+                          No templates defined — create templates in Assets first
+                        </td>
+                      </tr>
+                    )}
+                    {!project && (
+                      <tr>
+                        <td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>
+                          Open a project to see templates
+                        </td>
+                      </tr>
+                    )}
+                    {(project?.templates || []).map(t => {
+                      const aoi = studio5000.templateAOIs?.[t.id];
+                      return (
+                        <tr key={t.id}>
+                          <td style={{ fontWeight: 500, fontSize: 13 }}>{t.name}</td>
+                          <td style={{ fontSize: 12, color: aoi ? 'var(--text-primary)' : 'var(--text-disabled)' }}>
+                            {aoi?.fileName || 'Not configured'}
+                          </td>
+                          <td style={{ fontSize: 12, color: aoi ? 'var(--accent)' : 'var(--text-disabled)' }}>
+                            {aoi?.aoiName || '—'}
+                          </td>
+                          <td>
+                            <button
+                              className="btn btn-ghost"
+                              style={{ fontSize: 11, padding: '3px 8px' }}
+                              disabled={!project}
+                              onClick={() => {
+                                setStudio5000PendingTemplateId(t.id);
+                                studio5000FileRef.current?.click();
+                              }}
+                            >
+                              {aoi ? 'Change' : 'Browse…'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+                <input
+                  type="checkbox"
+                  id="enableStudio5000"
+                  checked={studio5000.enableMenuItems || false}
+                  onChange={e => setStudio5000(prev => ({ ...prev, enableMenuItems: e.target.checked }))}
+                  disabled={!project}
+                />
+                <label htmlFor="enableStudio5000" className="text-sm text-text-primary cursor-pointer">
+                  Enable Studio 5000 Menu Items
+                </label>
+              </div>
+              {studio5000.enableMenuItems && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -8, paddingLeft: 22 }}>
+                  Adds "Export to Studio 5000" to the template right-click menu in Assets. Requires an AOI file to be configured for the template.
+                </div>
+              )}
             </div>
           )}
 
