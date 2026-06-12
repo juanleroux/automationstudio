@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
 function normalizeUrl(gatewayUrl) {
   return (gatewayUrl || '').trim().replace(/\/+$/, '');
@@ -147,6 +150,52 @@ router.post('/test', async (req, res) => {
     } else {
       res.status(502).json({ error: err.message });
     }
+  }
+});
+
+// POST /api/ignition/reset-password — run gwcmd.sh -p inside the Ignition Docker container
+router.post('/reset-password', async (req, res) => {
+  try {
+    // Find the Ignition container
+    const { stdout: psOut } = await execAsync('docker ps --format "{{.Names}}"', { timeout: 10000 });
+    const containers = psOut.trim().split('\n').filter(Boolean);
+    const container = containers.find(c => c.toLowerCase().includes('ignition'));
+    if (!container) {
+      const list = containers.length ? containers.join(', ') : '(none running)';
+      return res.status(404).json({ error: `No Ignition container found. Running containers: ${list}` });
+    }
+
+    console.log('[Ignition reset-password] using container:', container);
+
+    // Locate gwcmd.sh — try known path first, fall back to find
+    let gwcmdPath = '/usr/local/bin/ignition/gwcmd.sh';
+    try {
+      await execAsync(`docker exec ${container} test -f "${gwcmdPath}"`, { timeout: 10000 });
+    } catch {
+      const { stdout: findOut } = await execAsync(
+        `docker exec ${container} find / -name "gwcmd.sh" 2>/dev/null | head -1`,
+        { timeout: 20000 }
+      );
+      gwcmdPath = findOut.trim();
+      if (!gwcmdPath) {
+        return res.status(404).json({ error: `gwcmd.sh not found in container "${container}"` });
+      }
+    }
+
+    console.log('[Ignition reset-password] gwcmd path:', gwcmdPath);
+
+    // Execute the password reset
+    const { stdout, stderr } = await execAsync(
+      `docker exec ${container} "${gwcmdPath}" -p`,
+      { timeout: 30000 }
+    );
+
+    const output = (stdout + stderr).trim();
+    console.log('[Ignition reset-password] output:', output);
+    return res.json({ success: true, container, gwcmdPath, output });
+  } catch (err) {
+    console.error('[Ignition reset-password] error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 

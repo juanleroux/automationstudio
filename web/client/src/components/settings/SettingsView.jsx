@@ -4,7 +4,7 @@ import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, testIgnitionConnection } from '../../api/client';
+import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword } from '../../api/client';
 
 export default function SettingsView() {
   const { project, updateProject } = useProject();
@@ -39,6 +39,8 @@ export default function SettingsView() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const tiaProjectFileRef = useRef(null);
 
   useEffect(() => {
@@ -95,6 +97,19 @@ export default function SettingsView() {
       setSiemensTestResult({ success: false, message: err.response?.data?.error || err.message });
     } finally {
       setSiemensTesting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    setConfirmReset(false);
+    setResetting(true);
+    try {
+      const result = await resetIgnitionPassword();
+      toast.success(`Password reset complete (container: ${result.container})`);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err.message);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -353,6 +368,50 @@ export default function SettingsView() {
                 <label htmlFor="enableIgnition" className="text-sm text-text-primary cursor-pointer">
                   Enable Ignition Menu Items
                 </label>
+              </div>
+
+              {/* Danger zone */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+                <div style={{ border: '1px solid rgba(229,83,83,0.35)', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 14px', background: 'rgba(229,83,83,0.06)', borderBottom: '1px solid rgba(229,83,83,0.2)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--danger)', marginBottom: 2 }}>Danger Zone</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>These actions are irreversible and affect the running Ignition instance.</div>
+                  </div>
+                  <div style={{ padding: '14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 3 }}>Reset Administrator Password</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        Runs <code style={{ fontSize: 11, background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: 3 }}>gwcmd.sh -p</code> inside
+                        the Ignition Docker container to reset the admin account password to the factory default.
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-danger"
+                      style={{ flexShrink: 0, fontSize: 12 }}
+                      onClick={() => setConfirmReset(true)}
+                      disabled={resetting}
+                    >
+                      {resetting ? 'Resetting…' : 'Reset Password'}
+                    </button>
+                  </div>
+
+                  {confirmReset && (
+                    <div style={{ margin: '0 14px 14px', padding: '12px 14px', background: 'var(--danger-bg)', border: '1px solid rgba(229,83,83,0.4)', borderRadius: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--danger)', marginBottom: 6 }}>
+                        Are you sure?
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.55 }}>
+                        This will immediately reset the Ignition administrator account password to the factory default by
+                        executing <code style={{ fontSize: 11, background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: 3 }}>gwcmd.sh -p</code> in
+                        the running container. You will need to log back in to Ignition afterwards.
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setConfirmReset(false)}>Cancel</button>
+                        <button className="btn btn-danger" style={{ fontSize: 12 }} onClick={handleResetPassword}>Yes, reset password</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
