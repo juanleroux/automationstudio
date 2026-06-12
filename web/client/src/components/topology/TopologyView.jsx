@@ -2,7 +2,10 @@ import React, {
   useState, useRef, useEffect, useCallback, useId,
 } from 'react';
 import {
-  Plus, Trash2, X, Link2, MousePointer, ChevronDown, Wifi, WifiOff, Loader,
+  Plus, Trash2, X, Link2, MousePointer, ChevronDown, Wifi, WifiOff, Loader, Printer,
+  Cpu, Radio, Sliders, Box, Monitor, LayoutDashboard, Database, Building2,
+  Server as ServerIcon, Laptop, Network, Shield, Activity,
+  Settings as SettingsIcon, Plug, Cloud as CloudIcon, BarChart2, LayoutGrid,
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { pingNode } from '../../api/client';
@@ -35,6 +38,27 @@ const NODE_TYPES = {
   Cloud:       { color: '#334155', defaultLevel: 5 },
   ERP:         { color: '#166534', defaultLevel: 4 },
   Custom:      { color: '#6b7280', defaultLevel: 2 },
+};
+
+const NODE_ICON = {
+  PLC:         Cpu,
+  RTU:         Radio,
+  DCS:         Sliders,
+  PAC:         Box,
+  HMI:         Monitor,
+  SCADA:       LayoutDashboard,
+  Historian:   Database,
+  MES:         Building2,
+  Server:      ServerIcon,
+  Workstation: Laptop,
+  Switch:      Network,
+  Firewall:    Shield,
+  Sensor:      Activity,
+  Actuator:    SettingsIcon,
+  'I/O Card':  Plug,
+  Cloud:       CloudIcon,
+  ERP:         BarChart2,
+  Custom:      LayoutGrid,
 };
 
 const CONNECTION_TYPES = [
@@ -147,11 +171,14 @@ function ConnectionPath({ conn, nodes, selected, onPointerDown }) {
 }
 
 function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown }) {
-  const color = NODE_TYPES[node.type]?.color ?? '#6b7280';
+  const color     = NODE_TYPES[node.type]?.color ?? '#6b7280';
   const ringColor = isConnectFrom ? '#f59e0b' : selected ? 'var(--accent)' : 'transparent';
+  const IconComp  = NODE_ICON[node.type] ?? LayoutGrid;
+  const iconX     = (NODE_W - 20) / 2;
 
   return (
     <g
+      data-node={node.id}
       transform={`translate(${node.x},${node.y})`}
       onPointerDown={onPointerDown}
       style={{ cursor: connecting ? 'crosshair' : 'grab' }}
@@ -174,21 +201,18 @@ function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown })
         fill={color}
         fillOpacity={0.85}
       />
+      {/* Node type icon */}
+      <foreignObject x={iconX} y={5} width={20} height={22} style={{ pointerEvents: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 22 }}>
+          <IconComp size={16} color="white" strokeWidth={2} />
+        </div>
+      </foreignObject>
+      {/* Node name */}
       <text
-        x={NODE_W / 2} y={22}
-        textAnchor="middle"
-        fontSize={13}
-        fontWeight="700"
-        fill="white"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {abbrev(node.type)}
-      </text>
-      <text
-        x={NODE_W / 2} y={40}
+        x={NODE_W / 2} y={43}
         textAnchor="middle"
         fontSize={9}
-        fill="rgba(255,255,255,0.85)"
+        fill="rgba(255,255,255,0.9)"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
         {node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name}
@@ -272,6 +296,7 @@ export default function TopologyView() {
   const [previewPt, setPreviewPt] = useState(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [pingState, setPingState] = useState({ status: 'idle', rtt: null, message: '' });
+  const [contextMenu, setContextMenu] = useState(null);
 
   const svgRef      = useRef(null);
   const addBtnRef   = useRef(null);
@@ -339,29 +364,28 @@ export default function TopologyView() {
     setSelected(null);
   }, [selected, updateTopology]);
 
-  const addNode = useCallback((type) => {
+  const addNode = useCallback((type, atWorldX, atWorldY) => {
     if (!project) return;
     const cfg = NODE_TYPES[type];
-    const lvl = cfg.defaultLevel;
-    const sameLevelCount = nodes.filter(n => n.level === lvl).length;
-    const x = LABEL_W + 20 + sameLevelCount * (NODE_W + 12);
-    const y = levelY(lvl) + (LEVEL_H - NODE_H) / 2;
+    let x, y, lvl;
+    if (atWorldX !== undefined && atWorldY !== undefined) {
+      x   = Math.max(LABEL_W, Math.min(SVG_W - NODE_W, atWorldX - NODE_W / 2));
+      y   = Math.max(0, Math.min(SVG_H - NODE_H, atWorldY - NODE_H / 2));
+      lvl = yToLevel(atWorldY);
+    } else {
+      lvl = cfg.defaultLevel;
+      const sameLevelCount = nodes.filter(n => n.level === lvl).length;
+      x = LABEL_W + 20 + sameLevelCount * (NODE_W + 12);
+      y = levelY(lvl) + (LEVEL_H - NODE_H) / 2;
+    }
     const newNode = {
-      id: uid(),
-      type,
-      level: lvl,
-      name: type,
-      description: '',
-      ipAddress: '',
-      vendor: '',
-      model: '',
-      notes: '',
-      x,
-      y,
+      id: uid(), type, level: lvl, name: type,
+      description: '', ipAddress: '', vendor: '', model: '', notes: '', x, y,
     };
     updateTopology(t => ({ ...t, nodes: [...(t.nodes ?? []), newNode] }));
     setSelected({ type: 'node', id: newNode.id });
     setAddMenuOpen(false);
+    setContextMenu(null);
   }, [project, nodes, updateTopology]);
 
   const svgToWorld = useCallback((clientX, clientY) => {
@@ -505,15 +529,28 @@ export default function TopologyView() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [deleteSelected, tool]);
 
+  const handleSvgContextMenu = useCallback((e) => {
+    e.preventDefault();
+    if (!project) return;
+    if (e.target !== svgRef.current && (e.target.closest('[data-node]') || e.target.closest('[data-conn]'))) return;
+    const rect = svgRef.current?.getBoundingClientRect();
+    const worldPt = svgToWorld(e.clientX, e.clientY);
+    setContextMenu({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      worldX: worldPt.x,
+      worldY: worldPt.y,
+    });
+  }, [project, svgToWorld]);
+
   useEffect(() => {
-    const handleClick = (e) => {
-      if (addBtnRef.current && !addBtnRef.current.contains(e.target)) {
-        setAddMenuOpen(false);
-      }
+    const dismiss = (e) => {
+      setAddMenuOpen(false);
+      if (!e.target.closest?.('[data-context-menu]')) setContextMenu(null);
     };
-    if (addMenuOpen) document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [addMenuOpen]);
+    document.addEventListener('mousedown', dismiss);
+    return () => document.removeEventListener('mousedown', dismiss);
+  }, []);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -556,7 +593,7 @@ export default function TopologyView() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-main)', overflow: 'hidden' }}>
+    <div data-topology-canvas="1" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-main)', overflow: 'hidden' }}>
       {/* Toolbar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2,
@@ -631,6 +668,8 @@ export default function TopologyView() {
         {toolbarBtn(false, '+', () => setZoom(z => Math.min(4, z * 1.15)), 'Zoom in')}
         {toolbarBtn(false, '−', () => setZoom(z => Math.max(0.15, z / 1.15)), 'Zoom out')}
         {toolbarBtn(false, 'Reset', () => { setZoom(1); setPan({ x: 0, y: 0 }); }, 'Reset view')}
+        <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+        {toolbarBtn(false, <><Printer size={14} /> Print</>, () => window.print(), 'Print / Save as PDF')}
       </div>
 
       {/* Main area */}
@@ -645,6 +684,7 @@ export default function TopologyView() {
             onPointerDown={handleSvgPointerDown}
             onPointerMove={(e) => { handleSvgPointerMove(e); handleNodePointerMove(e); }}
             onPointerUp={(e) => { handleSvgPointerUp(e); handleNodePointerUp(e); }}
+            onContextMenu={handleSvgContextMenu}
           >
             <defs>
               <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
@@ -707,6 +747,54 @@ export default function TopologyView() {
               pointerEvents: 'none',
             }}>
               <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>Open or create a project to use the Topology view.</span>
+            </div>
+          )}
+
+          {/* Right-click context menu */}
+          {contextMenu && (
+            <div
+              data-context-menu="1"
+              style={{
+                position: 'absolute',
+                left: Math.min(contextMenu.x, (svgRef.current?.clientWidth ?? 600) - 270),
+                top:  Math.min(contextMenu.y, (svgRef.current?.clientHeight ?? 400) - 360),
+                zIndex: 200,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 7,
+                padding: 8,
+                boxShadow: '0 6px 24px rgba(0,0,0,0.22)',
+                minWidth: 260,
+              }}
+            >
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, padding: '2px 6px 6px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                Add Node
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+                {Object.entries(NODE_TYPES).map(([type, cfg]) => {
+                  const Icon = NODE_ICON[type] ?? LayoutGrid;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => addNode(type, contextMenu.worldX, contextMenu.worldY)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        padding: '5px 7px', borderRadius: 4,
+                        background: 'transparent', border: 'none',
+                        cursor: 'pointer', fontSize: 11,
+                        color: 'var(--text-primary)', textAlign: 'left',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-bg)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ color: cfg.color, flexShrink: 0, display: 'flex' }}>
+                        <Icon size={13} strokeWidth={2} />
+                      </span>
+                      {type}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -853,14 +941,15 @@ export default function TopologyView() {
                     onClick={() => { deleteSelected(); }}
                     style={{
                       marginTop: 4, width: '100%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                       background: 'rgba(239,68,68,0.1)',
                       color: '#ef4444',
                       border: '1px solid rgba(239,68,68,0.3)',
-                      padding: '5px 0', borderRadius: 4,
+                      padding: '6px 0', borderRadius: 4,
                       cursor: 'pointer', fontSize: 12,
                     }}
                   >
-                    Delete Node
+                    <Trash2 size={13} /> Delete Node
                   </button>
                 </>
               )}
@@ -914,14 +1003,15 @@ export default function TopologyView() {
                       onClick={() => { deleteSelected(); }}
                       style={{
                         marginTop: 4, width: '100%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                         background: 'rgba(239,68,68,0.1)',
                         color: '#ef4444',
                         border: '1px solid rgba(239,68,68,0.3)',
-                        padding: '5px 0', borderRadius: 4,
+                        padding: '6px 0', borderRadius: 4,
                         cursor: 'pointer', fontSize: 12,
                       }}
                     >
-                      Delete Connection
+                      <Trash2 size={13} /> Delete Connection
                     </button>
                   </>
                 );
