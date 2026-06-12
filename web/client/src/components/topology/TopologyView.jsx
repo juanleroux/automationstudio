@@ -357,6 +357,95 @@ export default function TopologyView() {
     }
   }, [selectedNode?.ipAddress]);
 
+  const handlePrint = useCallback(() => {
+    if (!project) return;
+
+    // Bounding box: always show all 6 levels; width = rightmost node + margin
+    const maxNodeX = nodes.length > 0
+      ? Math.max(...nodes.map(n => n.x + NODE_W)) + 60
+      : LABEL_W + 700;
+    const vW = Math.max(maxNodeX, LABEL_W + 400);
+    const vH = SVG_H;
+
+    // ── Level bands ─────────────────────────────────────────────
+    const bandsHtml = LEVELS.map(lv => {
+      const y = levelY(lv.id);
+      const t = lv.title.length > 13 ? lv.title.slice(0, 12) + '…' : lv.title;
+      return `<rect x="0" y="${y}" width="${vW}" height="${LEVEL_H}" fill="${lv.bg}"/>
+<rect x="0" y="${y}" width="${LABEL_W}" height="${LEVEL_H}" fill="${lv.color}"/>
+<text x="${LABEL_W / 2}" y="${y + 22}" text-anchor="middle" font-size="10" font-weight="700" fill="rgba(255,255,255,0.95)">${lv.label}</text>
+<text x="${LABEL_W / 2}" y="${y + 36}" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">${t}</text>
+<line x1="0" y1="${y + LEVEL_H}" x2="${vW}" y2="${y + LEVEL_H}" stroke="rgba(120,120,120,0.2)" stroke-width="1"/>
+<text x="${vW - 10}" y="${y + LEVEL_H - 10}" text-anchor="end" font-size="8" fill="rgba(120,120,120,0.45)">${lv.desc}</text>`;
+    }).join('\n');
+
+    // ── Connections ─────────────────────────────────────────────
+    const connsHtml = connections.map(conn => {
+      const from = nodes.find(n => n.id === conn.fromId);
+      const to   = nodes.find(n => n.id === conn.toId);
+      if (!from || !to) return '';
+      const fcx = from.x + NODE_W / 2, fcy = from.y + NODE_H / 2;
+      const tcx = to.x   + NODE_W / 2, tcy = to.y   + NODE_H / 2;
+      const dx  = tcx - fcx, dy = tcy - fcy;
+      const d   = `M${fcx},${fcy} C${fcx + dx * 0.4},${fcy} ${tcx - dx * 0.4},${tcy} ${tcx},${tcy}`;
+      const cs  = CONN_STYLE[conn.protocol] ?? { dash: null, w: 1.5 };
+      const lbl = (conn.name || conn.protocol || '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      const da  = cs.dash ? ` stroke-dasharray="${cs.dash}"` : '';
+      const midX = fcx + dx * 0.5, midY = fcy + dy * 0.5;
+      return `<path d="${d}" fill="none" stroke="#666" stroke-width="${cs.w}" stroke-opacity="0.8"${da} marker-end="url(#pr-arrow)"/>
+${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fill="#666">${lbl}</text>` : ''}`;
+    }).join('\n');
+
+    // ── Nodes ────────────────────────────────────────────────────
+    const nodesHtml = nodes.map(node => {
+      const color   = node.color ?? NODE_TYPES[node.type]?.color ?? '#6b7280';
+      const iconKey = node.icon ?? node.type ?? 'Custom';
+      const name    = (node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name)
+        .replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      return `<g transform="translate(${node.x},${node.y})">
+  <rect x="0" y="0" width="${NODE_W}" height="${NODE_H}" rx="5" fill="${color}" fill-opacity="0.9"/>
+  <text x="${NODE_W / 2}" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="white">${abbrev(iconKey)}</text>
+  <text x="${NODE_W / 2}" y="40" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.9)">${name}</text>
+</g>`;
+    }).join('\n');
+
+    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vW} ${vH}" width="${vW}" height="${vH}" style="font-family:system-ui,sans-serif;max-width:100%;height:auto">
+  <defs>
+    <marker id="pr-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#666" fill-opacity="0.8"/>
+    </marker>
+  </defs>
+  ${bandsHtml}
+  ${connsHtml}
+  ${nodesHtml}
+</svg>`;
+
+    const title = project.name
+      ? `Topology — ${project.name.replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]))}`
+      : 'ISA-95 Topology';
+    const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const win = window.open('', '_blank');
+    if (!win) { alert('Allow pop-ups to print.'); return; }
+    win.document.write(`<!DOCTYPE html><html><head>
+<meta charset="utf-8"/>
+<title>${title}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  @page{size:landscape;margin:8mm}
+  body{font-family:system-ui,sans-serif;background:#fff;padding:6mm}
+  h1{font-size:13px;font-weight:600;color:#222;margin-bottom:3px}
+  p{font-size:9px;color:#888;margin-bottom:8px}
+  svg{width:100%;height:auto;display:block}
+</style></head><body>
+<h1>${title}</h1>
+<p>ISA-95 Network Topology · ${dateStr}</p>
+${svgStr}
+<script>window.addEventListener('load',function(){window.print();setTimeout(function(){window.close()},600)});<\/script>
+</body></html>`);
+    win.document.close();
+  }, [project, nodes, connections]);
+
   const updateTopology = useCallback((updater) => {
     if (!project) return;
     updateProject(prev => ({
@@ -702,7 +791,7 @@ export default function TopologyView() {
         {toolbarBtn(false, '−', () => setZoom(z => Math.max(0.15, z / 1.15)), 'Zoom out')}
         {toolbarBtn(false, 'Reset', () => { setZoom(1); setPan({ x: 0, y: 0 }); }, 'Reset view')}
         <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
-        {toolbarBtn(false, <><Printer size={14} /> Print</>, () => window.print(), 'Print / Save as PDF')}
+        {toolbarBtn(false, <><Printer size={14} /> Print</>, handlePrint, 'Print / Save as PDF', !project)}
       </div>
 
       {/* Main area */}

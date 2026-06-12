@@ -297,14 +297,3 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
 }
 .arrow-heartbeat { animation: heartbeat-arrow 1.6s ease-in-out infinite; }
 
-@media print {
-  /* Hide everything except the topology canvas when printing */
-  body > #root > div > *:not([data-topology-canvas]) { display: none !important; }
-  [data-topology-canvas] {
-    position: fixed !important; inset: 0 !important;
-    width: 100vw !important; height: 100vh !important;
-    overflow: visible !important;
-  }
-  [data-topology-canvas] > *:first-child { display: none !important; } /* toolbar */
-  [data-topology-canvas] > *:last-child  { display: none !important; } /* status bar if any */
-}
