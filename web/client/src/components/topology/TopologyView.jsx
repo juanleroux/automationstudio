@@ -142,6 +142,11 @@ function ConnectionPath({ conn, nodes, selected, onPointerDown }) {
 
   const label = conn.name || conn.protocol || null;
 
+  // Stable, staggered animation params from connection id
+  const seed      = (parseInt(conn.id.slice(-4), 36) % 1000) / 1000;
+  const animDur   = (2.2 + seed * 1.6).toFixed(2);   // 2.2 – 3.8 s
+  const animBegin = (seed * 2.4).toFixed(2);           // 0 – 2.4 s stagger
+
   return (
     <g data-conn={conn.id} onPointerDown={onPointerDown} style={{ cursor: 'pointer' }}>
       {/* wide transparent hit area */}
@@ -155,6 +160,26 @@ function ConnectionPath({ conn, nodes, selected, onPointerDown }) {
         strokeDasharray={dash ?? undefined}
         markerEnd={`url(#arrow${selected ? '-sel' : ''})`}
       />
+      {/* Travel bubble */}
+      <circle r={3} fill="white" opacity={0} style={{ pointerEvents: 'none' }}>
+        <animateMotion
+          dur={`${animDur}s`}
+          begin={`${animBegin}s`}
+          repeatCount="indefinite"
+          path={d}
+          calcMode="spline"
+          keyTimes="0;1"
+          keySplines="0.42 0 0.58 1"
+        />
+        <animate
+          attributeName="opacity"
+          values="0;0.9;0.9;0"
+          keyTimes="0;0.07;0.93;1"
+          dur={`${animDur}s`}
+          begin={`${animBegin}s`}
+          repeatCount="indefinite"
+        />
+      </circle>
       {label && (
         <text
           x={midX}
