@@ -1,16 +1,16 @@
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const REPULSION        = 1600;
-const REPULSION_CUTOFF = 160;   // skip pairs beyond this — prevents cluster mass ejecting far nodes
-const SPRING_K         = 0.10;
+const REPULSION        = 1800;
+const REPULSION_CUTOFF = 200;
+const SPRING_K         = 0.14;
 const DAMPING          = 0.80;
-const GRAVITY          = 0.001; // very low — springs maintain hierarchy; gravity only corrals orphans
+const GRAVITY          = 0.001;
 const MAX_VEL          = 8;
-const GOLDEN           = 2.39996; // golden angle (rad) for spiral instance placement
+const GOLDEN           = 2.39996;
 const SPRING_LENS = {
   'project-tpl': 130,
-  'tpl-inst':     65,
+  'tpl-inst':     55,   // shorter — instances stay tight to their template
 };
 
 const TEMPLATE_PALETTE = [
@@ -169,10 +169,14 @@ export default function GraphView({ templates, areas, counts, projectName }) {
       const { w, h } = sizeRef.current;
       const br = Math.max(200, Math.min(w, h) * 0.44);
 
-      // Repulsion (with cutoff)
+      // Repulsion
+      // Instances only repel nodes that share their colour (= same template).
+      // This prevents the dense template cluster from ejecting lone instances
+      // that belong to single-instance templates.
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const a = nodes[i], b = nodes[j];
+          if ((a.type === 'instance' || b.type === 'instance') && a.color !== b.color) continue;
           let dx = b.x - a.x, dy = b.y - a.y;
           let d2 = dx*dx + dy*dy || 0.01;
           let d  = Math.sqrt(d2);
