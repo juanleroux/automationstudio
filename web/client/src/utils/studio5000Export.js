@@ -6,13 +6,17 @@ function sanitizeTagName(name) {
   return s || 'Tag';
 }
 
-// Extract raw AOI XML using string slicing (avoids XMLSerializer namespace junk)
+// Extract raw AOI XML using string slicing (avoids XMLSerializer namespace junk).
+// Must match the SINGULAR <AddOnInstructionDefinition (not the plural wrapper).
 function extractAOIXml(xmlContent) {
-  const startIdx = xmlContent.indexOf('<AddOnInstructionDefinition');
+  // [^s] prevents matching <AddOnInstructionDefinitions> (the plural wrapper)
+  const startMatch = xmlContent.match(/<AddOnInstructionDefinition[^s]/);
+  if (!startMatch) return '';
+  const startIdx = startMatch.index;
   const endIdx = xmlContent.lastIndexOf('</AddOnInstructionDefinition>');
-  if (startIdx === -1 || endIdx === -1) return '';
+  if (endIdx === -1) return '';
   const raw = xmlContent.slice(startIdx, endIdx + '</AddOnInstructionDefinition>'.length);
-  // Strip any Use="..." attribute that may be present
+  // Strip any Use="..." attribute that may be present on the definition element
   return raw.replace(/\s+Use="[^"]*"/, '');
 }
 
