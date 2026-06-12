@@ -626,9 +626,9 @@ export default function SettingsView() {
                 </div>
               )}
 
-              {/* Profile File Location */}
+              {/* Project File Location */}
               <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Profile File Location</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Project File Location</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
                   Select a Studio 5000 project L5X file. When Studio 5000 menu items are enabled, this unlocks
                   an "Import from Studio 5000" option in the Assets view to pull AOIs and instances directly
