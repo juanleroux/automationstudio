@@ -12,30 +12,49 @@ import { openCommissioningReport } from '../../utils/commissioningReport';
 import { getFoldersFromIgnition } from '../../api/client';
 import { useToast } from '../shared/Toast';
 
-function FolderNode({ node, depth = 0 }) {
+function collectAllPaths(nodes, result = []) {
+  for (const n of nodes) {
+    result.push(n.path);
+    if (n.children?.length) collectAllPaths(n.children, result);
+  }
+  return result;
+}
+
+function FolderNode({ node, depth = 0, selected, onToggle }) {
   const [open, setOpen] = useState(depth < 2);
   const hasChildren = node.children && node.children.length > 0;
+  const checked = selected.has(node.path);
   return (
     <div>
       <div
         style={{
           display: 'flex', alignItems: 'center', gap: 4,
           paddingLeft: depth * 16 + 4, paddingTop: 3, paddingBottom: 3,
-          cursor: hasChildren ? 'pointer' : 'default',
           borderRadius: 3,
         }}
         className="tree-node"
-        onClick={() => hasChildren && setOpen(o => !o)}
       >
-        {hasChildren
-          ? (open ? <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} /> : <ChevronRight size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />)
-          : <span style={{ width: 12, flexShrink: 0 }} />
-        }
-        <Folder size={13} style={{ flexShrink: 0, color: 'var(--accent)' }} />
-        <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{node.name}</span>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onToggle(node.path)}
+          onClick={e => e.stopPropagation()}
+          style={{ width: 13, height: 13, flexShrink: 0, cursor: 'pointer' }}
+        />
+        <span
+          style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, cursor: hasChildren ? 'pointer' : 'default' }}
+          onClick={() => hasChildren && setOpen(o => !o)}
+        >
+          {hasChildren
+            ? (open ? <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} /> : <ChevronRight size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />)
+            : <span style={{ width: 12, flexShrink: 0 }} />
+          }
+          <Folder size={13} style={{ flexShrink: 0, color: 'var(--accent)' }} />
+          <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{node.name}</span>
+        </span>
       </div>
       {open && hasChildren && node.children.map((child, i) => (
-        <FolderNode key={i} node={child} depth={depth + 1} />
+        <FolderNode key={i} node={child} depth={depth + 1} selected={selected} onToggle={onToggle} />
       ))}
     </div>
   );
@@ -190,6 +209,7 @@ export default function EngineeringView() {
   const startW = useRef(0);
   const [ctxMenu, setCtxMenu] = useState(null); // { x, y }
   const [folderModal, setFolderModal] = useState(null); // null | { loading, folders, error }
+  const [selectedPaths, setSelectedPaths] = useState(new Set());
 
   const onMouseDown = (e) => {
     dragging.current = true;
@@ -296,12 +316,30 @@ export default function EngineeringView() {
         provider: eng.provider || 'default',
         folderPath: eng.folderPath || undefined,
       });
-      setFolderModal({ loading: false, folders: result.folders || [], error: null });
+        const folders = result.folders || [];
+      setFolderModal({ loading: false, folders, error: null });
+      setSelectedPaths(new Set(collectAllPaths(folders)));
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || 'Unknown error';
       setFolderModal({ loading: false, folders: null, error: msg });
     }
   }, [project, toast]);
+
+  const handleTogglePath = useCallback((path) => {
+    setSelectedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    if (folderModal?.folders) setSelectedPaths(new Set(collectAllPaths(folderModal.folders)));
+  }, [folderModal]);
+
+  const handleSelectNone = useCallback(() => {
+    setSelectedPaths(new Set());
+  }, []);
 
   if (!project) {
     return <NoProjectOpen />;
@@ -328,8 +366,31 @@ export default function EngineeringView() {
         <Modal
           title="Ignition Folder Structure"
           onClose={() => setFolderModal(null)}
-          width={420}
-          footer={<button className="btn btn-secondary" onClick={() => setFolderModal(null)}>Close</button>}
+          width={460}
+          footer={
+            folderModal.folders && !folderModal.loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={handleSelectAll}>All</button>
+                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={handleSelectNone}>None</button>
+                <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>
+                  {selectedPaths.size} of {collectAllPaths(folderModal.folders).length} selected
+                </span>
+                <button className="btn btn-secondary" onClick={() => setFolderModal(null)}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  disabled={selectedPaths.size === 0}
+                  onClick={() => {
+                    toast.success(`${selectedPaths.size} folder${selectedPaths.size !== 1 ? 's' : ''} selected`);
+                    setFolderModal(null);
+                  }}
+                >
+                  <Download size={13} /> Import
+                </button>
+              </div>
+            ) : (
+              <button className="btn btn-secondary" onClick={() => setFolderModal(null)}>Close</button>
+            )
+          }
         >
           {folderModal.loading && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '24px 0', justifyContent: 'center', color: 'var(--text-muted)' }}>
@@ -346,7 +407,9 @@ export default function EngineeringView() {
             folderModal.folders.length === 0
               ? <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '12px 0' }}>No folders found.</div>
               : <div style={{ maxHeight: 400, overflowY: 'auto', overflowX: 'hidden' }}>
-                  {folderModal.folders.map((f, i) => <FolderNode key={i} node={f} depth={0} />)}
+                  {folderModal.folders.map((f, i) => (
+                    <FolderNode key={i} node={f} depth={0} selected={selectedPaths} onToggle={handleTogglePath} />
+                  ))}
                 </div>
           )}
         </Modal>
