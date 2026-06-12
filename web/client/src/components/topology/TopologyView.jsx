@@ -2,9 +2,10 @@ import React, {
   useState, useRef, useEffect, useCallback, useId,
 } from 'react';
 import {
-  Plus, Trash2, X, Link2, MousePointer, ChevronDown,
+  Plus, Trash2, X, Link2, MousePointer, ChevronDown, Wifi, WifiOff, Loader,
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
+import { pingNode } from '../../api/client';
 
 const LEVELS = [
   { id: 5, label: 'Level 5', title: 'Cloud / Enterprise',    desc: 'Enterprise Information Network',       color: '#1e3a5f', bg: 'rgba(30,58,95,0.07)'   },
@@ -36,10 +37,11 @@ const NODE_TYPES = {
   Custom:      { color: '#6b7280', defaultLevel: 2 },
 };
 
-const PROTOCOLS = [
-  'Ethernet/IP', 'Modbus TCP', 'Modbus RTU', 'OPC-UA', 'OPC-DA',
-  'Profibus', 'Profinet', 'DeviceNet', 'HART', 'Foundation Fieldbus',
-  'DNP3', 'IEC 61850', 'BACnet', 'Custom',
+const CONNECTION_TYPES = [
+  'Ethernet', 'Ethernet/IP', 'Profinet', 'Profibus', 'Modbus TCP', 'Modbus Serial',
+  'Modbus RTU', 'Fieldbus', 'Foundation Fieldbus', 'ASi (AS-Interface)', 'OPC UA',
+  'OPC DA', 'MQTT', 'HART', 'DeviceNet', 'DNP3', 'IEC 61850',
+  'Wireless HART', 'ISA100 Wireless', 'Serial (RS-232/485)', 'Custom',
 ];
 
 const LEVEL_H = 130;
@@ -241,6 +243,7 @@ export default function TopologyView() {
   const [pan, setPan]             = useState({ x: 0, y: 0 });
   const [previewPt, setPreviewPt] = useState(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [pingState, setPingState] = useState({ status: 'idle', rtt: null, message: '' });
 
   const svgRef      = useRef(null);
   const addBtnRef   = useRef(null);
@@ -250,6 +253,25 @@ export default function TopologyView() {
   const selectedNode = selected?.type === 'node' ? nodes.find(n => n.id === selected.id) : null;
   const selectedConn = selected?.type === 'conn' ? connections.find(c => c.id === selected.id) : null;
   const panelOpen    = !!(selectedNode || selectedConn);
+
+  useEffect(() => {
+    setPingState({ status: 'idle', rtt: null, message: '' });
+  }, [selected?.id]);
+
+  const handlePing = useCallback(async () => {
+    if (!selectedNode?.ipAddress) return;
+    setPingState({ status: 'pinging', rtt: null, message: '' });
+    try {
+      const result = await pingNode({ host: selectedNode.ipAddress, port: 80 });
+      setPingState({
+        status: result.alive ? 'alive' : 'dead',
+        rtt: result.rtt,
+        message: result.message,
+      });
+    } catch (err) {
+      setPingState({ status: 'dead', rtt: null, message: err.message ?? 'Request failed' });
+    }
+  }, [selectedNode?.ipAddress]);
 
   const updateTopology = useCallback((updater) => {
     if (!project) return;
@@ -731,12 +753,44 @@ export default function TopologyView() {
                     />
                   </PropField>
                   <PropField label="IP Address">
-                    <input
-                      type="text"
-                      value={selectedNode.ipAddress}
-                      onChange={e => updateNode(selectedNode.id, { ipAddress: e.target.value })}
-                      style={inputStyle}
-                    />
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <input
+                        type="text"
+                        value={selectedNode.ipAddress}
+                        onChange={e => { updateNode(selectedNode.id, { ipAddress: e.target.value }); setPingState({ status: 'idle', rtt: null, message: '' }); }}
+                        style={{ ...inputStyle, flex: 1 }}
+                        placeholder="e.g. 192.168.1.10"
+                      />
+                      <button
+                        onClick={handlePing}
+                        disabled={!selectedNode.ipAddress || pingState.status === 'pinging'}
+                        title="Ping host"
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          padding: '4px 7px', borderRadius: 4, flexShrink: 0,
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-main)',
+                          color: !selectedNode.ipAddress ? 'var(--text-disabled)' : 'var(--text-muted)',
+                          cursor: !selectedNode.ipAddress || pingState.status === 'pinging' ? 'not-allowed' : 'pointer',
+                          fontSize: 11,
+                        }}
+                      >
+                        {pingState.status === 'pinging' ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Wifi size={13} />}
+                      </button>
+                    </div>
+                    {pingState.status !== 'idle' && pingState.status !== 'pinging' && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        marginTop: 5, fontSize: 11,
+                        color: pingState.status === 'alive' ? '#22c55e' : '#ef4444',
+                      }}>
+                        {pingState.status === 'alive'
+                          ? <Wifi size={12} />
+                          : <WifiOff size={12} />
+                        }
+                        <span>{pingState.message}</span>
+                      </div>
+                    )}
                   </PropField>
                   <PropField label="Vendor">
                     <input
@@ -797,14 +851,14 @@ export default function TopologyView() {
                         style={inputStyle}
                       />
                     </PropField>
-                    <PropField label="Protocol">
+                    <PropField label="Type">
                       <select
                         value={selectedConn.protocol}
                         onChange={e => updateConnection(selectedConn.id, { protocol: e.target.value })}
                         style={inputStyle}
                       >
                         <option value="">— none —</option>
-                        {PROTOCOLS.map(p => <option key={p} value={p}>{p}</option>)}
+                        {CONNECTION_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
                       </select>
                     </PropField>
                     <PropField label="Description">
