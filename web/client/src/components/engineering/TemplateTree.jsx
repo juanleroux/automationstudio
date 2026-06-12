@@ -1492,7 +1492,7 @@ export default function TemplateTree({ selected, onSelect }) {
                           description: param.usage || '',
                           dataType: mapL5XDataType(param.dataType),
                           value: '',
-                          parameter: true,
+                          parameter: false,
                           lastModification: now,
                         }));
                         tpl = { id: maxTplId, name: aoiName, description: '', color: '#3b82f6', attributes: attrs, instances: [], profiles: [], lastModification: now };
