@@ -409,17 +409,7 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
 </g>`;
     }).join('\n');
 
-    // ── Scale to fit one landscape page ─────────────────────────
-    // Conservative printable area at 96 dpi:
-    //   A4 landscape (297×210mm) minus 10mm margins → ~263×178mm → ~995×672px
-    //   Leave ~28px for header text → SVG available: 995×644px
-    const PAGE_W = 995;
-    const PAGE_H = 644;
-    const scale  = Math.min(PAGE_W / vW, PAGE_H / vH);
-    const dispW  = Math.floor(vW * scale);
-    const dispH  = Math.floor(vH * scale);
-
-    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vW} ${vH}" width="${dispW}" height="${dispH}" style="font-family:system-ui,sans-serif;display:block">
+    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vW} ${vH}" width="100%" height="100%" preserveAspectRatio="xMidYMin meet" style="display:block;font-family:system-ui,sans-serif">
   <defs>
     <marker id="pr-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
       <path d="M0,0 L0,6 L8,3 z" fill="#666" fill-opacity="0.8"/>
@@ -442,14 +432,34 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
 <title>${title}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  @page{size:landscape;margin:10mm}
-  body{font-family:system-ui,sans-serif;background:#fff;padding:0}
-  .hdr{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
-  h1{font-size:12px;font-weight:600;color:#222}
-  p{font-size:9px;color:#999}
-</style></head><body>
-<div class="hdr"><h1>${title}</h1><p>ISA-95 Network Topology · ${dateStr}</p></div>
-${svgStr}
+  /* Zero page margins — browser header/footer live outside this area */
+  @page{size:landscape;margin:8mm}
+  /* html+body fill exactly one page; overflow:hidden is the hard stop */
+  html{height:100%}
+  body{
+    height:100%;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    font-family:system-ui,sans-serif;
+    background:#fff;
+  }
+  .hdr{
+    flex-shrink:0;
+    display:flex;align-items:baseline;gap:10px;
+    padding-bottom:3px;
+    border-bottom:1px solid #e0e0e0;
+    margin-bottom:4px;
+  }
+  h1{font-size:11px;font-weight:600;color:#222}
+  .sub{font-size:9px;color:#aaa}
+  /* SVG wrapper grows to fill all remaining height */
+  .wrap{flex:1;min-height:0;display:flex}
+  svg{flex:1;min-width:0;min-height:0}
+</style>
+</head><body>
+<div class="hdr"><h1>${title}</h1><span class="sub">ISA-95 Network Topology · ${dateStr}</span></div>
+<div class="wrap">${svgStr}</div>
 <script>window.addEventListener('load',function(){window.print();setTimeout(function(){window.close()},600)});<\/script>
 </body></html>`);
     win.document.close();
