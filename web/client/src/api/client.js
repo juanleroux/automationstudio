@@ -23,7 +23,7 @@ export const uploadToIgnition = (payload) => api.post('/ignition/upload', payloa
 export const exportFromIgnition = (params) => api.get('/ignition/export', { params }).then(r => r.data);
 export const getFoldersFromIgnition = (params) => api.get('/ignition/folders', { params }).then(r => r.data);
 export const testIgnitionConnection = (data) => api.post('/ignition/test', data).then(r => r.data);
-export const resetIgnitionPassword = () => api.post('/ignition/reset-password').then(r => r.data);
+export const resetIgnitionPassword = (newPassword) => api.post('/ignition/reset-password', { newPassword }).then(r => r.data);
 
 // Siemens TIA Portal bridge
 export const testSiemensConnection = (data) => api.post('/siemens/test', data).then(r => r.data);

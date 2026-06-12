@@ -224,6 +224,11 @@ router.post('/test', async (req, res) => {
 
 // POST /api/ignition/reset-password — run gwcmd.sh -p inside the Ignition Docker container
 router.post('/reset-password', async (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword || !newPassword.trim()) {
+    return res.status(400).json({ error: 'New password is required' });
+  }
+
   try {
     // List running containers via Docker socket
     const listRes = await dockerGet('/containers/json');
@@ -254,7 +259,6 @@ router.post('/reset-password', async (req, res) => {
       await dockerPost(`/exec/${testId}/start`, { Detach: false, Tty: false });
       const inspectRes = await dockerGet(`/exec/${testId}/json`);
       if (inspectRes.data?.ExitCode !== 0) {
-        // Not found at known path — search for it
         const findExec = await dockerPost(`/containers/${containerId}/exec`, {
           AttachStdout: true, AttachStderr: true,
           Cmd: ['find', '/', '-name', 'gwcmd.sh', '-maxdepth', '8'],
@@ -269,18 +273,28 @@ router.post('/reset-password', async (req, res) => {
 
     console.log('[Ignition reset-password] gwcmd path:', gwcmdPath);
 
-    // Execute the password reset
+    // gwcmd.sh -p is interactive: it reads the new password twice from stdin.
+    // Pipe it in via printf so it runs non-interactively.
+    // Shell-escape single quotes in the password to prevent injection.
+    const safePass = newPassword.replace(/'/g, "'\\''");
+    const shellCmd = `printf '${safePass}\\n${safePass}\\n' | '${gwcmdPath}' -p`;
+
     const resetExec = await dockerPost(`/containers/${containerId}/exec`, {
-      AttachStdout: true, AttachStderr: true,
-      Cmd: [gwcmdPath, '-p'],
+      AttachStdout: true, AttachStderr: true, AttachStdin: false,
+      Cmd: ['sh', '-c', shellCmd],
     });
     if (!resetExec.data?.Id) {
       return res.status(502).json({ error: 'Failed to create exec instance', detail: resetExec.data });
     }
 
     const output = await dockerExecAttached(resetExec.data.Id);
-    console.log('[Ignition reset-password] output:', output);
-    return res.json({ success: true, container: containerName, gwcmdPath, output });
+
+    // Get the exit code from exec inspect
+    const inspectRes = await dockerGet(`/exec/${resetExec.data.Id}/json`);
+    const exitCode = inspectRes.data?.ExitCode ?? -1;
+
+    console.log('[Ignition reset-password] exitCode:', exitCode, 'output:', output);
+    return res.json({ success: exitCode === 0, container: containerName, gwcmdPath, output, exitCode });
   } catch (err) {
     console.error('[Ignition reset-password] error:', err.message);
     return res.status(500).json({ error: err.message });

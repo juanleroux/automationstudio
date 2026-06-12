@@ -40,7 +40,9 @@ export default function SettingsView() {
   const [testResult, setTestResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [resetResult, setResetResult] = useState(null); // { success, output, exitCode }
   const tiaProjectFileRef = useRef(null);
 
   useEffect(() => {
@@ -103,13 +105,22 @@ export default function SettingsView() {
   const handleResetPassword = async () => {
     setConfirmReset(false);
     setResetting(true);
+    setResetResult(null);
     try {
-      const result = await resetIgnitionPassword();
-      toast.success(`Password reset complete (container: ${result.container})`);
+      const result = await resetIgnitionPassword(resetPassword);
+      setResetResult({ success: result.success, output: result.output, exitCode: result.exitCode, container: result.container });
+      if (result.success) {
+        toast.success('Password reset complete');
+      } else {
+        toast.error(`gwcmd exited with code ${result.exitCode}`);
+      }
     } catch (err) {
-      toast.error(err?.response?.data?.error || err.message);
+      const msg = err?.response?.data?.error || err.message;
+      setResetResult({ success: false, output: msg, exitCode: -1 });
+      toast.error(msg);
     } finally {
       setResetting(false);
+      setResetPassword('');
     }
   };
 
@@ -400,15 +411,39 @@ export default function SettingsView() {
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--danger)', marginBottom: 6 }}>
                         Are you sure?
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.55 }}>
-                        This will immediately reset the Ignition administrator account password to the factory default by
-                        executing <code style={{ fontSize: 11, background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: 3 }}>gwcmd.sh -p</code> in
-                        the running container. You will need to log back in to Ignition afterwards.
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.55 }}>
+                        This will execute <code style={{ fontSize: 11, background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: 3 }}>gwcmd.sh -p</code> in
+                        the running Ignition container. Enter the new administrator password below.
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>New Password</label>
+                        <input
+                          type="password"
+                          value={resetPassword}
+                          onChange={e => setResetPassword(e.target.value)}
+                          placeholder="Enter new administrator password"
+                          autoFocus
+                          onKeyDown={e => e.key === 'Enter' && resetPassword.trim() && handleResetPassword()}
+                        />
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setConfirmReset(false)}>Cancel</button>
-                        <button className="btn btn-danger" style={{ fontSize: 12 }} onClick={handleResetPassword}>Yes, reset password</button>
+                        <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => { setConfirmReset(false); setResetPassword(''); }}>Cancel</button>
+                        <button className="btn btn-danger" style={{ fontSize: 12 }} disabled={!resetPassword.trim()} onClick={handleResetPassword}>Reset Password</button>
                       </div>
+                    </div>
+                  )}
+
+                  {resetResult && !confirmReset && (
+                    <div style={{ margin: '0 14px 14px', padding: '12px 14px', background: resetResult.success ? 'rgba(62,207,142,0.08)' : 'var(--danger-bg)', border: `1px solid ${resetResult.success ? 'rgba(62,207,142,0.3)' : 'rgba(229,83,83,0.4)'}`, borderRadius: 6 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: resetResult.success ? '#3ecf8e' : 'var(--danger)', marginBottom: 6 }}>
+                        {resetResult.success ? `Password reset successfully (${resetResult.container})` : `Reset failed (exit code ${resetResult.exitCode})`}
+                      </div>
+                      {resetResult.output && (
+                        <pre style={{ fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg-main)', padding: '8px 10px', borderRadius: 4, margin: '0 0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 120, overflowY: 'auto' }}>
+                          {resetResult.output}
+                        </pre>
+                      )}
+                      <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={() => setResetResult(null)}>Dismiss</button>
                     </div>
                   )}
                 </div>
