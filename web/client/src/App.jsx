@@ -8,6 +8,7 @@ import EngineeringView from './components/engineering/EngineeringView';
 import CalculatorsView from './components/calculators/CalculatorsView';
 import CommTestView from './components/commtest/CommTestView';
 import SettingsView from './components/settings/SettingsView';
+import TopologyView from './components/topology/TopologyView';
 
 function AppInner() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -15,6 +16,7 @@ function AppInner() {
   return (
     <Layout activeView={activeView} onChangeView={setActiveView}>
       {activeView === 'dashboard'   && <DashboardView />}
+      {activeView === 'topology'    && <TopologyView />}
       {activeView === 'engineering' && <EngineeringView />}
       {activeView === 'calculators' && <CalculatorsView />}
       {activeView === 'commtest'    && <CommTestView />}
