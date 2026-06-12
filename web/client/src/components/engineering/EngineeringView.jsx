@@ -356,7 +356,7 @@ export default function EngineeringView() {
         >
           <div className="context-menu-item" onClick={handleDownloadFolders}>
             <Download size={14} />
-            Download Folder Structure from Ignition
+            Import from Ignition
           </div>
         </div>
       )}
