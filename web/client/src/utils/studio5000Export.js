@@ -6,6 +6,16 @@ function sanitizeTagName(name) {
   return s || 'Tag';
 }
 
+// Extract raw AOI XML using string slicing (avoids XMLSerializer namespace junk)
+function extractAOIXml(xmlContent) {
+  const startIdx = xmlContent.indexOf('<AddOnInstructionDefinition');
+  const endIdx = xmlContent.lastIndexOf('</AddOnInstructionDefinition>');
+  if (startIdx === -1 || endIdx === -1) return '';
+  const raw = xmlContent.slice(startIdx, endIdx + '</AddOnInstructionDefinition>'.length);
+  // Strip any Use="..." attribute that may be present
+  return raw.replace(/\s+Use="[^"]*"/, '');
+}
+
 function parseAOI(xmlContent) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlContent, 'application/xml');
@@ -15,35 +25,50 @@ function parseAOI(xmlContent) {
 
   const aoiName = aoiDef.getAttribute('Name');
 
-  // Visible+Required params (the ones that appear in the rung call signature)
+  // Visible+Required params (appear in the rung call signature)
   const visibleParams = [...doc.querySelectorAll('Parameter')]
     .filter(p => p.getAttribute('Required') === 'true' && p.getAttribute('Visible') === 'true')
     .map(p => ({ name: p.getAttribute('Name'), dataType: p.getAttribute('DataType'), usage: p.getAttribute('Usage') }));
 
-  // All params (for tag structure generation)
+  // All params (for Decorated Structure — Parameters only, NOT LocalTags)
   const allParams = [...doc.querySelectorAll('Parameter')]
     .map(p => ({ name: p.getAttribute('Name'), dataType: p.getAttribute('DataType'), usage: p.getAttribute('Usage') }));
 
-  // Local tags (for tag structure generation)
+  // Local tags (for L5K data only — not included in Decorated Structure)
   const localTags = [...doc.querySelectorAll('LocalTag')]
     .map(lt => {
       const obj = { name: lt.getAttribute('Name'), dataType: lt.getAttribute('DataType') };
-      // Capture TIMER/COUNTER defaults
       const pre = lt.querySelector('DataValueMember[Name="PRE"]');
       if (pre) obj.pre = pre.getAttribute('Value') || '0';
       return obj;
     });
 
-  // Extract raw AOI XML to embed as context (without the outer RSLogix5000Content wrapper)
-  const serializer = new XMLSerializer();
-  const aoiClone = aoiDef.cloneNode(true);
-  aoiClone.removeAttribute('Use'); // strip Use="Target"
-  const aoiDefXml = serializer.serializeToString(aoiClone);
+  const aoiDefXml = extractAOIXml(xmlContent);
 
   return { aoiName, visibleParams, allParams, localTags, aoiDefXml };
 }
 
-function memberXml(name, dataType, pre = '10000', indent = '      ') {
+// Generate L5K data: [EnableIn=1, localTag1, localTag2, ...]
+// TIMER/COUNTER: [status_bits, PRE, ACC]; scalar types: 0
+function generateL5KData(localTags) {
+  const parts = ['1']; // EnableIn always 1
+  for (const lt of localTags) {
+    const dt = lt.dataType;
+    if (dt === 'BOOL' || dt === 'DINT' || dt === 'INT' || dt === 'SINT') {
+      parts.push('0');
+    } else if (dt === 'REAL') {
+      parts.push('0.0');
+    } else if (dt === 'TIMER' || dt === 'COUNTER') {
+      const pre = lt.pre || '0';
+      parts.push(`[0,${pre},0]`);
+    } else {
+      parts.push('0');
+    }
+  }
+  return `[${parts.join(',')}]`;
+}
+
+function memberXml(name, dataType, indent = '      ') {
   if (dataType === 'BOOL') {
     const val = name === 'EnableIn' ? '1' : '0';
     return `${indent}<DataValueMember Name="${name}" DataType="BOOL" Value="${val}"/>`;
@@ -51,31 +76,11 @@ function memberXml(name, dataType, pre = '10000', indent = '      ') {
   if (dataType === 'DINT') {
     return `${indent}<DataValueMember Name="${name}" DataType="DINT" Radix="Decimal" Value="0"/>`;
   }
-  if (dataType === 'INT') {
-    return `${indent}<DataValueMember Name="${name}" DataType="INT" Radix="Decimal" Value="0"/>`;
+  if (dataType === 'INT' || dataType === 'SINT') {
+    return `${indent}<DataValueMember Name="${name}" DataType="${dataType}" Radix="Decimal" Value="0"/>`;
   }
   if (dataType === 'REAL') {
     return `${indent}<DataValueMember Name="${name}" DataType="REAL" Radix="Float" Value="0.0"/>`;
-  }
-  if (dataType === 'TIMER') {
-    return `${indent}<StructureMember Name="${name}" DataType="TIMER">
-${indent}  <DataValueMember Name="PRE" DataType="DINT" Radix="Decimal" Value="${pre}"/>
-${indent}  <DataValueMember Name="ACC" DataType="DINT" Radix="Decimal" Value="0"/>
-${indent}  <DataValueMember Name="EN" DataType="BOOL" Value="0"/>
-${indent}  <DataValueMember Name="TT" DataType="BOOL" Value="0"/>
-${indent}  <DataValueMember Name="DN" DataType="BOOL" Value="0"/>
-${indent}</StructureMember>`;
-  }
-  if (dataType === 'COUNTER') {
-    return `${indent}<StructureMember Name="${name}" DataType="COUNTER">
-${indent}  <DataValueMember Name="PRE" DataType="DINT" Radix="Decimal" Value="0"/>
-${indent}  <DataValueMember Name="ACC" DataType="DINT" Radix="Decimal" Value="0"/>
-${indent}  <DataValueMember Name="CU" DataType="BOOL" Value="0"/>
-${indent}  <DataValueMember Name="CD" DataType="BOOL" Value="0"/>
-${indent}  <DataValueMember Name="DN" DataType="BOOL" Value="0"/>
-${indent}  <DataValueMember Name="OV" DataType="BOOL" Value="0"/>
-${indent}  <DataValueMember Name="UN" DataType="BOOL" Value="0"/>
-${indent}</StructureMember>`;
   }
   // Unknown — skip
   return '';
@@ -91,14 +96,16 @@ export function generateStudio5000Routine({ template, aoiConfig, controllerName 
   const routineName = sanitizeTagName(template.name) || 'Routine';
 
   // ── Tags (one per instance) ────────────────────────────────────────────────
+  const l5kData = generateL5KData(localTags);
   const tagsXml = instances.map(inst => {
     const tagName = sanitizeTagName(inst.name);
-    const members = [
-      ...allParams.map(p => memberXml(p.name, p.dataType)),
-      ...localTags.map(lt => memberXml(lt.name, lt.dataType, lt.pre || '10000')),
-    ].filter(Boolean);
+    // Decorated Structure: Parameters only (no LocalTags)
+    const members = allParams.map(p => memberXml(p.name, p.dataType)).filter(Boolean);
 
     return `  <Tag Name="${tagName}" TagType="Base" DataType="${aoiName}" Constant="false" ExternalAccess="Read/Write">
+    <Data Format="L5K">
+      <![CDATA[${l5kData}]]>
+    </Data>
     <Data Format="Decorated">
       <Structure DataType="${aoiName}">
 ${members.join('\n')}
