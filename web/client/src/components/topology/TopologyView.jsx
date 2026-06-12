@@ -409,7 +409,17 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
 </g>`;
     }).join('\n');
 
-    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vW} ${vH}" width="${vW}" height="${vH}" style="font-family:system-ui,sans-serif;max-width:100%;height:auto">
+    // ── Scale to fit one landscape page ─────────────────────────
+    // Conservative printable area at 96 dpi:
+    //   A4 landscape (297×210mm) minus 10mm margins → ~263×178mm → ~995×672px
+    //   Leave ~28px for header text → SVG available: 995×644px
+    const PAGE_W = 995;
+    const PAGE_H = 644;
+    const scale  = Math.min(PAGE_W / vW, PAGE_H / vH);
+    const dispW  = Math.floor(vW * scale);
+    const dispH  = Math.floor(vH * scale);
+
+    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vW} ${vH}" width="${dispW}" height="${dispH}" style="font-family:system-ui,sans-serif;display:block">
   <defs>
     <marker id="pr-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
       <path d="M0,0 L0,6 L8,3 z" fill="#666" fill-opacity="0.8"/>
@@ -432,14 +442,13 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
 <title>${title}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  @page{size:landscape;margin:8mm}
-  body{font-family:system-ui,sans-serif;background:#fff;padding:6mm}
-  h1{font-size:13px;font-weight:600;color:#222;margin-bottom:3px}
-  p{font-size:9px;color:#888;margin-bottom:8px}
-  svg{width:100%;height:auto;display:block}
+  @page{size:landscape;margin:10mm}
+  body{font-family:system-ui,sans-serif;background:#fff;padding:0}
+  .hdr{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+  h1{font-size:12px;font-weight:600;color:#222}
+  p{font-size:9px;color:#999}
 </style></head><body>
-<h1>${title}</h1>
-<p>ISA-95 Network Topology · ${dateStr}</p>
+<div class="hdr"><h1>${title}</h1><p>ISA-95 Network Topology · ${dateStr}</p></div>
 ${svgStr}
 <script>window.addEventListener('load',function(){window.print();setTimeout(function(){window.close()},600)});<\/script>
 </body></html>`);
