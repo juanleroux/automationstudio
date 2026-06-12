@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ChevronRight, ChevronDown, Folder, FolderOpen, Tag,
   Circle, Search, Filter, Plus, Trash2, Copy, Edit2,
-  Upload, Download, Flag, MoreVertical, ArrowUpDown
+  Upload, Download, Flag, MoreVertical, ArrowUpDown, FileCode
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -10,9 +10,57 @@ import { uploadToIgnition } from '../../api/client';
 import { exportFromIgnition } from '../../api/client';
 import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
-import { downloadStudio5000Routine } from '../../utils/studio5000Export';
+import { downloadStudio5000Routine, parseProjectL5X } from '../../utils/studio5000Export';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
+
+function S5kGroupRow({ group, s5kSelected, setS5kSelected }) {
+  const [expanded, setExpanded] = useState(true);
+  const allSelected = group.instances.every(i => s5kSelected.has(`${group.aoiName}::${i.name}`));
+  const someSelected = !allSelected && group.instances.some(i => s5kSelected.has(`${group.aoiName}::${i.name}`));
+  const checkRef = useRef(null);
+  useEffect(() => { if (checkRef.current) checkRef.current.indeterminate = someSelected; }, [someSelected]);
+  const toggleAll = () => {
+    setS5kSelected(prev => {
+      const next = new Set(prev);
+      group.instances.forEach(i => {
+        const k = `${group.aoiName}::${i.name}`;
+        if (allSelected) next.delete(k); else next.add(k);
+      });
+      return next;
+    });
+  };
+  const toggleOne = (name) => {
+    setS5kSelected(prev => {
+      const next = new Set(prev);
+      const k = `${group.aoiName}::${name}`;
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+  };
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', background: 'var(--bg-surface)', borderRadius: 5, cursor: 'pointer' }} onClick={() => setExpanded(e => !e)}>
+        <input type="checkbox" ref={checkRef} checked={allSelected} onChange={toggleAll} onClick={e => e.stopPropagation()} style={{ width: 13, height: 13, flexShrink: 0, cursor: 'pointer' }} />
+        {expanded ? <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} /> : <ChevronRight size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />}
+        <FileCode size={13} style={{ flexShrink: 0, color: 'var(--accent)' }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{group.aoiName}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{group.instances.length} instance{group.instances.length !== 1 ? 's' : ''}</span>
+      </div>
+      {expanded && (
+        <div style={{ paddingLeft: 22 }}>
+          {group.instances.map((inst, i) => (
+            <div key={i} className="tree-node" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 4px', borderRadius: 3, cursor: 'pointer' }} onClick={() => toggleOne(inst.name)}>
+              <input type="checkbox" checked={s5kSelected.has(`${group.aoiName}::${inst.name}`)} onChange={() => toggleOne(inst.name)} onClick={e => e.stopPropagation()} style={{ width: 13, height: 13, flexShrink: 0, cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, color: inst.isNamed ? 'var(--text-primary)' : 'var(--text-muted)' }}>{inst.name}</span>
+              {inst.tagRef !== inst.name && <span style={{ fontSize: 11, color: 'var(--text-disabled)' }}>{inst.tagRef}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function nextId(arr) {
   if (!arr || !arr.length) return 1;
@@ -46,6 +94,9 @@ export default function TemplateTree({ selected, onSelect }) {
   const [ignitionFetch, setIgnitionFetch] = useState({ loading: false, error: null, udts: [] });
   const [selectedUdts, setSelectedUdts] = useState(new Set());
   const [ignitionFilter, setIgnitionFilter] = useState('');
+  const [showImportStudio5000, setShowImportStudio5000] = useState(false);
+  const [s5kGroups, setS5kGroups] = useState([]);
+  const [s5kSelected, setS5kSelected] = useState(new Set());
   const [multiSelected, setMultiSelected] = useState(new Set()); // "templateId:instanceId"
 
   const renameInputRef = useRef(null);
@@ -976,6 +1027,44 @@ export default function TemplateTree({ selected, onSelect }) {
                   </div>
                 </>
               )}
+              {project?.studio5000?.enableMenuItems && (
+                <>
+                  <div className="context-menu-separator" />
+                  <div
+                    className="context-menu-item"
+                    style={!project?.studio5000?.projectL5X ? { opacity: 0.45 } : {}}
+                    onClick={() => {
+                      const content = project?.studio5000?.projectL5X?.content;
+                      if (!content) {
+                        toast.error('No Studio 5000 project file set — configure it in Settings → Studio 5000');
+                        setContextMenu(null);
+                        return;
+                      }
+                      try {
+                        const groups = parseProjectL5X(content);
+                        if (!groups.length) {
+                          toast.error('No AOI definitions found in the project file');
+                          setContextMenu(null);
+                          return;
+                        }
+                        const all = new Set();
+                        for (const g of groups) g.instances.forEach(i => all.add(`${g.aoiName}::${i.name}`));
+                        setS5kGroups(groups);
+                        setS5kSelected(all);
+                        setShowImportStudio5000(true);
+                      } catch (err) {
+                        toast.error('Failed to parse project file: ' + err.message);
+                      }
+                      setContextMenu(null);
+                    }}
+                  >
+                    <FileCode size={14} /> Import from Studio 5000
+                    {!project?.studio5000?.projectL5X && (
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>(no file set)</span>
+                    )}
+                  </div>
+                </>
+              )}
             </>
           ) : contextMenu.type === 'template' ? (
             <>
@@ -1358,6 +1447,75 @@ export default function TemplateTree({ selected, onSelect }) {
           </Modal>
         );
       })()}
+
+      {/* Import from Studio 5000 Modal */}
+      {showImportStudio5000 && (
+        <Modal
+          title="Import from Studio 5000"
+          onClose={() => setShowImportStudio5000(false)}
+          width={500}
+          footer={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+              <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => {
+                const all = new Set();
+                for (const g of s5kGroups) g.instances.forEach(i => all.add(`${g.aoiName}::${i.name}`));
+                setS5kSelected(all);
+              }}>All</button>
+              <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setS5kSelected(new Set())}>None</button>
+              <span style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)' }}>
+                {s5kSelected.size} of {s5kGroups.reduce((n, g) => n + g.instances.length, 0)} selected
+              </span>
+              <button className="btn btn-secondary" onClick={() => setShowImportStudio5000(false)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                disabled={s5kSelected.size === 0}
+                onClick={() => {
+                  const now = new Date().toISOString();
+                  const toImport = new Map();
+                  for (const group of s5kGroups) {
+                    const sel = group.instances.filter(i => s5kSelected.has(`${group.aoiName}::${i.name}`));
+                    if (sel.length) toImport.set(group.aoiName, sel.map(i => i.name));
+                  }
+                  if (!toImport.size) return;
+                  updateProject(p => {
+                    const tmpls = [...(p.templates || [])];
+                    let maxTplId = tmpls.length ? Math.max(...tmpls.map(t => t.id)) : 0;
+                    for (const [aoiName, instNames] of toImport) {
+                      let tpl = tmpls.find(t => t.name === aoiName);
+                      if (!tpl) {
+                        maxTplId++;
+                        tpl = { id: maxTplId, name: aoiName, description: '', color: '#3b82f6', attributes: [], instances: [], profiles: [], lastModification: now };
+                        tmpls.push(tpl);
+                      }
+                      const existingNames = new Set(tpl.instances.map(i => i.name));
+                      let maxInstId = tpl.instances.length ? Math.max(...tpl.instances.map(i => i.id)) : 0;
+                      for (const name of instNames) {
+                        if (!existingNames.has(name)) {
+                          maxInstId++;
+                          tpl.instances.push({ id: maxInstId, name, attributes: [], lastModification: now });
+                        }
+                      }
+                    }
+                    return { ...p, templates: tmpls };
+                  });
+                  const total = [...toImport.values()].reduce((s, arr) => s + arr.length, 0);
+                  toast.success(`Imported ${total} instance${total !== 1 ? 's' : ''} from Studio 5000`);
+                  setShowImportStudio5000(false);
+                  setS5kSelected(new Set());
+                }}
+              >
+                <Download size={13} /> Import
+              </button>
+            </div>
+          }
+        >
+          <div style={{ maxHeight: 440, overflowY: 'auto' }}>
+            {s5kGroups.map((group, i) => (
+              <S5kGroupRow key={i} group={group} s5kSelected={s5kSelected} setS5kSelected={setS5kSelected} />
+            ))}
+          </div>
+        </Modal>
+      )}
 
       {/* Import from Ignition Modal */}
       {showImportIgnition && (
