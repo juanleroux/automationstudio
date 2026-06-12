@@ -10,7 +10,7 @@ import { uploadToIgnition } from '../../api/client';
 import { exportFromIgnition } from '../../api/client';
 import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
-import { downloadStudio5000Routine, parseProjectL5X } from '../../utils/studio5000Export';
+import { downloadStudio5000Routine, parseProjectL5X, mapL5XDataType } from '../../utils/studio5000Export';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
 
@@ -1490,7 +1490,7 @@ export default function TemplateTree({ selected, onSelect }) {
                           id: idx + 1,
                           name: param.name,
                           description: param.usage || '',
-                          dataType: param.dataType,
+                          dataType: mapL5XDataType(param.dataType),
                           value: '',
                           parameter: true,
                           lastModification: now,

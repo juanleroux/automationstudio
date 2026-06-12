@@ -155,6 +155,27 @@ ${rungsXml}
 </RSLogix5000Content>`;
 }
 
+// ── L5X → app data type mapping ───────────────────────────────────────────────
+// Data type values must match DataTypeSelect.jsx: 0=None,1=Bool,2=Int8,3=Int16,
+// 4=Int32,5=UInt8,6=UInt16,7=UInt32,8=Float,9=String,10=Int4
+export function mapL5XDataType(l5xType) {
+  switch ((l5xType || '').toUpperCase()) {
+    case 'BOOL':   return 1;
+    case 'SINT':   return 2;
+    case 'INT':    return 3;
+    case 'DINT':   return 4;
+    case 'LINT':   return 4;
+    case 'USINT':  return 5;
+    case 'UINT':   return 6;
+    case 'UDINT':  return 7;
+    case 'ULINT':  return 7;
+    case 'REAL':   return 8;
+    case 'LREAL':  return 8;
+    case 'STRING': return 9;
+    default:       return 9;
+  }
+}
+
 // ── Project L5X parser ────────────────────────────────────────────────────────
 // Extracts AOI definitions (with their visible Input/Output parameters) and
 // tag instances from a controller-level L5X file.
