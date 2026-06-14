@@ -11,6 +11,7 @@ import { exportFromIgnition } from '../../api/client';
 import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
 import { downloadStudio5000Routine, parseProjectL5X, mapL5XDataType } from '../../utils/studio5000Export';
+import { parseXDB, mapCEDataType, downloadXBD } from '../../utils/controlExpertExport';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
 
@@ -62,6 +63,53 @@ function S5kGroupRow({ group, s5kSelected, setS5kSelected }) {
   );
 }
 
+function CeGroupRow({ group, ceSelected, setCeSelected }) {
+  const [expanded, setExpanded] = useState(true);
+  const allSelected = group.instances.every(i => ceSelected.has(`${group.fbTypeName}::${i}`));
+  const someSelected = !allSelected && group.instances.some(i => ceSelected.has(`${group.fbTypeName}::${i}`));
+  const checkRef = useRef(null);
+  useEffect(() => { if (checkRef.current) checkRef.current.indeterminate = someSelected; }, [someSelected]);
+  const toggleAll = () => {
+    setCeSelected(prev => {
+      const next = new Set(prev);
+      group.instances.forEach(i => {
+        const k = `${group.fbTypeName}::${i}`;
+        if (allSelected) next.delete(k); else next.add(k);
+      });
+      return next;
+    });
+  };
+  const toggleOne = (name) => {
+    setCeSelected(prev => {
+      const next = new Set(prev);
+      const k = `${group.fbTypeName}::${name}`;
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+  };
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', background: 'var(--bg-surface)', borderRadius: 5, cursor: 'pointer' }} onClick={() => setExpanded(e => !e)}>
+        <input type="checkbox" ref={checkRef} checked={allSelected} onChange={toggleAll} onClick={e => e.stopPropagation()} style={{ width: 13, height: 13, flexShrink: 0, cursor: 'pointer' }} />
+        {expanded ? <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} /> : <ChevronRight size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />}
+        <FileCode size={13} style={{ flexShrink: 0, color: 'var(--accent)' }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{group.fbTypeName}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{group.instances.length} instance{group.instances.length !== 1 ? 's' : ''}</span>
+      </div>
+      {expanded && (
+        <div style={{ paddingLeft: 22 }}>
+          {group.instances.map((name, i) => (
+            <div key={i} className="tree-node" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 4px', borderRadius: 3, cursor: 'pointer' }} onClick={() => toggleOne(name)}>
+              <input type="checkbox" checked={ceSelected.has(`${group.fbTypeName}::${name}`)} onChange={() => toggleOne(name)} onClick={e => e.stopPropagation()} style={{ width: 13, height: 13, flexShrink: 0, cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>{name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function nextId(arr) {
   if (!arr || !arr.length) return 1;
   return Math.max(...arr.map(x => x.id)) + 1;
@@ -97,6 +145,9 @@ export default function TemplateTree({ selected, onSelect }) {
   const [showImportStudio5000, setShowImportStudio5000] = useState(false);
   const [s5kGroups, setS5kGroups] = useState([]);
   const [s5kSelected, setS5kSelected] = useState(new Set());
+  const [showImportControlExpert, setShowImportControlExpert] = useState(false);
+  const [ceGroups, setCeGroups] = useState([]); // [{ fbTypeName, fbVersion, parameters, instances: [name] }]
+  const [ceSelected, setCeSelected] = useState(new Set());
   const [multiSelected, setMultiSelected] = useState(new Set()); // "templateId:instanceId"
 
   const renameInputRef = useRef(null);
@@ -1065,6 +1116,43 @@ export default function TemplateTree({ selected, onSelect }) {
                   </div>
                 </>
               )}
+              {project?.controlExpert?.enableMenuItems && (
+                <>
+                  <div className="context-menu-separator" />
+                  <div
+                    className="context-menu-item"
+                    style={!project?.controlExpert?.projectXDBFile ? { opacity: 0.45 } : {}}
+                    onClick={() => {
+                      const xdbFile = project?.controlExpert?.projectXDBFile;
+                      if (!xdbFile?.content) {
+                        toast.error('No Control Expert XDB file set — configure it in Settings → Control Expert');
+                        setContextMenu(null);
+                        return;
+                      }
+                      try {
+                        const parsed = parseXDB(xdbFile.content);
+                        const group = {
+                          fbTypeName: parsed.fbTypeName,
+                          fbVersion: parsed.version,
+                          parameters: parsed.parameters,
+                          instances: [],
+                        };
+                        setCeGroups([group]);
+                        setCeSelected(new Set());
+                        setShowImportControlExpert(true);
+                      } catch (err) {
+                        toast.error('Failed to parse XDB file: ' + err.message);
+                      }
+                      setContextMenu(null);
+                    }}
+                  >
+                    <FileCode size={14} /> Import from Control Expert
+                    {!project?.controlExpert?.projectXDBFile && (
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>(no file set)</span>
+                    )}
+                  </div>
+                </>
+              )}
             </>
           ) : contextMenu.type === 'template' ? (
             <>
@@ -1128,6 +1216,30 @@ export default function TemplateTree({ selected, onSelect }) {
                         }}
                       >
                         <Download size={14} /> Export to Studio 5000
+                      </div>
+                    );
+                  })()}
+                  {project?.controlExpert?.enableMenuItems && (() => {
+                    const t = templates.find(x => x.id === contextMenu.templateId);
+                    const fbConfig = project?.controlExpert?.templateFBs?.[contextMenu.templateId];
+                    const hasInstances = (t?.instances?.length || 0) > 0;
+                    return (
+                      <div
+                        className="context-menu-item"
+                        style={{ opacity: (!fbConfig || !hasInstances) ? 0.4 : 1, pointerEvents: (!fbConfig || !hasInstances) ? 'none' : 'auto' }}
+                        title={!fbConfig ? 'Configure XDB file in Settings → Control Expert' : !hasInstances ? 'No instances to export' : ''}
+                        onClick={() => {
+                          if (!t || !fbConfig) return;
+                          try {
+                            downloadXBD({ template: t, fbConfig, projectName: project?.name });
+                            toast.success(`Exported ${t.name} (${t.instances?.length || 0} instances)`);
+                          } catch (err) {
+                            toast.error('Export failed: ' + err.message);
+                          }
+                          setContextMenu(null);
+                        }}
+                      >
+                        <Download size={14} /> Export to Control Expert
                       </div>
                     );
                   })()}
@@ -1524,6 +1636,97 @@ export default function TemplateTree({ selected, onSelect }) {
             {s5kGroups.map((group, i) => (
               <S5kGroupRow key={i} group={group} s5kSelected={s5kSelected} setS5kSelected={setS5kSelected} />
             ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* Import from Control Expert Modal */}
+      {showImportControlExpert && (
+        <Modal
+          title="Import from Control Expert"
+          onClose={() => setShowImportControlExpert(false)}
+          width={520}
+          footer={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+              <button className="btn btn-secondary" onClick={() => setShowImportControlExpert(false)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                disabled={!ceGroups[0] || ceGroups[0].instances.length === 0 || ceSelected.size === 0}
+                onClick={() => {
+                  const group = ceGroups[0];
+                  if (!group) return;
+                  const now = new Date().toISOString();
+                  const selNames = group.instances.filter(n => ceSelected.has(`${group.fbTypeName}::${n}`));
+                  if (!selNames.length) return;
+                  updateProject(p => {
+                    const tmpls = [...(p.templates || [])];
+                    let maxTplId = tmpls.length ? Math.max(...tmpls.map(t => t.id)) : 0;
+                    let tpl = tmpls.find(t => t.name === group.fbTypeName);
+                    if (!tpl) {
+                      maxTplId++;
+                      const attrs = (group.parameters || []).map((param, idx) => ({
+                        id: idx + 1,
+                        name: param.name,
+                        description: param.usage || '',
+                        dataType: mapCEDataType(param.typeName),
+                        value: '',
+                        parameter: false,
+                        lastModification: now,
+                      }));
+                      tpl = { id: maxTplId, name: group.fbTypeName, description: '', attributes: attrs, instances: [], profiles: [], lastModification: now };
+                      tmpls.push(tpl);
+                    }
+                    const existingNames = new Set(tpl.instances.map(i => i.name));
+                    let maxInstId = tpl.instances.length ? Math.max(...tpl.instances.map(i => i.id)) : 0;
+                    for (const name of selNames) {
+                      if (!existingNames.has(name)) {
+                        maxInstId++;
+                        tpl.instances.push({ id: maxInstId, name, attributes: [], lastModification: now });
+                      }
+                    }
+                    return { ...p, templates: tmpls };
+                  });
+                  toast.success(`Imported ${selNames.length} instance${selNames.length !== 1 ? 's' : ''} from Control Expert`);
+                  setShowImportControlExpert(false);
+                  setCeSelected(new Set());
+                }}
+              >
+                <Download size={13} /> Import
+              </button>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            {ceGroups[0] && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 10px', background: 'var(--bg-surface)', borderRadius: 5 }}>
+                FB Type: <strong style={{ color: 'var(--text-primary)' }}>{ceGroups[0].fbTypeName}</strong>
+                {' '}· {ceGroups[0].parameters?.length || 0} parameters
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6 }}>
+                Instance Names
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                Enter the names of the instances to import, one per line. These become instance names in the template.
+              </div>
+              <textarea
+                rows={6}
+                placeholder="PUMP_01&#10;PUMP_02&#10;PUMP_03"
+                style={{ width: '100%', fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }}
+                onChange={e => {
+                  const names = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+                  const fbTypeName = ceGroups[0]?.fbTypeName || '';
+                  setCeGroups(prev => prev.map((g, i) => i === 0 ? { ...g, instances: names } : g));
+                  setCeSelected(new Set(names.map(n => `${fbTypeName}::${n}`)));
+                }}
+              />
+              {ceGroups[0]?.instances?.length > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {ceGroups[0].instances.length} instance{ceGroups[0].instances.length !== 1 ? 's' : ''} ready to import
+                </div>
+              )}
+            </div>
           </div>
         </Modal>
       )}

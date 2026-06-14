@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw } from 'lucide-react';
+import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw, Layers } from 'lucide-react';
 import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -43,6 +43,22 @@ export default function SettingsView() {
   const studio5000FileRef = useRef(null);
   const studio5000ProjectFileRef = useRef(null);
   const [studio5000PendingTemplateId, setStudio5000PendingTemplateId] = useState(null);
+
+  // controlExpert reads directly from project so it persists across view changes without Save
+  const controlExpert = project?.controlExpert || { enableMenuItems: false, templateFBs: {} };
+  const updateControlExpert = (updater) => {
+    if (!project) return;
+    updateProject(p => ({
+      ...p,
+      controlExpert: typeof updater === 'function'
+        ? updater(p.controlExpert || { enableMenuItems: false, templateFBs: {} })
+        : updater,
+    }));
+  };
+  const [ceTemplateListKey, setCeTemplateListKey] = useState(0);
+  const ceXDBFileRef = useRef(null);
+  const ceProjectXDBFileRef = useRef(null);
+  const [cePendingTemplateId, setCePendingTemplateId] = useState(null);
   const [siemens, setSiemens] = useState(
     project?.siemens || {
       tiaVersion: 'V21',
@@ -179,6 +195,7 @@ export default function SettingsView() {
     { id: 'engineering', label: 'Ignition API', icon: Zap },
     { id: 'siemens', label: 'Siemens API', icon: Cpu },
     { id: 'studio5000', label: 'Studio 5000', icon: FileCode },
+    { id: 'controlExpert', label: 'Control Expert', icon: Layers },
     { id: 'company', label: 'Company', icon: Building2 },
   ];
 
@@ -818,6 +835,230 @@ export default function SettingsView() {
               {studio5000.enableMenuItems && (
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -8, paddingLeft: 22 }}>
                   Adds "Export to Studio 5000" to the template right-click menu in Assets. Requires an AOI file to be configured for the template.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Control Expert tab */}
+          {activeTab === 'controlExpert' && (
+            <div className="flex flex-col gap-4">
+              {!project && (
+                <div className="p-3 rounded-md text-sm text-yellow-400" style={{ background: 'rgba(255,193,7,0.1)', border: '1px solid rgba(255,193,7,0.2)' }}>
+                  Open a project to configure Control Expert settings
+                </div>
+              )}
+
+              {/* Project XDB File Location */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Project File Location</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                  Select a Schneider Control Expert Derived Function Block definition file (.XDB). When Control Expert
+                  menu items are enabled, this unlocks an "Import from Control Expert" option in the Assets view to pull
+                  FB types and instances directly from your project.
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={controlExpert.projectXDBFile?.fileName || ''}
+                    placeholder="No XDB file selected"
+                    readOnly
+                    disabled={!project}
+                    style={{ flex: 1, fontSize: 12, cursor: 'default' }}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => ceProjectXDBFileRef.current?.click()}
+                    disabled={!project}
+                    title="Browse for Control Expert XDB file"
+                    style={{ flexShrink: 0, padding: '0 10px' }}
+                  >
+                    <FolderOpen size={14} />
+                  </button>
+                  {controlExpert.projectXDBFile && (
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => updateControlExpert(prev => ({ ...prev, projectXDBFile: null }))}
+                      disabled={!project}
+                      title="Clear XDB file"
+                      style={{ flexShrink: 0, padding: '0 8px', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1 }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {controlExpert.projectXDBFile && (
+                  <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Layers size={12} />
+                    {controlExpert.projectXDBFile.fileName}
+                    {controlExpert.projectXDBFile.fbTypeName && (
+                      <span style={{ color: 'var(--text-muted)' }}>· FB type: <strong style={{ color: 'var(--text-primary)' }}>{controlExpert.projectXDBFile.fbTypeName}</strong></span>
+                    )}
+                  </div>
+                )}
+                {/* Hidden file input for XDB project file */}
+                <input
+                  ref={ceProjectXDBFileRef}
+                  type="file"
+                  accept=".XDB,.xdb"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                      const content = ev.target.result;
+                      let fbTypeName = file.name.replace(/\.xdb$/i, '');
+                      let fbVersion = '1.0';
+                      try {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(content, 'application/xml');
+                        const fbSource = doc.querySelector('FBSource');
+                        if (fbSource) {
+                          fbTypeName = fbSource.getAttribute('nameOfFBType') || fbTypeName;
+                          fbVersion = fbSource.getAttribute('version') || '1.0';
+                        }
+                      } catch (_) {}
+                      updateControlExpert(prev => ({
+                        ...prev,
+                        projectXDBFile: { fileName: file.name, fbTypeName, fbVersion, content },
+                      }));
+                      toast.success(`XDB file "${file.name}" loaded (FB type: ${fbTypeName})`);
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>FB File Mapping</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Associate a Function Block XDB file with each template. Used when exporting to Schneider Control Expert.
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: 12, gap: 6, flexShrink: 0 }}
+                  onClick={() => setCeTemplateListKey(k => k + 1)}
+                  disabled={!project}
+                  title="Refresh template list"
+                >
+                  <RotateCw size={13} /> Refresh
+                </button>
+              </div>
+
+              {/* Hidden file input for per-template XDB browsing */}
+              <input
+                ref={ceXDBFileRef}
+                type="file"
+                accept=".XDB,.xdb"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file || cePendingTemplateId == null) return;
+                  const reader = new FileReader();
+                  reader.onload = ev => {
+                    const content = ev.target.result;
+                    let fbTypeName = file.name.replace(/\.xdb$/i, '');
+                    let fbVersion = '1.0';
+                    try {
+                      const parser = new DOMParser();
+                      const doc = parser.parseFromString(content, 'application/xml');
+                      const fbSource = doc.querySelector('FBSource');
+                      if (fbSource) {
+                        fbTypeName = fbSource.getAttribute('nameOfFBType') || fbTypeName;
+                        fbVersion = fbSource.getAttribute('version') || '1.0';
+                      }
+                    } catch (_) {}
+                    updateControlExpert(prev => ({
+                      ...prev,
+                      templateFBs: {
+                        ...prev.templateFBs,
+                        [cePendingTemplateId]: { fileName: file.name, fbTypeName, fbVersion, content },
+                      },
+                    }));
+                    toast.success(`FB "${fbTypeName}" linked to template`);
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                  setCePendingTemplateId(null);
+                }}
+              />
+
+              {/* Template table */}
+              <div key={ceTemplateListKey} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Template</th>
+                      <th>XDB File</th>
+                      <th>FB Type</th>
+                      <th style={{ width: 90 }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project && (project.templates || []).length === 0 && (
+                      <tr>
+                        <td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>
+                          No templates defined — create templates in Assets first
+                        </td>
+                      </tr>
+                    )}
+                    {!project && (
+                      <tr>
+                        <td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>
+                          Open a project to see templates
+                        </td>
+                      </tr>
+                    )}
+                    {(project?.templates || []).map(t => {
+                      const fb = controlExpert.templateFBs?.[t.id];
+                      return (
+                        <tr key={t.id}>
+                          <td style={{ fontWeight: 500, fontSize: 13 }}>{t.name}</td>
+                          <td style={{ fontSize: 12, color: fb ? 'var(--text-primary)' : 'var(--text-disabled)' }}>
+                            {fb?.fileName || 'Not configured'}
+                          </td>
+                          <td style={{ fontSize: 12, color: fb ? 'var(--accent)' : 'var(--text-disabled)' }}>
+                            {fb?.fbTypeName || '—'}
+                          </td>
+                          <td>
+                            <button
+                              className="btn btn-ghost"
+                              style={{ fontSize: 11, padding: '3px 8px' }}
+                              disabled={!project}
+                              onClick={() => {
+                                setCePendingTemplateId(t.id);
+                                ceXDBFileRef.current?.click();
+                              }}
+                            >
+                              {fb ? 'Change' : 'Browse…'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+                <input
+                  type="checkbox"
+                  id="enableControlExpert"
+                  checked={controlExpert.enableMenuItems || false}
+                  onChange={e => updateControlExpert(prev => ({ ...prev, enableMenuItems: e.target.checked }))}
+                  disabled={!project}
+                />
+                <label htmlFor="enableControlExpert" className="text-sm text-text-primary cursor-pointer">
+                  Enable Control Expert Menu Items
+                </label>
+              </div>
+              {controlExpert.enableMenuItems && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -8, paddingLeft: 22 }}>
+                  Adds "Export to Control Expert" to the template right-click menu in Assets. Requires an XDB file to be configured for the template.
                 </div>
               )}
             </div>

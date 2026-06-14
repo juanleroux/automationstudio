@@ -18,6 +18,7 @@ function blankProject(name) {
     areas: [{ id: 1, name: 'Area 1', description: '', lastModification: new Date().toISOString() }],
     engineering: { ignitionGateway: '', apiKey: '', folderPath: '', enableIgnitionMenuItems: false },
     studio5000: { enableMenuItems: false, templateAOIs: {}, projectL5X: null },
+    controlExpert: { enableMenuItems: false, templateFBs: {}, projectXDBFile: null },
     proposal: {
       folderPath: '',
       clientDetails: {
