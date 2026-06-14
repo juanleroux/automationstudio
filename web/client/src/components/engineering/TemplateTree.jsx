@@ -1365,6 +1365,56 @@ export default function TemplateTree({ selected, onSelect }) {
                         <div className="context-menu-item" onClick={() => exportInstancesToJSON(ctxInsts)}>
                           <Download size={14} /> Export to JSON
                         </div>
+                        {project?.studio5000?.enableMenuItems && (() => {
+                          const t = templates.find(x => x.id === contextMenu.templateId);
+                          const aoiConfig = project?.studio5000?.templateAOIs?.[contextMenu.templateId];
+                          const disabled = !aoiConfig;
+                          const partialTemplate = t ? { ...t, instances: ctxInsts.map(item => item.instance) } : null;
+                          return (
+                            <div
+                              className="context-menu-item"
+                              style={{ opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? 'none' : 'auto' }}
+                              title={disabled ? 'Configure AOI file in Settings → Studio 5000' : ''}
+                              onClick={() => {
+                                if (!partialTemplate || !aoiConfig) return;
+                                try {
+                                  downloadStudio5000Routine({ template: partialTemplate, aoiConfig });
+                                  toast.success(`Exported ${ctxInsts.length} instance${ctxInsts.length !== 1 ? 's' : ''} to Studio 5000`);
+                                } catch (err) {
+                                  toast.error('Export failed: ' + err.message);
+                                }
+                                setContextMenu(null);
+                              }}
+                            >
+                              <Download size={14} /> Export to Studio 5000
+                            </div>
+                          );
+                        })()}
+                        {project?.controlExpert?.enableMenuItems && (() => {
+                          const t = templates.find(x => x.id === contextMenu.templateId);
+                          const fbConfig = project?.controlExpert?.templateFBs?.[contextMenu.templateId];
+                          const disabled = !fbConfig;
+                          const partialTemplate = t ? { ...t, instances: ctxInsts.map(item => item.instance) } : null;
+                          return (
+                            <div
+                              className="context-menu-item"
+                              style={{ opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? 'none' : 'auto' }}
+                              title={disabled ? 'Configure XDB file in Settings → Control Expert' : ''}
+                              onClick={() => {
+                                if (!partialTemplate || !fbConfig) return;
+                                try {
+                                  downloadXBD({ template: partialTemplate, fbConfig, projectName: project?.name });
+                                  toast.success(`Exported ${ctxInsts.length} instance${ctxInsts.length !== 1 ? 's' : ''} to Control Expert`);
+                                } catch (err) {
+                                  toast.error('Export failed: ' + err.message);
+                                }
+                                setContextMenu(null);
+                              }}
+                            >
+                              <Download size={14} /> Export to Control Expert
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                     {multiSelected.size > 0 && (
