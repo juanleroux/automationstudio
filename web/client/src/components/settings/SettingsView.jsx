@@ -191,45 +191,63 @@ export default function SettingsView() {
   };
 
   const tabs = [
-    { id: 'general', label: 'General', icon: SlidersHorizontal },
-    { id: 'engineering', label: 'Ignition API', icon: Zap },
-    { id: 'siemens', label: 'Siemens API', icon: Cpu },
-    { id: 'studio5000', label: 'Studio 5000', icon: FileCode },
-    { id: 'controlExpert', label: 'Control Expert', icon: Layers },
-    { id: 'company', label: 'Company', icon: Building2 },
+    { id: 'general',       label: 'General',        desc: 'Project & appearance',   icon: SlidersHorizontal },
+    { id: 'engineering',   label: 'Ignition API',   desc: 'Gateway connection',      icon: Zap },
+    { id: 'siemens',       label: 'Siemens API',    desc: 'TIA Portal settings',     icon: Cpu },
+    { id: 'studio5000',    label: 'Studio 5000',    desc: 'Rockwell AOI export',     icon: FileCode },
+    { id: 'controlExpert', label: 'Control Expert', desc: 'Schneider FB export',     icon: Layers },
+    { id: 'company',       label: 'Company',        desc: 'Branding & proposal',     icon: Building2 },
   ];
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--bg-main)' }}>
-      {/* Tab bar with Save button */}
-      <div className="tab-bar" style={{ flexShrink: 0, paddingLeft: 4, paddingRight: 8, justifyContent: 'space-between' }}>
-        <div className="flex">
+    <div className="flex h-full">
+      {/* Sidebar */}
+      <div style={{
+        width: 210, flexShrink: 0,
+        background: 'var(--bg-surface)',
+        borderRight: '1px solid var(--border)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
+            Settings
+          </span>
+        </div>
         {tabs.map(tab => {
-          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              className={`tab-item flex items-center gap-2 ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '10px 14px', textAlign: 'left', cursor: 'pointer',
+                background: isActive ? 'var(--bg-active, rgba(59,130,246,0.08))' : 'transparent',
+                borderTop: 'none', borderRight: 'none', borderBottom: 'none',
+                borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+              }}
             >
-              <Icon size={13} />
-              {tab.label}
+              <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: 'var(--text-primary)' }}>
+                {tab.label}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{tab.desc}</div>
             </button>
           );
         })}
+        <div style={{ flex: 1 }} />
+        <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={saving}
+            style={{ width: '100%', fontSize: 12 }}
+          >
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={handleSave}
-          disabled={saving}
-          style={{ height: 28, fontSize: 12, padding: '0 14px', alignSelf: 'center', marginBottom: 2 }}
-        >
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto" style={{ padding: '24px 24px' }}>
+      <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg-main)', padding: '24px 24px' }}>
         <div style={{ maxWidth: 520 }}>
 
           {/* General tab */}
@@ -1136,3 +1154,4 @@ export default function SettingsView() {
     </div>
   );
 }
+
