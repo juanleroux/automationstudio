@@ -191,12 +191,12 @@ export default function SettingsView() {
   };
 
   const tabs = [
-    { id: 'general',       label: 'General',        desc: 'Project & appearance',   icon: SlidersHorizontal },
-    { id: 'engineering',   label: 'Ignition API',   desc: 'Gateway connection',      icon: Zap },
-    { id: 'siemens',       label: 'Siemens API',    desc: 'TIA Portal settings',     icon: Cpu },
-    { id: 'studio5000',    label: 'Studio 5000',    desc: 'Rockwell AOI export',     icon: FileCode },
-    { id: 'controlExpert', label: 'Control Expert', desc: 'Schneider FB export',     icon: Layers },
-    { id: 'company',       label: 'Company',        desc: 'Branding & proposal',     icon: Building2 },
+    { id: 'general',       label: 'General',                          desc: 'Project & appearance',   icon: SlidersHorizontal },
+    { id: 'engineering',   label: 'Ignition Project Settings',        desc: 'Gateway connection',      icon: Zap },
+    { id: 'siemens',       label: 'Siemens Project Settings',         desc: 'TIA Portal settings',     icon: Cpu },
+    { id: 'studio5000',    label: 'Rockwell Automation Project',      desc: 'Studio 5000 AOI export',  icon: FileCode },
+    { id: 'controlExpert', label: 'Schneider Electric Project',       desc: 'Control Expert FB export', icon: Layers },
+    { id: 'company',       label: 'Company',                          desc: 'Branding & proposal',     icon: Building2 },
   ];
 
   return (
