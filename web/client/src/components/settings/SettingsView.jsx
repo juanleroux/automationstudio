@@ -64,12 +64,15 @@ export default function SettingsView() {
     project?.siemens || {
       tiaVersion: 'V21',
       projectPath: '',
+      bridgeUrl: 'http://localhost:5180',
       openWithUI: false,
       enableSiemensMenuItems: true,
     }
   );
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [siemensTesting, setSiemensTesting] = useState(false);
+  const [siemensTestResult, setSiemensTestResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -660,9 +663,9 @@ export default function SettingsView() {
                 </div>
               )}
               <div className="p-3 rounded-md text-sm" style={{ background: 'rgba(0,114,198,0.08)', border: '1px solid rgba(0,114,198,0.25)', color: 'var(--text-secondary)' }}>
-                Uses TIA Portal Openness — a direct .NET assembly call registered in the Windows GAC.
-                No separate service is required. Access is controlled by Windows authentication
-                inherited from the running process.
+                TIA Portal Openness is a .NET-only API, so a small bridge service must run on the
+                Windows machine that has TIA Portal installed and licensed for Openness. This app
+                talks to that bridge over HTTP.
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -680,6 +683,37 @@ export default function SettingsView() {
                   </select>
                   <p className="text-xs text-text-muted mt-1">Must match the installed TIA Portal version</p>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Bridge URL</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="url"
+                    value={siemens.bridgeUrl || ''}
+                    onChange={e => setSiemens(p => ({ ...p, bridgeUrl: e.target.value }))}
+                    placeholder="http://localhost:5180"
+                    disabled={!project}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleTestSiemensConnection}
+                    disabled={!project || siemensTesting || !siemens.bridgeUrl}
+                    style={{ flexShrink: 0, fontSize: 12 }}
+                  >
+                    {siemensTesting ? 'Testing...' : 'Test Connection'}
+                  </button>
+                </div>
+                <p className="text-xs text-text-muted mt-1">Address of the TIA Openness bridge service running on the Windows engineering workstation</p>
+                {siemensTestResult && (
+                  <div className="flex items-center gap-2 text-sm" style={{ marginTop: 6 }}>
+                    {siemensTestResult.success
+                      ? <><Wifi size={14} style={{ color: 'var(--accent)' }} /><span style={{ color: 'var(--accent)' }}>{siemensTestResult.message}</span></>
+                      : <><WifiOff size={14} style={{ color: '#e55353' }} /><span style={{ color: '#e55353' }}>{siemensTestResult.message}</span></>
+                    }
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-text-muted mb-1">TIA Project Path (optional)</label>

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- TIA Portal Openness ships as a .NET Framework 4.8 assembly, so the bridge
+         must target net48 rather than .NET Core/5+ to load it in-process. -->
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>SiemensTiaBridge</RootNamespace>
+    <AssemblyName>SiemensTiaBridge</AssemblyName>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <!--
+    Siemens.Engineering.dll (and Siemens.Engineering.Hmi.dll, etc.) are not distributed on
+    NuGet. They ship with the TIA Portal installation. Copy the version matching your
+    TiaVersion setting from the install, e.g.:
+      C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18\Siemens.Engineering.dll
+    into the lib\ folder next to this .csproj (or update HintPath below to reference it
+    directly from the Program Files location).
+  -->
+  <ItemGroup>
+    <Reference Include="Siemens.Engineering">
+      <HintPath>lib\Siemens.Engineering.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
