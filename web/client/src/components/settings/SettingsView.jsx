@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Wifi, WifiOff, Building2, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw, Layers } from 'lucide-react';
+import { Wifi, WifiOff, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw, Layers } from 'lucide-react';
 import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -13,6 +13,7 @@ export default function SettingsView() {
   const accentSwatchRef = useRef(null);
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('general');
+  const [generalSubTab, setGeneralSubTab] = useState('general');
   const [config, setConfig] = useState(null);
   const [engineering, setEngineering] = useState(
     project?.engineering || {
@@ -196,7 +197,6 @@ export default function SettingsView() {
     { id: 'siemens',       label: 'Siemens',              desc: 'Project Settings',        icon: Cpu },
     { id: 'studio5000',    label: 'Rockwell Automation',  desc: 'Project Settings',        icon: FileCode },
     { id: 'controlExpert', label: 'Schneider Electric',   desc: 'Project Settings',        icon: Layers },
-    { id: 'company',       label: 'Company',              desc: 'Branding & Proposal',     icon: Building2 },
   ];
 
   return (
@@ -254,6 +254,33 @@ export default function SettingsView() {
           {activeTab === 'general' && (
             <div className="flex flex-col gap-6">
 
+              {/* Sub-tabs */}
+              <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)' }}>
+                {[
+                  { id: 'general', label: 'General' },
+                  { id: 'company', label: 'Company' },
+                ].map(sub => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setGeneralSubTab(sub.id)}
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: 13,
+                      fontWeight: generalSubTab === sub.id ? 600 : 400,
+                      color: generalSubTab === sub.id ? 'var(--text-primary)' : 'var(--text-muted)',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: generalSubTab === sub.id ? '2px solid var(--accent)' : '2px solid transparent',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+
+              {generalSubTab === 'general' && (
+                <>
               {/* Project Details */}
               {project ? (
                 <div>
@@ -346,6 +373,75 @@ export default function SettingsView() {
                   </div>
                 </div>
               </div>
+                </>
+              )}
+
+              {generalSubTab === 'company' && (
+                config ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-text-muted mb-1">Company Name</label>
+                        <input type="text" value={config.proposal?.companyName || ''} onChange={e => setCompany('companyName', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-text-muted mb-1">Contact Name</label>
+                        <input type="text" value={config.proposal?.contactName || ''} onChange={e => setCompany('contactName', e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-text-muted mb-1">Phone Number</label>
+                        <input type="text" value={config.proposal?.phoneNumber || ''} onChange={e => setCompany('phoneNumber', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-text-muted mb-1">Email Address</label>
+                        <input type="email" value={config.proposal?.emailAddress || ''} onChange={e => setCompany('emailAddress', e.target.value)} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-muted mb-1">Address</label>
+                      <textarea value={config.proposal?.address || ''} onChange={e => setCompany('address', e.target.value)} rows={2} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-text-muted mb-1">Tax Number</label>
+                        <input type="text" value={config.proposal?.taxNumber || ''} onChange={e => setCompany('taxNumber', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-text-muted mb-1">Tax Amount (%)</label>
+                        <input type="number" value={config.proposal?.taxAmount || '0'} onChange={e => setCompany('taxAmount', e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-text-muted mb-1">Currency Symbol</label>
+                        <input type="text" value={config.proposal?.currencySymbol || '$'} onChange={e => setCompany('currencySymbol', e.target.value)} style={{ maxWidth: 80 }} maxLength={5} />
+                      </div>
+                    </div>
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                      <p className="text-xs text-text-muted mb-2">Preview Colors</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {['previewBodyColor', 'previewHeaderColor', 'previewFooterColor', 'previewSummaryColor'].map(key => (
+                          <div key={key} className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={config.proposal?.[key] || '#ffffff'}
+                              onChange={e => setCompany(key, e.target.value)}
+                              style={{ width: 36, height: 30, padding: 2, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)', cursor: 'pointer' }}
+                            />
+                            <label className="text-xs text-text-muted capitalize">
+                              {key.replace('preview', '').replace('Color', '')}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-text-muted text-sm">Loading...</div>
+                )
+              )}
 
             </div>
           )}
@@ -1080,73 +1176,6 @@ export default function SettingsView() {
                 </div>
               )}
             </div>
-          )}
-
-          {/* Company tab */}
-          {activeTab === 'company' && config && (
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Company Name</label>
-                  <input type="text" value={config.proposal?.companyName || ''} onChange={e => setCompany('companyName', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Contact Name</label>
-                  <input type="text" value={config.proposal?.contactName || ''} onChange={e => setCompany('contactName', e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Phone Number</label>
-                  <input type="text" value={config.proposal?.phoneNumber || ''} onChange={e => setCompany('phoneNumber', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Email Address</label>
-                  <input type="email" value={config.proposal?.emailAddress || ''} onChange={e => setCompany('emailAddress', e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-text-muted mb-1">Address</label>
-                <textarea value={config.proposal?.address || ''} onChange={e => setCompany('address', e.target.value)} rows={2} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Tax Number</label>
-                  <input type="text" value={config.proposal?.taxNumber || ''} onChange={e => setCompany('taxNumber', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Tax Amount (%)</label>
-                  <input type="number" value={config.proposal?.taxAmount || '0'} onChange={e => setCompany('taxAmount', e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Currency Symbol</label>
-                  <input type="text" value={config.proposal?.currencySymbol || '$'} onChange={e => setCompany('currencySymbol', e.target.value)} style={{ maxWidth: 80 }} maxLength={5} />
-                </div>
-              </div>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                <p className="text-xs text-text-muted mb-2">Preview Colors</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {['previewBodyColor', 'previewHeaderColor', 'previewFooterColor', 'previewSummaryColor'].map(key => (
-                    <div key={key} className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={config.proposal?.[key] || '#ffffff'}
-                        onChange={e => setCompany(key, e.target.value)}
-                        style={{ width: 36, height: 30, padding: 2, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)', cursor: 'pointer' }}
-                      />
-                      <label className="text-xs text-text-muted capitalize">
-                        {key.replace('preview', '').replace('Color', '')}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          {activeTab === 'company' && !config && (
-            <div className="py-8 text-center text-text-muted text-sm">Loading...</div>
           )}
 
         </div>
