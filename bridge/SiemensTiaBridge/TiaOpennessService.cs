@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Xml;
 using Siemens.Engineering;
 using Siemens.Engineering.HW.Features;
@@ -160,24 +159,14 @@ namespace SiemensTiaBridge
                 }
             }
 
-            // Create / update FC with one LAD network per instance
+            // Create / update FC: let TIA generate the block shell, then splice in our networks.
             string fcCreated = null;
             if (!string.IsNullOrWhiteSpace(fcName) && instances.Count > 0)
             {
                 try
                 {
-                    var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion ?? "V19");
-                    var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"{fcName}_{Guid.NewGuid()}.xml"));
-                    try
-                    {
-                        File.WriteAllText(tmpFile.FullName, xml, new UTF8Encoding(false));
-                        targetGroup.Blocks.Import(tmpFile, ImportOptions.Override);
-                        fcCreated = fcName;
-                    }
-                    finally
-                    {
-                        try { tmpFile.Delete(); } catch { }
-                    }
+                    CreateFcWithNetworks(targetGroup, fcName, fcNumber, instances);
+                    fcCreated = fcName;
                 }
                 catch (Exception ex)
                 {
@@ -191,74 +180,146 @@ namespace SiemensTiaBridge
             return new CreateInstancesResult { Created = created, Skipped = skipped, FcCreated = fcCreated };
         }
 
-        private static string BuildFcXml(string fcName, int? fcNumber, List<InstanceInfo> instances, string tiaVersion)
+        /// <summary>
+        /// Creates (or replaces) an FC whose networks are LAD calls to the supplied instance DBs.
+        /// Strategy: create an empty FC via TIA API → export it (so TIA writes the correct version-
+        /// specific block header XML) → inject CompileUnit nodes → re-import with Override.
+        /// This avoids having to guess TIA's internal identifier attributes (Namespace, etc.).
+        /// </summary>
+        private static void CreateFcWithNetworks(
+            PlcBlockGroup targetGroup,
+            string fcName,
+            int? fcNumber,
+            List<InstanceInfo> instances)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
-            sb.AppendLine("<Document>");
-            sb.AppendLine($"  <Engineering version=\"{XmlEsc(tiaVersion)}\" />");
-            sb.AppendLine("  <SW.Blocks.FC ID=\"0\" CompositionName=\"Blocks\" Namespace=\"SW\">");
-            sb.AppendLine("    <AttributeList>");
-            sb.AppendLine($"      <AutoNumber>{(fcNumber.HasValue ? "false" : "true")}</AutoNumber>");
-            sb.AppendLine($"      <Name>{XmlEsc(fcName)}</Name>");
-            if (fcNumber.HasValue)
-                sb.AppendLine($"      <Number>{fcNumber.Value}</Number>");
-            sb.AppendLine("      <ProgrammingLanguage>LAD</ProgrammingLanguage>");
-            sb.AppendLine("    </AttributeList>");
-            sb.AppendLine("    <ObjectList>");
-
-            int uid = 1;
-            foreach (var inst in instances)
+            // Find existing FC or create a new empty one so TIA generates the correct XML shell.
+            FC fc = null;
+            foreach (var block in targetGroup.Blocks)
             {
-                int cuId      = uid++;
-                int titleId   = uid++;
-                int titleItem = uid++;
-                int callUid   = uid++;
-                int wireUid   = uid++;
-                int pwrUid    = uid++;
-
-                sb.AppendLine($"      <SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
-                sb.AppendLine("        <AttributeList>");
-                sb.AppendLine("          <NetworkSource>");
-                sb.AppendLine("            <FlgNet xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4\">");
-                sb.AppendLine("              <Parts>");
-                sb.AppendLine($"                <Call UId=\"{callUid}\">");
-                sb.AppendLine($"                  <CallInfo Name=\"{XmlEsc(inst.Name)}\" BlockType=\"DB\">");
-                sb.AppendLine($"                    <Instance Name=\"{XmlEsc(inst.Name)}\" Scope=\"GlobalVariable\">");
-                sb.AppendLine($"                      <Component Name=\"{XmlEsc(inst.Name)}\"/>");
-                sb.AppendLine("                    </Instance>");
-                sb.AppendLine("                  </CallInfo>");
-                sb.AppendLine("                </Call>");
-                sb.AppendLine("              </Parts>");
-                sb.AppendLine("              <Wires>");
-                sb.AppendLine($"                <Wire UId=\"{wireUid}\">");
-                sb.AppendLine($"                  <Powerrail UId=\"{pwrUid}\"/>");
-                sb.AppendLine($"                  <NameCon UId=\"{callUid}\" Name=\"en\"/>");
-                sb.AppendLine("                </Wire>");
-                sb.AppendLine("              </Wires>");
-                sb.AppendLine("            </FlgNet>");
-                sb.AppendLine("          </NetworkSource>");
-                sb.AppendLine("          <ProgrammingLanguage>LAD</ProgrammingLanguage>");
-                sb.AppendLine("        </AttributeList>");
-                sb.AppendLine("        <ObjectList>");
-                sb.AppendLine($"          <MultilingualText ID=\"{titleId}\" CompositionName=\"Title\">");
-                sb.AppendLine("            <ObjectList>");
-                sb.AppendLine($"              <MultilingualTextItem ID=\"{titleItem}\" CompositionName=\"Items\">");
-                sb.AppendLine("                <AttributeList>");
-                sb.AppendLine("                  <Culture>en-US</Culture>");
-                sb.AppendLine($"                  <Text>{XmlEsc(inst.LongDesc)}</Text>");
-                sb.AppendLine("                </AttributeList>");
-                sb.AppendLine("              </MultilingualTextItem>");
-                sb.AppendLine("            </ObjectList>");
-                sb.AppendLine("          </MultilingualText>");
-                sb.AppendLine("        </ObjectList>");
-                sb.AppendLine("      </SW.Blocks.CompileUnit>");
+                if (block is FC existing &&
+                    string.Equals(existing.Name, fcName, StringComparison.OrdinalIgnoreCase))
+                {
+                    fc = existing;
+                    break;
+                }
             }
+            if (fc == null)
+                fc = targetGroup.Blocks.CreateFc(fcName, !fcNumber.HasValue, fcNumber ?? 0, "LAD");
 
-            sb.AppendLine("    </ObjectList>");
-            sb.AppendLine("  </SW.Blocks.FC>");
-            sb.AppendLine("</Document>");
-            return sb.ToString();
+            var exportFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"fc_exp_{Guid.NewGuid()}.xml"));
+            var importFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"fc_imp_{Guid.NewGuid()}.xml"));
+            try
+            {
+                // Export the empty shell — TIA writes all the version-correct identifier attributes.
+                fc.Export(exportFile, ExportOptions.None);
+
+                var doc = new XmlDocument();
+                doc.Load(exportFile.FullName);
+
+                // Locate the SW.Blocks.FC element.
+                XmlElement fcElem = null;
+                foreach (XmlNode n in doc.DocumentElement.ChildNodes)
+                {
+                    if (n is XmlElement el && el.Name.StartsWith("SW.Blocks.FC"))
+                    { fcElem = el; break; }
+                }
+                if (fcElem == null)
+                    throw new Exception("SW.Blocks.FC element not found in exported XML");
+
+                // Get or create the ObjectList that holds CompileUnits.
+                var objList = fcElem["ObjectList"];
+                if (objList == null)
+                {
+                    objList = doc.CreateElement("ObjectList");
+                    fcElem.AppendChild(objList);
+                }
+                else
+                {
+                    // Replace all existing networks.
+                    var toRemove = new List<XmlNode>();
+                    foreach (XmlNode child in objList.ChildNodes)
+                        if (child is XmlElement ce && ce.Name == "SW.Blocks.CompileUnit")
+                            toRemove.Add(child);
+                    foreach (var n in toRemove) objList.RemoveChild(n);
+                }
+
+                // Find the highest existing ID so our new IDs don't collide.
+                int nextId = 1;
+                foreach (XmlNode n in doc.SelectNodes("//*[@ID]"))
+                {
+                    if (n is XmlElement e && int.TryParse(e.GetAttribute("ID"), out int id))
+                        nextId = Math.Max(nextId, id + 1);
+                }
+
+                // Append one CompileUnit (network) per instance.
+                foreach (var inst in instances)
+                {
+                    int cuId    = nextId++;
+                    int titleId = nextId++;
+                    int itemId  = nextId++;
+                    int callUid = nextId++;
+                    int wireUid = nextId++;
+                    int pwrUid  = nextId++;
+
+                    var frag = doc.CreateDocumentFragment();
+                    frag.InnerXml = CompileUnitXml(cuId, titleId, itemId, callUid, wireUid, pwrUid, inst);
+                    objList.AppendChild(frag);
+                }
+
+                doc.Save(importFile.FullName);
+                targetGroup.Blocks.Import(importFile, ImportOptions.Override);
+            }
+            finally
+            {
+                try { exportFile.Delete(); } catch { }
+                try { importFile.Delete(); } catch { }
+            }
+        }
+
+        private static string CompileUnitXml(
+            int cuId, int titleId, int itemId,
+            int callUid, int wireUid, int pwrUid,
+            InstanceInfo inst)
+        {
+            var n = XmlEsc(inst.Name);
+            var t = XmlEsc(inst.LongDesc);
+            return
+                $"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">" +
+                "<AttributeList>" +
+                "<NetworkSource>" +
+                "<FlgNet xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4\">" +
+                "<Parts>" +
+                $"<Call UId=\"{callUid}\">" +
+                $"<CallInfo Name=\"{n}\" BlockType=\"DB\">" +
+                $"<Instance Name=\"{n}\" Scope=\"GlobalVariable\">" +
+                $"<Component Name=\"{n}\"/>" +
+                "</Instance>" +
+                "</CallInfo>" +
+                "</Call>" +
+                "</Parts>" +
+                "<Wires>" +
+                $"<Wire UId=\"{wireUid}\">" +
+                $"<Powerrail UId=\"{pwrUid}\"/>" +
+                $"<NameCon UId=\"{callUid}\" Name=\"en\"/>" +
+                "</Wire>" +
+                "</Wires>" +
+                "</FlgNet>" +
+                "</NetworkSource>" +
+                "<ProgrammingLanguage>LAD</ProgrammingLanguage>" +
+                "</AttributeList>" +
+                "<ObjectList>" +
+                $"<MultilingualText ID=\"{titleId}\" CompositionName=\"Title\">" +
+                "<ObjectList>" +
+                $"<MultilingualTextItem ID=\"{itemId}\" CompositionName=\"Items\">" +
+                "<AttributeList>" +
+                "<Culture>en-US</Culture>" +
+                $"<Text>{t}</Text>" +
+                "</AttributeList>" +
+                "</MultilingualTextItem>" +
+                "</ObjectList>" +
+                "</MultilingualText>" +
+                "</ObjectList>" +
+                "</SW.Blocks.CompileUnit>";
         }
 
         private static string XmlEsc(string s) =>
@@ -277,10 +338,7 @@ namespace SiemensTiaBridge
                 foreach (PlcBlockGroup g in current.Groups)
                 {
                     if (string.Equals(g.Name, segment, StringComparison.OrdinalIgnoreCase))
-                    {
-                        next = g;
-                        break;
-                    }
+                    { next = g; break; }
                 }
                 if (next == null)
                     next = current.Groups.Create(segment);
