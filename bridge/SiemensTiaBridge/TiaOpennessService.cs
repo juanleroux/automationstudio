@@ -197,46 +197,27 @@ namespace SiemensTiaBridge
             sb.Append($"<Name>{XmlEsc(fcName)}</Name>");
             if (fcNumber.HasValue)
                 sb.Append($"<Number>{fcNumber.Value}</Number>");
-            sb.Append("<Namespace></Namespace>");   // required; empty = project-local block
-            sb.Append("<ProgrammingLanguage>LAD</ProgrammingLanguage>");
+            sb.Append("<Namespace></Namespace>");
+            sb.Append("<ProgrammingLanguage>SCL</ProgrammingLanguage>");
             sb.Append("</AttributeList>");
             sb.Append("<ObjectList>");
 
-            int uid = 1;
+            int nextId = 1;
             foreach (var inst in instances)
             {
-                int cuId      = uid++;
-                int titleId   = uid++;
-                int titleItem = uid++;
-                int callUid   = uid++;
-                int wireUid   = uid++;
-                int pwrUid    = uid++;
-                var n  = XmlEsc(inst.Name);
-                var fb = XmlEsc(fbName);
-                var t  = XmlEsc(inst.LongDesc);
+                int cuId      = nextId++;
+                int titleId   = nextId++;
+                int titleItem = nextId++;
+                var n = inst.Name;          // raw name for SCL call
+                var t = XmlEsc(inst.LongDesc);
+                var sclCall = $"&quot;{XmlEsc(n)}&quot;();";
 
                 sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
                 sb.Append("<AttributeList>");
                 sb.Append("<NetworkSource>");
-                sb.Append("<FlgNet xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4\">");
-                sb.Append("<Parts>");
-                sb.Append($"<Call uid=\"{callUid}\">");
-                sb.Append($"<CallInfo Name=\"{fb}\" BlockType=\"FB\">");
-                sb.Append($"<Instance Scope=\"GlobalVariable\">");
-                sb.Append($"<Component Name=\"{n}\"/>");
-                sb.Append("</Instance>");
-                sb.Append("</CallInfo>");
-                sb.Append("</Call>");
-                sb.Append("</Parts>");
-                sb.Append("<Wires>");
-                sb.Append($"<Wire uid=\"{wireUid}\">");
-                sb.Append($"<Powerrail uid=\"{pwrUid}\"/>");
-                sb.Append($"<NameCon uid=\"{callUid}\" Name=\"en\"/>");
-                sb.Append("</Wire>");
-                sb.Append("</Wires>");
-                sb.Append("</FlgNet>");
+                sb.Append($"<StructuredText>{sclCall}</StructuredText>");
                 sb.Append("</NetworkSource>");
-                sb.Append("<ProgrammingLanguage>LAD</ProgrammingLanguage>");
+                sb.Append("<ProgrammingLanguage>SCL</ProgrammingLanguage>");
                 sb.Append("</AttributeList>");
                 sb.Append("<ObjectList>");
                 sb.Append($"<MultilingualText ID=\"{titleId}\" CompositionName=\"Title\">");
