@@ -4,7 +4,7 @@ import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword, ignitionGatewayControl, listTiaFunctionBlocks } from '../../api/client';
+import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword, ignitionGatewayControl, testSiemensConnection, listTiaFunctionBlocks } from '../../api/client';
 
 export default function SettingsView() {
   const { project, updateProject } = useProject();
