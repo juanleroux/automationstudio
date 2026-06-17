@@ -4,7 +4,7 @@ import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword, ignitionGatewayControl } from '../../api/client';
+import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword, ignitionGatewayControl, listTiaFunctionBlocks } from '../../api/client';
 
 export default function SettingsView() {
   const { project, updateProject } = useProject();
@@ -67,12 +67,16 @@ export default function SettingsView() {
       bridgeUrl: 'http://localhost:5180',
       openWithUI: false,
       enableSiemensMenuItems: true,
+      templateFBs: {},
     }
   );
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [siemensTesting, setSiemensTesting] = useState(false);
   const [siemensTestResult, setSiemensTestResult] = useState(null);
+  const [tiaFBs, setTiaFBs] = useState([]);
+  const [loadingFBs, setLoadingFBs] = useState(false);
+  const [fbListKey, setFbListKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -136,6 +140,21 @@ export default function SettingsView() {
       setSiemensTestResult({ success: false, message: err.response?.data?.error || err.message });
     } finally {
       setSiemensTesting(false);
+    }
+  };
+
+  const handleRefreshFBs = async () => {
+    if (!siemens.bridgeUrl) { toast.error('Enter a Bridge URL first'); return; }
+    setLoadingFBs(true);
+    try {
+      const result = await listTiaFunctionBlocks(siemens.bridgeUrl);
+      if (result.skipped?.length) toast.info(`${result.skipped.length} FB(s) skipped (inconsistent — compile in TIA Portal first)`);
+      setTiaFBs(result.functionBlocks || []);
+      toast.success(`Found ${(result.functionBlocks || []).length} FB(s)`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message);
+    } finally {
+      setLoadingFBs(false);
     }
   };
 
@@ -748,6 +767,93 @@ export default function SettingsView() {
                   }}
                 />
                 <p className="text-xs text-text-muted mt-1">Full path to the TIA Portal project file on this machine</p>
+              </div>
+
+              {/* FB Mapping */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>FB Mapping</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Associate a TIA Portal Function Block with each template. Requires the bridge to be running with a project open.
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: 12, gap: 6, flexShrink: 0 }}
+                  onClick={handleRefreshFBs}
+                  disabled={!project || loadingFBs || !siemens.bridgeUrl}
+                  title="Fetch FB list from TIA Portal via bridge"
+                >
+                  <RefreshCw size={13} /> {loadingFBs ? 'Loading...' : 'Refresh from TIA'}
+                </button>
+              </div>
+
+              <div key={fbListKey} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Template</th>
+                      <th>Function Block</th>
+                      <th style={{ width: 70 }}>Params</th>
+                      <th style={{ width: 70 }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!project && (
+                      <tr><td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>Open a project to see templates</td></tr>
+                    )}
+                    {project && (project.templates || []).length === 0 && (
+                      <tr><td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>No templates defined — create templates in Assets first</td></tr>
+                    )}
+                    {(project?.templates || []).map(t => {
+                      const mapped = siemens.templateFBs?.[t.id];
+                      return (
+                        <tr key={t.id}>
+                          <td style={{ fontWeight: 500, fontSize: 13 }}>{t.name}</td>
+                          <td>
+                            <select
+                              value={mapped?.fbName || ''}
+                              disabled={!project || tiaFBs.length === 0}
+                              style={{ fontSize: 12, width: '100%' }}
+                              onChange={e => {
+                                const fb = tiaFBs.find(f => f.Name === e.target.value);
+                                setSiemens(prev => ({
+                                  ...prev,
+                                  templateFBs: {
+                                    ...prev.templateFBs,
+                                    [t.id]: fb ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters } : null,
+                                  },
+                                }));
+                              }}
+                            >
+                              <option value="">{tiaFBs.length === 0 ? 'Refresh to load FBs' : '— Select FB —'}</option>
+                              {tiaFBs.map(fb => (
+                                <option key={fb.Name} value={fb.Name}>FB{fb.Number}: {fb.Name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td style={{ fontSize: 12, color: mapped ? 'var(--accent)' : 'var(--text-disabled)', textAlign: 'center' }}>
+                            {mapped ? mapped.parameters?.length ?? 0 : '—'}
+                          </td>
+                          <td>
+                            {mapped && (
+                              <button
+                                className="btn btn-ghost"
+                                style={{ fontSize: 11, padding: '3px 8px' }}
+                                onClick={() => setSiemens(prev => ({
+                                  ...prev,
+                                  templateFBs: { ...prev.templateFBs, [t.id]: null },
+                                }))}
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
               <div className="flex flex-col gap-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
