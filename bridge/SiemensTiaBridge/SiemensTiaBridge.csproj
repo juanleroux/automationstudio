@@ -25,8 +25,12 @@
     directly from the Program Files location).
   -->
   <ItemGroup>
-    <Reference Include="Siemens.Engineering">
-      <HintPath>lib\Siemens.Engineering.dll</HintPath>
+    <!-- Copy all Siemens Openness DLLs from the V19 PublicAPI folder into lib\ before building.
+         They are GAC-registered by the TIA Portal installer so Private=false keeps them
+         out of the build output — the runtime picks them up from the GAC. -->
+    <_SiemensDlls Include="lib\*.dll" />
+    <Reference Include="@(_SiemensDlls->'%(Filename)')">
+      <HintPath>%(Identity)</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
