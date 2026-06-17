@@ -18,7 +18,8 @@ namespace SiemensTiaBridge
     /// </summary>
     public static class Program
     {
-        private static readonly TiaOpennessService Tia = new TiaOpennessService();
+        private static TiaOpennessService _tia;
+        private static TiaOpennessService Tia => _tia ??= new TiaOpennessService();
 
         public static void Main(string[] args)
         {
@@ -34,7 +35,7 @@ namespace SiemensTiaBridge
             Console.CancelKeyPress += (s, e) =>
             {
                 listener.Stop();
-                Tia.Dispose();
+                _tia?.Dispose();
             };
 
             while (listener.IsListening)
@@ -67,8 +68,8 @@ namespace SiemensTiaBridge
                         WriteJson(response, 200, new
                         {
                             status = "ok",
-                            projectOpen = Tia.IsProjectOpen,
-                            openProjectName = Tia.OpenProjectName,
+                            projectOpen = _tia?.IsProjectOpen ?? false,
+                            openProjectName = _tia?.OpenProjectName,
                         });
                         break;
 
