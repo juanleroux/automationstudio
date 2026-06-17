@@ -197,7 +197,7 @@ namespace SiemensTiaBridge
             sb.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
             sb.AppendLine("<Document>");
             sb.AppendLine($"  <Engineering version=\"{XmlEsc(tiaVersion)}\" />");
-            sb.AppendLine("  <SW.Blocks.FC ID=\"0\">");
+            sb.AppendLine("  <SW.Blocks.FC ID=\"0\" CompositionName=\"Blocks\" Namespace=\"SW\">");
             sb.AppendLine("    <AttributeList>");
             sb.AppendLine($"      <AutoNumber>{(fcNumber.HasValue ? "false" : "true")}</AutoNumber>");
             sb.AppendLine($"      <Name>{XmlEsc(fcName)}</Name>");
