@@ -162,6 +162,8 @@ namespace SiemensTiaBridge
                 }
             return null;
         }
+
+        public void CloseProject()
         {
             if (_project != null)
             {
