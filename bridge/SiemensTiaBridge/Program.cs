@@ -27,9 +27,9 @@ namespace SiemensTiaBridge
             if (args.Length > 0 && int.TryParse(args[0], out var parsed)) port = parsed;
 
             var listener = new HttpListener();
-            listener.Prefixes.Add($"http://localhost:{port}/");
+            listener.Prefixes.Add($"http://+:{port}/");
             listener.Start();
-            Console.WriteLine($"SiemensTiaBridge listening on http://localhost:{port}/");
+            Console.WriteLine($"SiemensTiaBridge listening on all interfaces, port {port}");
             Console.WriteLine("Press Ctrl+C to stop.");
 
             Console.CancelKeyPress += (s, e) =>
