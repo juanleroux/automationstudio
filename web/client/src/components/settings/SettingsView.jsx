@@ -856,7 +856,7 @@ export default function SettingsView() {
                     {project && (project.templates || []).length === 0 && (
                       <tr><td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>No templates defined — create templates in Assets first</td></tr>
                     )}
-                    {(project?.templates || []).map(t => {
+                    {[...(project?.templates || [])].sort((a, b) => a.name.localeCompare(b.name)).map(t => {
                       const mapped = siemens.templateFBs?.[t.id];
                       return (
                         <tr key={t.id}>
@@ -864,7 +864,7 @@ export default function SettingsView() {
                           <td>
                             <select
                               value={mapped?.fbName || ''}
-                              disabled={!project || tiaFBs.length === 0}
+                              disabled={!project}
                               style={{ fontSize: 12, width: '100%' }}
                               onChange={e => {
                                 const fb = tiaFBs.find(f => f.Name === e.target.value);
@@ -877,7 +877,11 @@ export default function SettingsView() {
                                 }));
                               }}
                             >
-                              <option value="">{tiaFBs.length === 0 ? 'Refresh to load FBs' : '— Select FB —'}</option>
+                              <option value="">{tiaFBs.length === 0 && !mapped ? 'Refresh to load FBs' : '— Select FB —'}</option>
+                              {/* Always show the saved FB as an option so it persists after page reload */}
+                              {mapped?.fbName && !tiaFBs.find(f => f.Name === mapped.fbName) && (
+                                <option value={mapped.fbName}>{mapped.fbName}</option>
+                              )}
                               {tiaFBs.map(fb => (
                                 <option key={fb.Name} value={fb.Name}>FB{fb.Number}: {fb.Name}</option>
                               ))}
