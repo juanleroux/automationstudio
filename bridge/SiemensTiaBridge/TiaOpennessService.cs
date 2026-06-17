@@ -144,7 +144,7 @@ namespace SiemensTiaBridge
             {
                 try
                 {
-                    CreateFcWithNetworks(targetGroup, fcName, fcNumber, instances, tiaVersion ?? "V19");
+                    CreateFcWithNetworks(targetGroup, fcName, fcNumber, instances, tiaVersion ?? "V19", fbName);
                     fcCreated = fcName;
                 }
                 catch (Exception ex)
@@ -164,9 +164,10 @@ namespace SiemensTiaBridge
             string fcName,
             int? fcNumber,
             List<InstanceInfo> instances,
-            string tiaVersion)
+            string tiaVersion,
+            string fbName)
         {
-            var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion);
+            var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion, fbName);
             var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"{fcName}_{Guid.NewGuid()}.xml"));
             try
             {
@@ -179,18 +180,12 @@ namespace SiemensTiaBridge
             }
         }
 
-        /// <summary>
-        /// Builds the TIA Portal block XML for an FC.
-        ///
-        /// Key insight: TIA Portal's error "Missing 'Namespace' identifier attribute"
-        /// refers to a CHILD ELEMENT inside AttributeList, not an XML attribute on the
-        /// block element.  Project-local blocks use an empty Namespace element.
-        /// </summary>
         private static string BuildFcXml(
             string fcName,
             int? fcNumber,
             List<InstanceInfo> instances,
-            string tiaVersion)
+            string tiaVersion,
+            string fbName)
         {
             var sb = new StringBuilder();
             sb.Append("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
@@ -216,8 +211,9 @@ namespace SiemensTiaBridge
                 int callUid   = uid++;
                 int wireUid   = uid++;
                 int pwrUid    = uid++;
-                var n = XmlEsc(inst.Name);
-                var t = XmlEsc(inst.LongDesc);
+                var n  = XmlEsc(inst.Name);
+                var fb = XmlEsc(fbName);
+                var t  = XmlEsc(inst.LongDesc);
 
                 sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
                 sb.Append("<AttributeList>");
@@ -225,8 +221,8 @@ namespace SiemensTiaBridge
                 sb.Append("<FlgNet xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4\">");
                 sb.Append("<Parts>");
                 sb.Append($"<Call UId=\"{callUid}\">");
-                sb.Append($"<CallInfo Name=\"{n}\" BlockType=\"DB\">");
-                sb.Append($"<Instance Name=\"{n}\" Scope=\"GlobalVariable\">");
+                sb.Append($"<CallInfo Name=\"{fb}\" BlockType=\"FB\">");
+                sb.Append($"<Instance Scope=\"GlobalVariable\">");
                 sb.Append($"<Component Name=\"{n}\"/>");
                 sb.Append("</Instance>");
                 sb.Append("</CallInfo>");
