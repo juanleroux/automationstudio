@@ -845,16 +845,17 @@ export default function SettingsView() {
                     <tr>
                       <th>Template</th>
                       <th>Function Block</th>
-                      <th style={{ width: 70 }}>Params</th>
-                      <th style={{ width: 70 }}>Action</th>
+                      <th style={{ width: 50 }}>Params</th>
+                      <th style={{ width: 80 }}>Start DB #</th>
+                      <th style={{ width: 60 }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {!project && (
-                      <tr><td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>Open a project to see templates</td></tr>
+                      <tr><td colSpan={5} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>Open a project to see templates</td></tr>
                     )}
                     {project && (project.templates || []).length === 0 && (
-                      <tr><td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>No templates defined — create templates in Assets first</td></tr>
+                      <tr><td colSpan={5} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>No templates defined — create templates in Assets first</td></tr>
                     )}
                     {[...(project?.templates || [])].sort((a, b) => a.name.localeCompare(b.name)).map(t => {
                       const mapped = siemens.templateFBs?.[t.id];
@@ -868,13 +869,18 @@ export default function SettingsView() {
                               style={{ fontSize: 12, width: '100%' }}
                               onChange={e => {
                                 const fb = tiaFBs.find(f => f.Name === e.target.value);
-                                setSiemens(prev => ({
-                                  ...prev,
-                                  templateFBs: {
-                                    ...prev.templateFBs,
-                                    [t.id]: fb ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters } : null,
-                                  },
-                                }));
+                                setSiemens(prev => {
+                                  const existing = prev.templateFBs?.[t.id];
+                                  return {
+                                    ...prev,
+                                    templateFBs: {
+                                      ...prev.templateFBs,
+                                      [t.id]: fb
+                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, startDbIndex: existing?.startDbIndex }
+                                        : null,
+                                    },
+                                  };
+                                });
                               }}
                             >
                               <option value="">{tiaFBs.length === 0 && !mapped ? 'Refresh to load FBs' : '— Select FB —'}</option>
@@ -889,6 +895,28 @@ export default function SettingsView() {
                           </td>
                           <td style={{ fontSize: 12, color: mapped ? 'var(--accent)' : 'var(--text-disabled)', textAlign: 'center' }}>
                             {mapped ? mapped.parameters?.length ?? 0 : '—'}
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min={0}
+                              max={65535}
+                              value={mapped?.startDbIndex ?? ''}
+                              disabled={!mapped || !project}
+                              placeholder="Auto"
+                              style={{ fontSize: 12, width: '100%', padding: '3px 6px' }}
+                              onChange={e => {
+                                const raw = e.target.value;
+                                const val = raw === '' ? undefined : parseInt(raw, 10);
+                                setSiemens(prev => ({
+                                  ...prev,
+                                  templateFBs: {
+                                    ...prev.templateFBs,
+                                    [t.id]: { ...(prev.templateFBs?.[t.id] || {}), startDbIndex: val },
+                                  },
+                                }));
+                              }}
+                            />
                           </td>
                           <td>
                             {mapped && (

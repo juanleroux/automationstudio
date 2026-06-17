@@ -1434,6 +1434,7 @@ export default function TemplateTree({ selected, onSelect }) {
                                     bridgeUrl,
                                     fbName: fbMapping.fbName,
                                     instanceNames,
+                                    ...(fbMapping.startDbIndex != null ? { startDbIndex: fbMapping.startDbIndex } : {}),
                                   });
                                   if (result.skipped?.length) {
                                     toast.error(`${result.skipped.length} skipped: ${result.skipped[0]}`);

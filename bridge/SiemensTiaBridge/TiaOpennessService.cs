@@ -121,7 +121,7 @@ namespace SiemensTiaBridge
             return info;
         }
 
-        public CreateInstancesResult CreateInstances(string fbName, List<string> instanceNames)
+        public CreateInstancesResult CreateInstances(string fbName, List<string> instanceNames, int? startDbIndex = null)
         {
             if (_project == null)
                 throw new InvalidOperationException("No project open");
@@ -133,16 +133,22 @@ namespace SiemensTiaBridge
             var created = new List<string>();
             var skipped = new List<string>();
 
+            int dbOffset = 0;
             foreach (var instanceName in instanceNames)
             {
                 try
                 {
-                    plcSw.BlockGroup.Blocks.CreateInstanceDB(instanceName, true, 0, fbName);
+                    if (startDbIndex.HasValue)
+                        plcSw.BlockGroup.Blocks.CreateInstanceDB(instanceName, false, startDbIndex.Value + dbOffset, fbName);
+                    else
+                        plcSw.BlockGroup.Blocks.CreateInstanceDB(instanceName, true, 0, fbName);
                     created.Add(instanceName);
+                    dbOffset++;
                 }
                 catch (Exception ex)
                 {
                     skipped.Add($"{instanceName}: {ex.Message}");
+                    dbOffset++;
                 }
             }
 
