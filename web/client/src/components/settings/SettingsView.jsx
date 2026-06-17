@@ -860,7 +860,8 @@ export default function SettingsView() {
                     {[...(project?.templates || [])].sort((a, b) => a.name.localeCompare(b.name)).map(t => {
                       const mapped = siemens.templateFBs?.[t.id];
                       return (
-                        <tr key={t.id}>
+                        <React.Fragment key={t.id}>
+                        <tr>
                           <td style={{ fontWeight: 500, fontSize: 13 }}>{t.name}</td>
                           <td>
                             <select
@@ -876,7 +877,7 @@ export default function SettingsView() {
                                     templateFBs: {
                                       ...prev.templateFBs,
                                       [t.id]: fb
-                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, startDbIndex: existing?.startDbIndex, targetFolder: existing?.targetFolder }
+                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, startDbIndex: existing?.startDbIndex, targetFolder: existing?.targetFolder, fcName: existing?.fcName, fcNumber: existing?.fcNumber }
                                         : null,
                                     },
                                   };
@@ -948,6 +949,48 @@ export default function SettingsView() {
                             )}
                           </td>
                         </tr>
+                        {mapped && (
+                          <tr style={{ background: 'var(--bg-surface)' }}>
+                            <td colSpan={5} style={{ padding: '4px 12px 8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>FC Name:</span>
+                                <input
+                                  type="text"
+                                  value={mapped.fcName || ''}
+                                  placeholder={`FC_${mapped.fbName || 'Name'} (leave blank to skip)`}
+                                  disabled={!project}
+                                  style={{ fontSize: 11, flex: 1, padding: '3px 6px' }}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setSiemens(prev => ({
+                                      ...prev,
+                                      templateFBs: { ...prev.templateFBs, [t.id]: { ...(prev.templateFBs?.[t.id] || {}), fcName: val || undefined } },
+                                    }));
+                                  }}
+                                />
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>FC #:</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={65535}
+                                  value={mapped.fcNumber ?? ''}
+                                  placeholder="Auto"
+                                  disabled={!project}
+                                  style={{ fontSize: 11, width: 70, padding: '3px 6px' }}
+                                  onChange={e => {
+                                    const raw = e.target.value;
+                                    const val = raw === '' ? undefined : parseInt(raw, 10);
+                                    setSiemens(prev => ({
+                                      ...prev,
+                                      templateFBs: { ...prev.templateFBs, [t.id]: { ...(prev.templateFBs?.[t.id] || {}), fcNumber: val } },
+                                    }));
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>

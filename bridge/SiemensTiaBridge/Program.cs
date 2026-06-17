@@ -96,8 +96,9 @@ namespace SiemensTiaBridge
                     case "POST /api/instances/create":
                         {
                             var body = ReadJsonBody<CreateInstancesRequest>(request);
-                            var result = Tia.CreateInstances(body.FbName, body.InstanceNames ?? new System.Collections.Generic.List<string>(), body.StartDbIndex, body.TargetFolder);
-                            WriteJson(response, 200, new { success = true, created = result.Created, skipped = result.Skipped });
+                            var instances = body.Instances ?? new System.Collections.Generic.List<InstanceInfo>();
+                            var result = Tia.CreateInstances(body.FbName, instances, body.StartDbIndex, body.TargetFolder, body.FcName, body.FcNumber, body.TiaVersion);
+                            WriteJson(response, 200, new { success = true, created = result.Created, skipped = result.Skipped, fcCreated = result.FcCreated });
                         }
                         break;
 
@@ -137,9 +138,12 @@ namespace SiemensTiaBridge
         private class CreateInstancesRequest
         {
             public string FbName { get; set; }
-            public System.Collections.Generic.List<string> InstanceNames { get; set; }
+            public System.Collections.Generic.List<InstanceInfo> Instances { get; set; }
             public int? StartDbIndex { get; set; }
             public string TargetFolder { get; set; }
+            public string FcName { get; set; }
+            public int? FcNumber { get; set; }
+            public string TiaVersion { get; set; }
         }
 
         private class OpenProjectRequest

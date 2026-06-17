@@ -1428,20 +1428,31 @@ export default function TemplateTree({ selected, onSelect }) {
                               onClick={async () => {
                                 if (disabled) return;
                                 setContextMenu(null);
-                                const instanceNames = ctxInsts.map(item => item.instance.name);
+                                const longDescAttr = (t?.attributes || []).find(a => a.name === 'LongDesc');
+                                const instances = ctxInsts.map(item => {
+                                  const inst = item.instance;
+                                  const ia = longDescAttr ? (inst.attributes || []).find(a => a.id === longDescAttr.id) : null;
+                                  const longDesc = (ia?.value != null ? ia.value : longDescAttr?.value) || '';
+                                  return { name: inst.name, longDesc };
+                                });
                                 try {
                                   const result = await createTiaInstances({
                                     bridgeUrl,
                                     fbName: fbMapping.fbName,
-                                    instanceNames,
+                                    instances,
                                     ...(fbMapping.startDbIndex != null ? { startDbIndex: fbMapping.startDbIndex } : {}),
                                     ...(fbMapping.targetFolder ? { targetFolder: fbMapping.targetFolder } : {}),
+                                    ...(fbMapping.fcName ? { fcName: fbMapping.fcName } : {}),
+                                    ...(fbMapping.fcNumber != null ? { fcNumber: fbMapping.fcNumber } : {}),
+                                    tiaVersion: project?.siemens?.tiaVersion || 'V19',
                                   });
                                   if (result.skipped?.length) {
                                     toast.error(`${result.skipped.length} skipped: ${result.skipped[0]}`);
                                   }
-                                  if (result.created?.length) {
-                                    toast.success(`Created ${result.created.length} instance DB${result.created.length !== 1 ? 's' : ''} in TIA Portal`);
+                                  if (result.created?.length || result.fcCreated) {
+                                    const dbMsg = result.created?.length ? `${result.created.length} instance DB${result.created.length !== 1 ? 's' : ''}` : '';
+                                    const fcMsg = result.fcCreated ? `FC "${result.fcCreated}"` : '';
+                                    toast.success(`Created ${[dbMsg, fcMsg].filter(Boolean).join(' + ')} in TIA Portal`);
                                   }
                                 } catch (err) {
                                   toast.error('TIA export failed: ' + (err.response?.data?.error || err.message));

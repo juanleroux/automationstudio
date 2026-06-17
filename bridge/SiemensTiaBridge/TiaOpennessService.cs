@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Xml;
 using Siemens.Engineering;
 using Siemens.Engineering.HW.Features;
@@ -80,8 +81,6 @@ namespace SiemensTiaBridge
                 Parameters = new List<FbParameter>(),
             };
 
-            // Export block to a temp XML file and parse the interface sections.
-            // This is more version-stable than accessing fb.Interface directly.
             var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"{fb.Name}_{Guid.NewGuid()}.xml"));
             try
             {
@@ -121,7 +120,14 @@ namespace SiemensTiaBridge
             return info;
         }
 
-        public CreateInstancesResult CreateInstances(string fbName, List<string> instanceNames, int? startDbIndex = null, string targetFolder = null)
+        public CreateInstancesResult CreateInstances(
+            string fbName,
+            List<InstanceInfo> instances,
+            int? startDbIndex = null,
+            string targetFolder = null,
+            string fcName = null,
+            int? fcNumber = null,
+            string tiaVersion = null)
         {
             if (_project == null)
                 throw new InvalidOperationException("No project open");
@@ -136,29 +142,128 @@ namespace SiemensTiaBridge
             var skipped = new List<string>();
 
             int dbOffset = 0;
-            foreach (var instanceName in instanceNames)
+            foreach (var inst in instances)
             {
                 try
                 {
                     if (startDbIndex.HasValue)
-                        targetGroup.Blocks.CreateInstanceDB(instanceName, false, startDbIndex.Value + dbOffset, fbName);
+                        targetGroup.Blocks.CreateInstanceDB(inst.Name, false, startDbIndex.Value + dbOffset, fbName);
                     else
-                        targetGroup.Blocks.CreateInstanceDB(instanceName, true, 0, fbName);
-                    created.Add(instanceName);
+                        targetGroup.Blocks.CreateInstanceDB(inst.Name, true, 0, fbName);
+                    created.Add(inst.Name);
                     dbOffset++;
                 }
                 catch (Exception ex)
                 {
-                    skipped.Add($"{instanceName}: {ex.Message}");
+                    skipped.Add($"{inst.Name}: {ex.Message}");
                     dbOffset++;
                 }
             }
 
-            if (created.Count > 0)
+            // Create / update FC with one LAD network per instance
+            string fcCreated = null;
+            if (!string.IsNullOrWhiteSpace(fcName) && instances.Count > 0)
+            {
+                try
+                {
+                    var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion ?? "V19");
+                    var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"{fcName}_{Guid.NewGuid()}.xml"));
+                    try
+                    {
+                        File.WriteAllText(tmpFile.FullName, xml, new UTF8Encoding(false));
+                        targetGroup.Blocks.Import(tmpFile, ImportOptions.Override);
+                        fcCreated = fcName;
+                    }
+                    finally
+                    {
+                        try { tmpFile.Delete(); } catch { }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    skipped.Add($"FC {fcName}: {ex.Message}");
+                }
+            }
+
+            if (created.Count > 0 || fcCreated != null)
                 _project.Save();
 
-            return new CreateInstancesResult { Created = created, Skipped = skipped };
+            return new CreateInstancesResult { Created = created, Skipped = skipped, FcCreated = fcCreated };
         }
+
+        private static string BuildFcXml(string fcName, int? fcNumber, List<InstanceInfo> instances, string tiaVersion)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+            sb.AppendLine("<Document>");
+            sb.AppendLine($"  <Engineering version=\"{XmlEsc(tiaVersion)}\" />");
+            sb.AppendLine("  <SW.Blocks.FC ID=\"0\">");
+            sb.AppendLine("    <AttributeList>");
+            sb.AppendLine($"      <AutoNumber>{(fcNumber.HasValue ? "false" : "true")}</AutoNumber>");
+            sb.AppendLine($"      <Name>{XmlEsc(fcName)}</Name>");
+            if (fcNumber.HasValue)
+                sb.AppendLine($"      <Number>{fcNumber.Value}</Number>");
+            sb.AppendLine("      <ProgrammingLanguage>LAD</ProgrammingLanguage>");
+            sb.AppendLine("    </AttributeList>");
+            sb.AppendLine("    <ObjectList>");
+
+            int uid = 1;
+            foreach (var inst in instances)
+            {
+                int cuId      = uid++;
+                int titleId   = uid++;
+                int titleItem = uid++;
+                int callUid   = uid++;
+                int wireUid   = uid++;
+                int pwrUid    = uid++;
+
+                sb.AppendLine($"      <SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
+                sb.AppendLine("        <AttributeList>");
+                sb.AppendLine("          <NetworkSource>");
+                sb.AppendLine("            <FlgNet xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4\">");
+                sb.AppendLine("              <Parts>");
+                sb.AppendLine($"                <Call UId=\"{callUid}\">");
+                sb.AppendLine($"                  <CallInfo Name=\"{XmlEsc(inst.Name)}\" BlockType=\"DB\">");
+                sb.AppendLine($"                    <Instance Name=\"{XmlEsc(inst.Name)}\" Scope=\"GlobalVariable\">");
+                sb.AppendLine($"                      <Component Name=\"{XmlEsc(inst.Name)}\"/>");
+                sb.AppendLine("                    </Instance>");
+                sb.AppendLine("                  </CallInfo>");
+                sb.AppendLine("                </Call>");
+                sb.AppendLine("              </Parts>");
+                sb.AppendLine("              <Wires>");
+                sb.AppendLine($"                <Wire UId=\"{wireUid}\">");
+                sb.AppendLine($"                  <Powerrail UId=\"{pwrUid}\"/>");
+                sb.AppendLine($"                  <NameCon UId=\"{callUid}\" Name=\"en\"/>");
+                sb.AppendLine("                </Wire>");
+                sb.AppendLine("              </Wires>");
+                sb.AppendLine("            </FlgNet>");
+                sb.AppendLine("          </NetworkSource>");
+                sb.AppendLine("          <ProgrammingLanguage>LAD</ProgrammingLanguage>");
+                sb.AppendLine("        </AttributeList>");
+                sb.AppendLine("        <ObjectList>");
+                sb.AppendLine($"          <MultilingualText ID=\"{titleId}\" CompositionName=\"Title\">");
+                sb.AppendLine("            <ObjectList>");
+                sb.AppendLine($"              <MultilingualTextItem ID=\"{titleItem}\" CompositionName=\"Items\">");
+                sb.AppendLine("                <AttributeList>");
+                sb.AppendLine("                  <Culture>en-US</Culture>");
+                sb.AppendLine($"                  <Text>{XmlEsc(inst.LongDesc)}</Text>");
+                sb.AppendLine("                </AttributeList>");
+                sb.AppendLine("              </MultilingualTextItem>");
+                sb.AppendLine("            </ObjectList>");
+                sb.AppendLine("          </MultilingualText>");
+                sb.AppendLine("        </ObjectList>");
+                sb.AppendLine("      </SW.Blocks.CompileUnit>");
+            }
+
+            sb.AppendLine("    </ObjectList>");
+            sb.AppendLine("  </SW.Blocks.FC>");
+            sb.AppendLine("</Document>");
+            return sb.ToString();
+        }
+
+        private static string XmlEsc(string s) =>
+            string.IsNullOrEmpty(s) ? "" :
+            s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
 
         private static PlcBlockGroup FindOrCreateGroup(PlcBlockGroup root, string folderPath)
         {
@@ -212,10 +317,17 @@ namespace SiemensTiaBridge
         public void Dispose() => CloseProject();
     }
 
+    public class InstanceInfo
+    {
+        public string Name { get; set; }
+        public string LongDesc { get; set; }
+    }
+
     public class CreateInstancesResult
     {
         public List<string> Created { get; set; }
         public List<string> Skipped { get; set; }
+        public string FcCreated { get; set; }
     }
 
     public class FbListResult

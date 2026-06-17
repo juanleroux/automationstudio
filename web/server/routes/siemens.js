@@ -63,17 +63,20 @@ router.post('/project/open', async (req, res) => {
 
 // POST /api/siemens/instances/create — create instance DBs in the open TIA project
 router.post('/instances/create', async (req, res) => {
-  const { bridgeUrl, fbName, instanceNames, startDbIndex, targetFolder } = req.body;
+  const { bridgeUrl, fbName, instances, startDbIndex, targetFolder, fcName, fcNumber, tiaVersion } = req.body;
 
   if (!bridgeUrl) return res.status(400).json({ error: 'bridgeUrl required' });
   if (!fbName) return res.status(400).json({ error: 'fbName required' });
-  if (!Array.isArray(instanceNames) || instanceNames.length === 0)
-    return res.status(400).json({ error: 'instanceNames array required' });
+  if (!Array.isArray(instances) || instances.length === 0)
+    return res.status(400).json({ error: 'instances array required' });
 
   const base = normalizeUrl(bridgeUrl);
-  const payload = { fbName, instanceNames };
+  const payload = { fbName, instances };
   if (startDbIndex != null) payload.startDbIndex = startDbIndex;
   if (targetFolder) payload.targetFolder = targetFolder;
+  if (fcName) payload.fcName = fcName;
+  if (fcNumber != null) payload.fcNumber = fcNumber;
+  if (tiaVersion) payload.tiaVersion = tiaVersion;
   try {
     const response = await axios.post(`${base}/api/instances/create`, payload, { timeout: 120000 });
     res.json(response.data);
