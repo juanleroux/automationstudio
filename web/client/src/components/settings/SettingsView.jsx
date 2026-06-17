@@ -299,7 +299,7 @@ export default function SettingsView() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto" style={{ background: 'var(--bg-main)', padding: '24px 24px' }}>
-        <div style={{ maxWidth: 520 }}>
+        <div style={{ maxWidth: 660 }}>
 
           {/* General tab */}
           {activeTab === 'general' && (
@@ -843,11 +843,11 @@ export default function SettingsView() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Template</th>
-                      <th>Function Block</th>
-                      <th style={{ width: 50 }}>Params</th>
+                      <th style={{ width: 120 }}>Template</th>
+                      <th style={{ width: 150 }}>Function Block</th>
+                      <th>Target Folder</th>
                       <th style={{ width: 80 }}>Start DB #</th>
-                      <th style={{ width: 60 }}>Action</th>
+                      <th style={{ width: 55 }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -884,7 +884,6 @@ export default function SettingsView() {
                               }}
                             >
                               <option value="">{tiaFBs.length === 0 && !mapped ? 'Refresh to load FBs' : '— Select FB —'}</option>
-                              {/* Always show the saved FB as an option so it persists after page reload */}
                               {mapped?.fbName && !tiaFBs.find(f => f.Name === mapped.fbName) && (
                                 <option value={mapped.fbName}>{mapped.fbName}</option>
                               )}
@@ -892,12 +891,14 @@ export default function SettingsView() {
                                 <option key={fb.Name} value={fb.Name}>FB{fb.Number}: {fb.Name}</option>
                               ))}
                             </select>
+                          </td>
+                          <td>
                             <input
                               type="text"
                               value={mapped?.targetFolder || ''}
                               disabled={!mapped || !project}
                               placeholder="\Folder\Subfolder"
-                              style={{ fontSize: 11, width: '100%', marginTop: 4, padding: '3px 6px', color: 'var(--text-secondary)' }}
+                              style={{ fontSize: 12, width: '100%', padding: '3px 6px' }}
                               onChange={e => {
                                 const val = e.target.value;
                                 setSiemens(prev => ({
@@ -909,9 +910,6 @@ export default function SettingsView() {
                                 }));
                               }}
                             />
-                          </td>
-                          <td style={{ fontSize: 12, color: mapped ? 'var(--accent)' : 'var(--text-disabled)', textAlign: 'center' }}>
-                            {mapped ? mapped.parameters?.length ?? 0 : '—'}
                           </td>
                           <td>
                             <input
