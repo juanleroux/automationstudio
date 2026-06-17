@@ -210,14 +210,19 @@ namespace SiemensTiaBridge
                 int cuId      = nextId++;
                 int titleId   = nextId++;
                 int titleItem = nextId++;
-                var n = inst.Name;          // raw name for SCL call
+                var n = XmlEsc(inst.Name);
                 var t = XmlEsc(inst.LongDesc);
-                var sclCall = $"&quot;{XmlEsc(n)}&quot;();";
 
                 sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
                 sb.Append("<AttributeList>");
                 sb.Append("<NetworkSource>");
-                sb.Append($"<StructuredText xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v2\">{sclCall}</StructuredText>");
+                sb.Append("<StructuredText xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v2\">");
+                sb.Append($"<Access Scope=\"GlobalVariable\"><Symbol><Component Name=\"{n}\"/></Symbol></Access>");
+                sb.Append("<Token Kind=\"OpenParenthesis\"/>");
+                sb.Append("<Token Kind=\"CloseParenthesis\"/>");
+                sb.Append("<Token Kind=\"Semicolon\"/>");
+                sb.Append("<NewLine/>");
+                sb.Append("</StructuredText>");
                 sb.Append("</NetworkSource>");
                 sb.Append("<ProgrammingLanguage>SCL</ProgrammingLanguage>");
                 sb.Append("</AttributeList>");
