@@ -1435,6 +1435,7 @@ export default function TemplateTree({ selected, onSelect }) {
                                     fbName: fbMapping.fbName,
                                     instanceNames,
                                     ...(fbMapping.startDbIndex != null ? { startDbIndex: fbMapping.startDbIndex } : {}),
+                                    ...(fbMapping.targetFolder ? { targetFolder: fbMapping.targetFolder } : {}),
                                   });
                                   if (result.skipped?.length) {
                                     toast.error(`${result.skipped.length} skipped: ${result.skipped[0]}`);

@@ -96,7 +96,7 @@ namespace SiemensTiaBridge
                     case "POST /api/instances/create":
                         {
                             var body = ReadJsonBody<CreateInstancesRequest>(request);
-                            var result = Tia.CreateInstances(body.FbName, body.InstanceNames ?? new System.Collections.Generic.List<string>(), body.StartDbIndex);
+                            var result = Tia.CreateInstances(body.FbName, body.InstanceNames ?? new System.Collections.Generic.List<string>(), body.StartDbIndex, body.TargetFolder);
                             WriteJson(response, 200, new { success = true, created = result.Created, skipped = result.Skipped });
                         }
                         break;
@@ -139,6 +139,7 @@ namespace SiemensTiaBridge
             public string FbName { get; set; }
             public System.Collections.Generic.List<string> InstanceNames { get; set; }
             public int? StartDbIndex { get; set; }
+            public string TargetFolder { get; set; }
         }
 
         private class OpenProjectRequest

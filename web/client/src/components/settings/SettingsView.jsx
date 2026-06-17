@@ -876,7 +876,7 @@ export default function SettingsView() {
                                     templateFBs: {
                                       ...prev.templateFBs,
                                       [t.id]: fb
-                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, startDbIndex: existing?.startDbIndex }
+                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, startDbIndex: existing?.startDbIndex, targetFolder: existing?.targetFolder }
                                         : null,
                                     },
                                   };
@@ -892,6 +892,23 @@ export default function SettingsView() {
                                 <option key={fb.Name} value={fb.Name}>FB{fb.Number}: {fb.Name}</option>
                               ))}
                             </select>
+                            <input
+                              type="text"
+                              value={mapped?.targetFolder || ''}
+                              disabled={!mapped || !project}
+                              placeholder="\Folder\Subfolder"
+                              style={{ fontSize: 11, width: '100%', marginTop: 4, padding: '3px 6px', color: 'var(--text-secondary)' }}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setSiemens(prev => ({
+                                  ...prev,
+                                  templateFBs: {
+                                    ...prev.templateFBs,
+                                    [t.id]: { ...(prev.templateFBs?.[t.id] || {}), targetFolder: val || undefined },
+                                  },
+                                }));
+                              }}
+                            />
                           </td>
                           <td style={{ fontSize: 12, color: mapped ? 'var(--accent)' : 'var(--text-disabled)', textAlign: 'center' }}>
                             {mapped ? mapped.parameters?.length ?? 0 : '—'}

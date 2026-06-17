@@ -121,7 +121,7 @@ namespace SiemensTiaBridge
             return info;
         }
 
-        public CreateInstancesResult CreateInstances(string fbName, List<string> instanceNames, int? startDbIndex = null)
+        public CreateInstancesResult CreateInstances(string fbName, List<string> instanceNames, int? startDbIndex = null, string targetFolder = null)
         {
             if (_project == null)
                 throw new InvalidOperationException("No project open");
@@ -129,6 +129,8 @@ namespace SiemensTiaBridge
             PlcSoftware plcSw = FindPlcSoftware();
             if (plcSw == null)
                 throw new InvalidOperationException("No PLC software found in project");
+
+            var targetGroup = FindOrCreateGroup(plcSw.BlockGroup, targetFolder);
 
             var created = new List<string>();
             var skipped = new List<string>();
@@ -139,9 +141,9 @@ namespace SiemensTiaBridge
                 try
                 {
                     if (startDbIndex.HasValue)
-                        plcSw.BlockGroup.Blocks.CreateInstanceDB(instanceName, false, startDbIndex.Value + dbOffset, fbName);
+                        targetGroup.Blocks.CreateInstanceDB(instanceName, false, startDbIndex.Value + dbOffset, fbName);
                     else
-                        plcSw.BlockGroup.Blocks.CreateInstanceDB(instanceName, true, 0, fbName);
+                        targetGroup.Blocks.CreateInstanceDB(instanceName, true, 0, fbName);
                     created.Add(instanceName);
                     dbOffset++;
                 }
@@ -156,6 +158,30 @@ namespace SiemensTiaBridge
                 _project.Save();
 
             return new CreateInstancesResult { Created = created, Skipped = skipped };
+        }
+
+        private static PlcBlockGroup FindOrCreateGroup(PlcBlockGroup root, string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath)) return root;
+
+            var segments = folderPath.Trim('\\', '/').Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            var current = root;
+            foreach (var segment in segments)
+            {
+                PlcBlockGroup next = null;
+                foreach (PlcBlockGroup g in current.Groups)
+                {
+                    if (string.Equals(g.Name, segment, StringComparison.OrdinalIgnoreCase))
+                    {
+                        next = g;
+                        break;
+                    }
+                }
+                if (next == null)
+                    next = current.Groups.Create(segment);
+                current = next;
+            }
+            return current;
         }
 
         private PlcSoftware FindPlcSoftware()
