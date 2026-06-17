@@ -86,6 +86,13 @@ namespace SiemensTiaBridge
                         WriteJson(response, 200, new { success = true });
                         break;
 
+                    case "GET /api/fb/list":
+                        {
+                            var fbs = Tia.ListFunctionBlocks();
+                            WriteJson(response, 200, new { success = true, functionBlocks = fbs });
+                        }
+                        break;
+
                     default:
                         WriteJson(response, 404, new { error = "Not found" });
                         break;

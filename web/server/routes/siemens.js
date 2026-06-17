@@ -28,4 +28,20 @@ router.post('/test', async (req, res) => {
   }
 });
 
+// GET /api/siemens/fb/list — list FB types from the open TIA project
+router.get('/fb/list', async (req, res) => {
+  const { bridgeUrl } = req.query;
+
+  if (!bridgeUrl) return res.status(400).json({ error: 'bridgeUrl query param required' });
+
+  const base = normalizeUrl(bridgeUrl);
+  try {
+    const response = await axios.get(`${base}/api/fb/list`, { timeout: 30000 });
+    res.json(response.data);
+  } catch (err) {
+    const msg = err.response?.data?.error || err.message;
+    res.status(502).json({ error: msg });
+  }
+});
+
 module.exports = router;
