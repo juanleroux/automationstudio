@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Xml;
 using Siemens.Engineering;
+using Siemens.Engineering.HW.Extensions;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 
@@ -29,10 +30,6 @@ namespace SiemensTiaBridge
             return _project.Name;
         }
 
-        /// <summary>
-        /// Returns every FB type defined in the project across all PLCs, with their
-        /// input, in/out and output parameters — same shape as parseXDB() in the UI.
-        /// </summary>
         public List<FbInfo> ListFunctionBlocks()
         {
             if (_project == null)
@@ -44,10 +41,11 @@ namespace SiemensTiaBridge
             {
                 foreach (var item in device.DeviceItems)
                 {
-                    var sw = item.GetService<PlcSoftware>();
-                    if (sw == null) continue;
-
-                    CollectFbs(sw.BlockGroup, results);
+                    // SoftwareContainer is the correct IEngineeringService to request;
+                    // its .Software property gives the PlcSoftware if this item is a CPU.
+                    var container = item.GetService<SoftwareContainer>();
+                    if (container?.Software is PlcSoftware plcSw)
+                        CollectFbs(plcSw.BlockGroup, results);
                 }
             }
 
@@ -59,11 +57,8 @@ namespace SiemensTiaBridge
             foreach (var block in group.Blocks)
             {
                 if (block is FB fb)
-                {
                     results.Add(BuildFbInfo(fb));
-                }
             }
-
             foreach (var sub in group.Groups)
                 CollectFbs(sub, results);
         }
@@ -77,26 +72,42 @@ namespace SiemensTiaBridge
                 Parameters = new List<FbParameter>(),
             };
 
-            foreach (var member in fb.Interface.Sections)
+            // Export block to a temp XML file and parse the interface sections.
+            // This is more version-stable than accessing fb.Interface directly.
+            var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"{fb.Name}_{Guid.NewGuid()}.xml"));
+            try
             {
-                string usage;
-                switch (member.Name.ToUpperInvariant())
-                {
-                    case "INPUT":   usage = "input";  break;
-                    case "INOUT":   usage = "inOut";  break;
-                    case "OUTPUT":  usage = "output"; break;
-                    default:        continue;         // STATIC/TEMP/CONSTANT — not exposed
-                }
+                fb.Export(tmpFile, ExportOptions.None);
 
-                foreach (var v in member.Members)
+                var doc = new XmlDocument();
+                doc.Load(tmpFile.FullName);
+
+                foreach (XmlElement section in doc.GetElementsByTagName("Section"))
                 {
-                    info.Parameters.Add(new FbParameter
+                    var sectionName = section.GetAttribute("Name") ?? "";
+                    string usage;
+                    switch (sectionName.ToUpperInvariant())
                     {
-                        Name    = v.Name,
-                        Type    = v.Datatype,
-                        Usage   = usage,
-                    });
+                        case "INPUT":  usage = "input";  break;
+                        case "INOUT":  usage = "inOut";  break;
+                        case "OUTPUT": usage = "output"; break;
+                        default: continue;
+                    }
+
+                    foreach (XmlElement member in section.GetElementsByTagName("Member"))
+                    {
+                        info.Parameters.Add(new FbParameter
+                        {
+                            Name  = member.GetAttribute("Name"),
+                            Type  = member.GetAttribute("Datatype"),
+                            Usage = usage,
+                        });
+                    }
                 }
+            }
+            finally
+            {
+                try { tmpFile.Delete(); } catch { }
             }
 
             return info;
