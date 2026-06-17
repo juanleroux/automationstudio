@@ -218,9 +218,9 @@ namespace SiemensTiaBridge
                 sb.Append("<NetworkSource>");
                 sb.Append("<StructuredText xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v2\">");
                 sb.Append($"<Access Scope=\"GlobalVariable\"><Symbol><Component Name=\"{n}\"/></Symbol></Access>");
-                sb.Append("<Token Kind=\"OpenParenthesis\"/>");
-                sb.Append("<Token Kind=\"CloseParenthesis\"/>");
-                sb.Append("<Token Kind=\"Semicolon\"/>");
+                sb.Append("<Token Text=\"(\"/>");
+                sb.Append("<Token Text=\")\"/>");
+                sb.Append("<Token Text=\";\"/>");
                 sb.Append("<NewLine/>");
                 sb.Append("</StructuredText>");
                 sb.Append("</NetworkSource>");
