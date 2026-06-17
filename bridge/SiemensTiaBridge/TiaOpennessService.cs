@@ -220,7 +220,7 @@ namespace SiemensTiaBridge
                 sb.Append("<NetworkSource>");
                 sb.Append("<FlgNet xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4\">");
                 sb.Append("<Parts>");
-                sb.Append($"<Call UId=\"{callUid}\">");
+                sb.Append($"<Call uid=\"{callUid}\">");
                 sb.Append($"<CallInfo Name=\"{fb}\" BlockType=\"FB\">");
                 sb.Append($"<Instance Scope=\"GlobalVariable\">");
                 sb.Append($"<Component Name=\"{n}\"/>");
@@ -229,9 +229,9 @@ namespace SiemensTiaBridge
                 sb.Append("</Call>");
                 sb.Append("</Parts>");
                 sb.Append("<Wires>");
-                sb.Append($"<Wire UId=\"{wireUid}\">");
-                sb.Append($"<Powerrail UId=\"{pwrUid}\"/>");
-                sb.Append($"<NameCon UId=\"{callUid}\" Name=\"en\"/>");
+                sb.Append($"<Wire uid=\"{wireUid}\">");
+                sb.Append($"<Powerrail uid=\"{pwrUid}\"/>");
+                sb.Append($"<NameCon uid=\"{callUid}\" Name=\"en\"/>");
                 sb.Append("</Wire>");
                 sb.Append("</Wires>");
                 sb.Append("</FlgNet>");
