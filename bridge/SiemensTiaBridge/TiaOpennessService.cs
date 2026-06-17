@@ -135,14 +135,15 @@ namespace SiemensTiaBridge
 
             foreach (var instanceName in instanceNames)
             {
+                var safeName = SanitizeBlockName(instanceName);
                 try
                 {
-                    plcSw.BlockGroup.Blocks.CreateInstanceDB(instanceName, true, 0, fbName);
-                    created.Add(instanceName);
+                    plcSw.BlockGroup.Blocks.CreateInstanceDB(safeName, true, 0, fbName);
+                    created.Add(safeName);
                 }
                 catch (Exception ex)
                 {
-                    skipped.Add($"{instanceName}: {ex.Message}");
+                    skipped.Add($"{instanceName} → {safeName}: {ex.Message}");
                 }
             }
 
@@ -150,6 +151,29 @@ namespace SiemensTiaBridge
                 _project.Save();
 
             return new CreateInstancesResult { Created = created, Skipped = skipped };
+        }
+
+        /// <summary>
+        /// TIA Portal block names must match [A-Za-z_][A-Za-z0-9_]* (no hyphens, spaces, etc.).
+        /// Replace any invalid character with '_' and prefix with '_' if the name starts with a digit.
+        /// </summary>
+        private static string SanitizeBlockName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "_Block";
+
+            var chars = name.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+            {
+                char c = chars[i];
+                if (!char.IsLetterOrDigit(c) && c != '_')
+                    chars[i] = '_';
+            }
+
+            var result = new string(chars);
+            if (char.IsDigit(result[0]))
+                result = "_" + result;
+
+            return result;
         }
 
         private PlcSoftware FindPlcSoftware()
