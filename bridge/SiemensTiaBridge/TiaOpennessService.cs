@@ -168,6 +168,8 @@ namespace SiemensTiaBridge
             string fbName)
         {
             var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion, fbName);
+            var debugPath = Path.Combine(Path.GetTempPath(), $"SiemensTiaBridge_debug_{fcName}.xml");
+            File.WriteAllText(debugPath, xml, new UTF8Encoding(false));
             var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"{fcName}_{Guid.NewGuid()}.xml"));
             try
             {
