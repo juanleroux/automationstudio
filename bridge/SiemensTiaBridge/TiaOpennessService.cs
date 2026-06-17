@@ -30,37 +30,45 @@ namespace SiemensTiaBridge
             return _project.Name;
         }
 
-        public List<FbInfo> ListFunctionBlocks()
+        public FbListResult ListFunctionBlocks()
         {
             if (_project == null)
                 throw new InvalidOperationException("No project open");
 
             var results = new List<FbInfo>();
+            var skipped = new List<string>();
 
             foreach (var device in _project.Devices)
             {
                 foreach (var item in device.DeviceItems)
                 {
-                    // SoftwareContainer is the correct IEngineeringService to request;
-                    // its .Software property gives the PlcSoftware if this item is a CPU.
                     var container = item.GetService<SoftwareContainer>();
                     if (container?.Software is PlcSoftware plcSw)
-                        CollectFbs(plcSw.BlockGroup, results);
+                        CollectFbs(plcSw.BlockGroup, results, skipped);
                 }
             }
 
-            return results;
+            return new FbListResult { FunctionBlocks = results, Skipped = skipped };
         }
 
-        private static void CollectFbs(PlcBlockGroup group, List<FbInfo> results)
+        private static void CollectFbs(PlcBlockGroup group, List<FbInfo> results, List<string> skipped)
         {
             foreach (var block in group.Blocks)
             {
                 if (block is FB fb)
-                    results.Add(BuildFbInfo(fb));
+                {
+                    try
+                    {
+                        results.Add(BuildFbInfo(fb));
+                    }
+                    catch (Exception ex)
+                    {
+                        skipped.Add($"{fb.Name}: {ex.Message}");
+                    }
+                }
             }
             foreach (var sub in group.Groups)
-                CollectFbs(sub, results);
+                CollectFbs(sub, results, skipped);
         }
 
         private static FbInfo BuildFbInfo(FB fb)
@@ -128,6 +136,12 @@ namespace SiemensTiaBridge
         }
 
         public void Dispose() => CloseProject();
+    }
+
+    public class FbListResult
+    {
+        public List<FbInfo> FunctionBlocks { get; set; }
+        public List<string> Skipped { get; set; }
     }
 
     public class FbInfo

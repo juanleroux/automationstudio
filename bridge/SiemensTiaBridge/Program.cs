@@ -88,8 +88,8 @@ namespace SiemensTiaBridge
 
                     case "GET /api/fb/list":
                         {
-                            var fbs = Tia.ListFunctionBlocks();
-                            WriteJson(response, 200, new { success = true, functionBlocks = fbs });
+                            var result = Tia.ListFunctionBlocks();
+                            WriteJson(response, 200, new { success = true, functionBlocks = result.FunctionBlocks, skipped = result.Skipped });
                         }
                         break;
 
