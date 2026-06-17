@@ -29,6 +29,8 @@ export const ignitionGatewayControl = (action) => api.post('/ignition/gateway-co
 // Siemens TIA Portal bridge
 export const testSiemensConnection = (data) => api.post('/siemens/test', data).then(r => r.data);
 export const listTiaFunctionBlocks = (bridgeUrl) => api.get('/siemens/fb/list', { params: { bridgeUrl } }).then(r => r.data);
+export const openTiaProject = (data) => api.post('/siemens/project/open', data).then(r => r.data);
+export const closeTiaProject = (data) => api.post('/siemens/project/close', data).then(r => r.data);
 
 // Communications — session-based live connections
 export const connectOpc     = (d) => api.post('/connections/opc/connect',     d).then(r => r.data);

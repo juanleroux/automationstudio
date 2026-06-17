@@ -4,7 +4,7 @@ import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
-import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword, ignitionGatewayControl, testSiemensConnection, listTiaFunctionBlocks } from '../../api/client';
+import { loadConfig, saveConfig, testIgnitionConnection, resetIgnitionPassword, ignitionGatewayControl, testSiemensConnection, listTiaFunctionBlocks, openTiaProject, closeTiaProject } from '../../api/client';
 
 export default function SettingsView() {
   const { project, updateProject } = useProject();
@@ -77,6 +77,8 @@ export default function SettingsView() {
   const [tiaFBs, setTiaFBs] = useState([]);
   const [loadingFBs, setLoadingFBs] = useState(false);
   const [fbListKey, setFbListKey] = useState(0);
+  const [tiaProjectOpen, setTiaProjectOpen] = useState(false);
+  const [openingProject, setOpeningProject] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -140,6 +142,33 @@ export default function SettingsView() {
       setSiemensTestResult({ success: false, message: err.response?.data?.error || err.message });
     } finally {
       setSiemensTesting(false);
+    }
+  };
+
+  const handleOpenTiaProject = async () => {
+    if (!siemens.bridgeUrl) { toast.error('Enter a Bridge URL first'); return; }
+    if (!siemens.projectPath) { toast.error('Enter a TIA Project Path first'); return; }
+    setOpeningProject(true);
+    try {
+      const result = await openTiaProject({ bridgeUrl: siemens.bridgeUrl, projectPath: siemens.projectPath, withUi: siemens.openWithUI });
+      setTiaProjectOpen(true);
+      toast.success(`Opened project: ${result.projectName}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message);
+    } finally {
+      setOpeningProject(false);
+    }
+  };
+
+  const handleCloseTiaProject = async () => {
+    if (!siemens.bridgeUrl) return;
+    try {
+      await closeTiaProject({ bridgeUrl: siemens.bridgeUrl });
+      setTiaProjectOpen(false);
+      setTiaFBs([]);
+      toast.success('TIA project closed');
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message);
     }
   };
 
@@ -767,6 +796,28 @@ export default function SettingsView() {
                   }}
                 />
                 <p className="text-xs text-text-muted mt-1">Full path to the TIA Portal project file on this machine</p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: 12 }}
+                    disabled={!project || openingProject || tiaProjectOpen || !siemens.projectPath || !siemens.bridgeUrl}
+                    onClick={handleOpenTiaProject}
+                  >
+                    {openingProject ? 'Opening...' : 'Open in TIA'}
+                  </button>
+                  {tiaProjectOpen && (
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: 12, color: 'var(--text-muted)' }}
+                      onClick={handleCloseTiaProject}
+                    >
+                      Close Project
+                    </button>
+                  )}
+                  {tiaProjectOpen && (
+                    <span style={{ fontSize: 12, color: 'var(--accent)', alignSelf: 'center' }}>● Project open</span>
+                  )}
+                </div>
               </div>
 
               {/* FB Mapping */}
