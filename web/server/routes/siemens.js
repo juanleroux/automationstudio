@@ -61,6 +61,25 @@ router.post('/project/open', async (req, res) => {
   }
 });
 
+// POST /api/siemens/instances/create — create instance DBs in the open TIA project
+router.post('/instances/create', async (req, res) => {
+  const { bridgeUrl, fbName, instanceNames } = req.body;
+
+  if (!bridgeUrl) return res.status(400).json({ error: 'bridgeUrl required' });
+  if (!fbName) return res.status(400).json({ error: 'fbName required' });
+  if (!Array.isArray(instanceNames) || instanceNames.length === 0)
+    return res.status(400).json({ error: 'instanceNames array required' });
+
+  const base = normalizeUrl(bridgeUrl);
+  try {
+    const response = await axios.post(`${base}/api/instances/create`, { fbName, instanceNames }, { timeout: 120000 });
+    res.json(response.data);
+  } catch (err) {
+    const msg = err.response?.data?.error || err.message;
+    res.status(502).json({ error: msg });
+  }
+});
+
 // POST /api/siemens/project/close — close the open TIA project
 router.post('/project/close', async (req, res) => {
   const { bridgeUrl } = req.body;

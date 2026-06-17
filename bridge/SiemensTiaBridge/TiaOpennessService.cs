@@ -121,7 +121,47 @@ namespace SiemensTiaBridge
             return info;
         }
 
-        public void CloseProject()
+        public CreateInstancesResult CreateInstances(string fbName, List<string> instanceNames)
+        {
+            if (_project == null)
+                throw new InvalidOperationException("No project open");
+
+            PlcSoftware plcSw = FindPlcSoftware();
+            if (plcSw == null)
+                throw new InvalidOperationException("No PLC software found in project");
+
+            var created = new List<string>();
+            var skipped = new List<string>();
+
+            foreach (var instanceName in instanceNames)
+            {
+                try
+                {
+                    plcSw.BlockGroup.Blocks.CreateInstanceDB(instanceName, true, 0, fbName);
+                    created.Add(instanceName);
+                }
+                catch (Exception ex)
+                {
+                    skipped.Add($"{instanceName}: {ex.Message}");
+                }
+            }
+
+            if (created.Count > 0)
+                _project.Save();
+
+            return new CreateInstancesResult { Created = created, Skipped = skipped };
+        }
+
+        private PlcSoftware FindPlcSoftware()
+        {
+            foreach (var device in _project.Devices)
+                foreach (var item in device.DeviceItems)
+                {
+                    var container = item.GetService<SoftwareContainer>();
+                    if (container?.Software is PlcSoftware plcSw) return plcSw;
+                }
+            return null;
+        }
         {
             if (_project != null)
             {
@@ -136,6 +176,12 @@ namespace SiemensTiaBridge
         }
 
         public void Dispose() => CloseProject();
+    }
+
+    public class CreateInstancesResult
+    {
+        public List<string> Created { get; set; }
+        public List<string> Skipped { get; set; }
     }
 
     public class FbListResult

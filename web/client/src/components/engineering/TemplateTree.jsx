@@ -7,7 +7,7 @@ import {
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
-import { exportFromIgnition } from '../../api/client';
+import { exportFromIgnition, createTiaInstances } from '../../api/client';
 import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
 import { downloadStudio5000Routine, parseProjectL5X, mapL5XDataType } from '../../utils/studio5000Export';
@@ -1412,6 +1412,41 @@ export default function TemplateTree({ selected, onSelect }) {
                               }}
                             >
                               <Download size={14} /> Export to Control Expert
+                            </div>
+                          );
+                        })()}
+                        {project?.siemens?.enableSiemensMenuItems && (() => {
+                          const t = templates.find(x => x.id === contextMenu.templateId);
+                          const fbMapping = project?.siemens?.templateFBs?.[contextMenu.templateId];
+                          const bridgeUrl = project?.siemens?.bridgeUrl;
+                          const disabled = !fbMapping || !bridgeUrl;
+                          return (
+                            <div
+                              className="context-menu-item"
+                              style={{ opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? 'none' : 'auto' }}
+                              title={disabled ? 'Configure FB mapping in Settings → Siemens' : ''}
+                              onClick={async () => {
+                                if (disabled) return;
+                                setContextMenu(null);
+                                const instanceNames = ctxInsts.map(item => item.instance.name);
+                                try {
+                                  const result = await createTiaInstances({
+                                    bridgeUrl,
+                                    fbName: fbMapping.fbName,
+                                    instanceNames,
+                                  });
+                                  if (result.skipped?.length) {
+                                    toast.error(`${result.skipped.length} skipped: ${result.skipped[0]}`);
+                                  }
+                                  if (result.created?.length) {
+                                    toast.success(`Created ${result.created.length} instance DB${result.created.length !== 1 ? 's' : ''} in TIA Portal`);
+                                  }
+                                } catch (err) {
+                                  toast.error('TIA export failed: ' + (err.response?.data?.error || err.message));
+                                }
+                              }}
+                            >
+                              <Upload size={14} /> Export to TIA Portal
                             </div>
                           );
                         })()}

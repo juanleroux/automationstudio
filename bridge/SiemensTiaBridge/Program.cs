@@ -93,6 +93,14 @@ namespace SiemensTiaBridge
                         }
                         break;
 
+                    case "POST /api/instances/create":
+                        {
+                            var body = ReadJsonBody<CreateInstancesRequest>(request);
+                            var result = Tia.CreateInstances(body.FbName, body.InstanceNames ?? new System.Collections.Generic.List<string>());
+                            WriteJson(response, 200, new { success = true, created = result.Created, skipped = result.Skipped });
+                        }
+                        break;
+
                     default:
                         WriteJson(response, 404, new { error = "Not found" });
                         break;
@@ -124,6 +132,12 @@ namespace SiemensTiaBridge
             var bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(payload));
             response.ContentLength64 = bytes.Length;
             response.OutputStream.Write(bytes, 0, bytes.Length);
+        }
+
+        private class CreateInstancesRequest
+        {
+            public string FbName { get; set; }
+            public System.Collections.Generic.List<string> InstanceNames { get; set; }
         }
 
         private class OpenProjectRequest
