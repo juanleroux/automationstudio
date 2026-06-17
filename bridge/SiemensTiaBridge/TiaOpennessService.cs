@@ -215,7 +215,7 @@ namespace SiemensTiaBridge
                 sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
                 sb.Append("<AttributeList>");
                 sb.Append("<NetworkSource>");
-                sb.Append($"<StructuredText>{sclCall}</StructuredText>");
+                sb.Append($"<StructuredText xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v2\">{sclCall}</StructuredText>");
                 sb.Append("</NetworkSource>");
                 sb.Append("<ProgrammingLanguage>SCL</ProgrammingLanguage>");
                 sb.Append("</AttributeList>");
@@ -270,6 +270,52 @@ namespace SiemensTiaBridge
                     var container = item.GetService<SoftwareContainer>();
                     if (container?.Software is PlcSoftware plcSw) return plcSw;
                 }
+            return null;
+        }
+
+        public string ExportBlockXml(string blockName)
+        {
+            if (_project == null)
+                throw new InvalidOperationException("No project open");
+
+            var block = FindBlockByName(blockName);
+            if (block == null)
+                throw new InvalidOperationException($"Block '{blockName}' not found in project");
+
+            var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"export_{blockName}_{Guid.NewGuid()}.xml"));
+            try
+            {
+                block.Export(tmpFile, ExportOptions.None);
+                return File.ReadAllText(tmpFile.FullName, Encoding.UTF8);
+            }
+            finally { try { tmpFile.Delete(); } catch { } }
+        }
+
+        private PlcBlock FindBlockByName(string name)
+        {
+            foreach (var device in _project.Devices)
+                foreach (var item in device.DeviceItems)
+                {
+                    var container = item.GetService<SoftwareContainer>();
+                    if (container?.Software is PlcSoftware plcSw)
+                    {
+                        var block = SearchGroup(plcSw.BlockGroup, name);
+                        if (block != null) return block;
+                    }
+                }
+            return null;
+        }
+
+        private static PlcBlock SearchGroup(PlcBlockGroup group, string name)
+        {
+            foreach (PlcBlock block in group.Blocks)
+                if (string.Equals(block.Name, name, StringComparison.OrdinalIgnoreCase))
+                    return block;
+            foreach (PlcBlockGroup sub in group.Groups)
+            {
+                var found = SearchGroup(sub, name);
+                if (found != null) return found;
+            }
             return null;
         }
 

@@ -93,6 +93,23 @@ namespace SiemensTiaBridge
                         }
                         break;
 
+                    case "GET /api/block/export":
+                        {
+                            var blockName = request.QueryString["blockName"];
+                            if (string.IsNullOrWhiteSpace(blockName))
+                            {
+                                WriteJson(response, 400, new { error = "blockName query param required" });
+                                break;
+                            }
+                            var xml = Tia.ExportBlockXml(blockName);
+                            response.StatusCode = 200;
+                            response.ContentType = "application/xml";
+                            var bytes = Encoding.UTF8.GetBytes(xml);
+                            response.ContentLength64 = bytes.Length;
+                            response.OutputStream.Write(bytes, 0, bytes.Length);
+                        }
+                        break;
+
                     case "POST /api/instances/create":
                         {
                             var body = ReadJsonBody<CreateInstancesRequest>(request);
