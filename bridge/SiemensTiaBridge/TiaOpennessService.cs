@@ -212,6 +212,7 @@ namespace SiemensTiaBridge
                 int titleItem = nextId++;
                 int accessUId = nextId++;
                 int symbolUId = nextId++;
+                int compUId   = nextId++;
                 int tokenOpen = nextId++;
                 int tokenClose= nextId++;
                 int tokenSemi = nextId++;
@@ -223,7 +224,7 @@ namespace SiemensTiaBridge
                 sb.Append("<AttributeList>");
                 sb.Append("<NetworkSource>");
                 sb.Append("<StructuredText xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v2\">");
-                sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\"><Symbol UId=\"{symbolUId}\"><Component Name=\"{n}\"/></Symbol></Access>");
+                sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\"><Symbol UId=\"{symbolUId}\"><Component Name=\"{n}\" UId=\"{compUId}\"/></Symbol></Access>");
                 sb.Append($"<Token Text=\"(\" UId=\"{tokenOpen}\"/>");
                 sb.Append($"<Token Text=\")\" UId=\"{tokenClose}\"/>");
                 sb.Append($"<Token Text=\";\" UId=\"{tokenSemi}\"/>");
