@@ -217,17 +217,21 @@ namespace SiemensTiaBridge
             foreach (var inst in instances)
             {
                 var n         = XmlEsc(inst.Name);
+                var comment   = XmlEsc(inst.LongDesc);
                 int accessUId = nextId++;
                 int symbolUId = nextId++;
                 int compUId   = nextId++;
                 int tokenOpen = nextId++;
                 int tokenClose= nextId++;
                 int tokenSemi = nextId++;
+                int commentId = nextId++;
                 int newLineId = nextId++;
                 sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\"><Symbol UId=\"{symbolUId}\"><Component Name=\"{n}\" UId=\"{compUId}\"/></Symbol></Access>");
                 sb.Append($"<Token Text=\"(\" UId=\"{tokenOpen}\"/>");
                 sb.Append($"<Token Text=\")\" UId=\"{tokenClose}\"/>");
                 sb.Append($"<Token Text=\";\" UId=\"{tokenSemi}\"/>");
+                if (!string.IsNullOrEmpty(inst.LongDesc))
+                    sb.Append($"<LineComment UId=\"{commentId}\"><Text>{comment}</Text></LineComment>");
                 sb.Append($"<NewLine UId=\"{newLineId}\"/>");
             }
             sb.Append("</StructuredText>");
