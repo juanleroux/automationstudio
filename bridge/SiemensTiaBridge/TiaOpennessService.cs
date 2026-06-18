@@ -292,7 +292,7 @@ namespace SiemensTiaBridge
             var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"export_{blockName}_{Guid.NewGuid()}.xml"));
             try
             {
-                block.Export(tmpFile, ExportOptions.None);
+                block.Export(tmpFile, ExportOptions.WithDefaults);
                 return File.ReadAllText(tmpFile.FullName, Encoding.UTF8);
             }
             finally { try { tmpFile.Delete(); } catch { } }
