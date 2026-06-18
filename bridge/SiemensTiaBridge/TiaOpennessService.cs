@@ -210,6 +210,11 @@ namespace SiemensTiaBridge
                 int cuId      = nextId++;
                 int titleId   = nextId++;
                 int titleItem = nextId++;
+                int accessUId = nextId++;
+                int tokenOpen = nextId++;
+                int tokenClose= nextId++;
+                int tokenSemi = nextId++;
+                int newLineId = nextId++;
                 var n = XmlEsc(inst.Name);
                 var t = XmlEsc(inst.LongDesc);
 
@@ -217,11 +222,11 @@ namespace SiemensTiaBridge
                 sb.Append("<AttributeList>");
                 sb.Append("<NetworkSource>");
                 sb.Append("<StructuredText xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v2\">");
-                sb.Append($"<Access Scope=\"GlobalVariable\"><Symbol><Component Name=\"{n}\"/></Symbol></Access>");
-                sb.Append("<Token Text=\"(\"/>");
-                sb.Append("<Token Text=\")\"/>");
-                sb.Append("<Token Text=\";\"/>");
-                sb.Append("<NewLine/>");
+                sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\"><Symbol><Component Name=\"{n}\"/></Symbol></Access>");
+                sb.Append($"<Token Text=\"(\" UId=\"{tokenOpen}\"/>");
+                sb.Append($"<Token Text=\")\" UId=\"{tokenClose}\"/>");
+                sb.Append($"<Token Text=\";\" UId=\"{tokenSemi}\"/>");
+                sb.Append($"<NewLine UId=\"{newLineId}\"/>");
                 sb.Append("</StructuredText>");
                 sb.Append("</NetworkSource>");
                 sb.Append("<ProgrammingLanguage>SCL</ProgrammingLanguage>");
