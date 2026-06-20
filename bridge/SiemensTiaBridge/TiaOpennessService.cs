@@ -102,7 +102,6 @@ namespace SiemensTiaBridge
         public CreateInstancesResult CreateInstances(
             string fbName,
             List<InstanceInfo> instances,
-            int? startDbIndex = null,
             string targetFolder = null,
             string fcName = null,
             int? fcNumber = null,
@@ -120,22 +119,19 @@ namespace SiemensTiaBridge
             var created = new List<string>();
             var skipped = new List<string>();
 
-            int dbOffset = 0;
             foreach (var inst in instances)
             {
                 try
                 {
-                    if (startDbIndex.HasValue)
-                        targetGroup.Blocks.CreateInstanceDB(inst.Name, false, startDbIndex.Value + dbOffset, fbName);
+                    if (inst.DbNumber.HasValue)
+                        targetGroup.Blocks.CreateInstanceDB(inst.Name, false, inst.DbNumber.Value, fbName);
                     else
                         targetGroup.Blocks.CreateInstanceDB(inst.Name, true, 0, fbName);
                     created.Add(inst.Name);
-                    dbOffset++;
                 }
                 catch (Exception ex)
                 {
                     skipped.Add($"{inst.Name}: {ex.Message}");
-                    dbOffset++;
                 }
             }
 
@@ -359,6 +355,7 @@ namespace SiemensTiaBridge
     {
         public string Name { get; set; }
         public string LongDesc { get; set; }
+        public int? DbNumber { get; set; }
     }
 
     public class CreateInstancesResult

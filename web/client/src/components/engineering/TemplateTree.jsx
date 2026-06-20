@@ -1429,18 +1429,21 @@ export default function TemplateTree({ selected, onSelect }) {
                                 if (disabled) return;
                                 setContextMenu(null);
                                 const longDescAttr = (t?.attributes || []).find(a => a.name === 'LongDesc');
+                                const dbAttr = (t?.attributes || []).find(a => a.name === 'DB');
                                 const instances = ctxInsts.map(item => {
                                   const inst = item.instance;
-                                  const ia = longDescAttr ? (inst.attributes || []).find(a => a.id === longDescAttr.id) : null;
-                                  const longDesc = (ia?.value != null ? ia.value : longDescAttr?.value) || '';
-                                  return { name: inst.name, longDesc };
+                                  const la = longDescAttr ? (inst.attributes || []).find(a => a.id === longDescAttr.id) : null;
+                                  const longDesc = (la?.value != null ? la.value : longDescAttr?.value) || '';
+                                  const da = dbAttr ? (inst.attributes || []).find(a => a.id === dbAttr.id) : null;
+                                  const dbVal = da?.value != null ? da.value : dbAttr?.value;
+                                  const dbNumber = (dbVal != null && dbVal !== '') ? parseInt(dbVal, 10) : undefined;
+                                  return { name: inst.name, longDesc, ...(dbNumber != null && !isNaN(dbNumber) ? { dbNumber } : {}) };
                                 });
                                 try {
                                   const result = await createTiaInstances({
                                     bridgeUrl,
                                     fbName: fbMapping.fbName,
                                     instances,
-                                    ...(fbMapping.startDbIndex != null ? { startDbIndex: fbMapping.startDbIndex } : {}),
                                     ...(fbMapping.targetFolder ? { targetFolder: fbMapping.targetFolder } : {}),
                                     ...(fbMapping.fcName ? { fcName: fbMapping.fcName } : {}),
                                     ...(fbMapping.fcNumber != null ? { fcNumber: fbMapping.fcNumber } : {}),

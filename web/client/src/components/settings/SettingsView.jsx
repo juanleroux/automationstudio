@@ -846,16 +846,15 @@ export default function SettingsView() {
                       <th style={{ width: 120 }}>Template</th>
                       <th style={{ width: 150 }}>Function Block</th>
                       <th>Target Folder</th>
-                      <th style={{ width: 80 }}>Start DB #</th>
                       <th style={{ width: 55 }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {!project && (
-                      <tr><td colSpan={5} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>Open a project to see templates</td></tr>
+                      <tr><td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>Open a project to see templates</td></tr>
                     )}
                     {project && (project.templates || []).length === 0 && (
-                      <tr><td colSpan={5} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>No templates defined — create templates in Assets first</td></tr>
+                      <tr><td colSpan={4} style={{ color: 'var(--text-disabled)', fontStyle: 'italic', fontSize: 12 }}>No templates defined — create templates in Assets first</td></tr>
                     )}
                     {[...(project?.templates || [])].sort((a, b) => a.name.localeCompare(b.name)).map(t => {
                       const mapped = siemens.templateFBs?.[t.id];
@@ -877,7 +876,7 @@ export default function SettingsView() {
                                     templateFBs: {
                                       ...prev.templateFBs,
                                       [t.id]: fb
-                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, startDbIndex: existing?.startDbIndex, targetFolder: existing?.targetFolder, fcName: existing?.fcName, fcNumber: existing?.fcNumber }
+                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, targetFolder: existing?.targetFolder, fcName: existing?.fcName, fcNumber: existing?.fcNumber }
                                         : null,
                                     },
                                   };
@@ -913,28 +912,6 @@ export default function SettingsView() {
                             />
                           </td>
                           <td>
-                            <input
-                              type="number"
-                              min={0}
-                              max={65535}
-                              value={mapped?.startDbIndex ?? ''}
-                              disabled={!mapped || !project}
-                              placeholder="Auto"
-                              style={{ fontSize: 12, width: '100%', padding: '3px 6px' }}
-                              onChange={e => {
-                                const raw = e.target.value;
-                                const val = raw === '' ? undefined : parseInt(raw, 10);
-                                setSiemens(prev => ({
-                                  ...prev,
-                                  templateFBs: {
-                                    ...prev.templateFBs,
-                                    [t.id]: { ...(prev.templateFBs?.[t.id] || {}), startDbIndex: val },
-                                  },
-                                }));
-                              }}
-                            />
-                          </td>
-                          <td>
                             {mapped && (
                               <button
                                 className="btn btn-ghost"
@@ -951,7 +928,7 @@ export default function SettingsView() {
                         </tr>
                         {mapped && (
                           <tr style={{ background: 'var(--bg-surface)' }}>
-                            <td colSpan={5} style={{ padding: '4px 12px 8px' }}>
+                            <td colSpan={4} style={{ padding: '4px 12px 8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>FC Name:</span>
                                 <input
