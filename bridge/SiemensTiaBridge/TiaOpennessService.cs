@@ -225,13 +225,14 @@ namespace SiemensTiaBridge
                 int tokenClose= nextId++;
                 int tokenSemi = nextId++;
                 int commentId = nextId++;
+                int commentTextId = nextId++;
                 int newLineId = nextId++;
                 sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\"><Symbol UId=\"{symbolUId}\"><Component Name=\"{n}\" UId=\"{compUId}\"/></Symbol></Access>");
                 sb.Append($"<Token Text=\"(\" UId=\"{tokenOpen}\"/>");
                 sb.Append($"<Token Text=\")\" UId=\"{tokenClose}\"/>");
                 sb.Append($"<Token Text=\";\" UId=\"{tokenSemi}\"/>");
                 if (!string.IsNullOrEmpty(inst.LongDesc))
-                    sb.Append($"<LineComment UId=\"{commentId}\"><Text>{comment}</Text></LineComment>");
+                    sb.Append($"<LineComment UId=\"{commentId}\"><Text UId=\"{commentTextId}\">{comment}</Text></LineComment>");
                 sb.Append($"<NewLine UId=\"{newLineId}\"/>");
             }
             sb.Append("</StructuredText>");
