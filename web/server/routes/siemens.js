@@ -53,7 +53,7 @@ router.post('/project/open', async (req, res) => {
 
   const base = normalizeUrl(bridgeUrl);
   try {
-    const response = await axios.post(`${base}/api/project/open`, { projectPath, withUi: withUi ?? true }, { timeout: 60000 });
+    const response = await axios.post(`${base}/api/project/open`, { projectPath, withUi: withUi ?? true }, { timeout: 180000 });
     res.json(response.data);
   } catch (err) {
     const msg = err.response?.data?.error || err.message;

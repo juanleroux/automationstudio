@@ -149,6 +149,7 @@ export default function SettingsView() {
     if (!siemens.bridgeUrl) { toast.error('Enter a Bridge URL first'); return; }
     if (!siemens.projectPath) { toast.error('Enter a TIA Project Path first'); return; }
     setOpeningProject(true);
+    toast.info('Opening TIA project… If TIA Portal shows an Openness access dialog, click "Yes to all" to continue.', 15000);
     try {
       const result = await openTiaProject({ bridgeUrl: siemens.bridgeUrl, projectPath: siemens.projectPath, withUi: siemens.openWithUI });
       setTiaProjectOpen(true);
