@@ -220,7 +220,7 @@ export default function NotesView() {
       {tabs.length === 0 && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text-muted)' }}>
           <StickyNote size={40} style={{ opacity: 0.25 }} />
-          <div style={{ fontSize: 14 }}>No note tabs yet</div>
+          <div style={{ fontSize: 14 }}>No notes yet</div>
           <button className="btn btn-secondary" onClick={addTab} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Plus size={13} /> New Tab
           </button>
