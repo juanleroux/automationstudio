@@ -210,7 +210,7 @@ export default function NotesView() {
         <button
           onClick={addTab}
           title="New note tab"
-          style={{ ...iconBtn, padding: '8px 10px', flexShrink: 0 }}
+          style={{ ...iconBtn, padding: '8px 10px', flexShrink: 0, borderBottom: '2px solid transparent' }}
         >
           <Plus size={14} />
         </button>
