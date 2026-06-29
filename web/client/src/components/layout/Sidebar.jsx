@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   Cpu, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
   FilePlus, FolderOpen, FolderX, Save, SaveAll, Zap,
-  Calculator, Network, Share2
+  Calculator, Network, Share2, StickyNote
 } from 'lucide-react';
 import { useProject, supportsFileSystemAccess } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -13,6 +13,7 @@ const PROJECT_NAV = [
   { id: 'dashboard',   label: 'Dashboard', icon: LayoutDashboard, alwaysEnabled: true },
   { id: 'topology',    label: 'Topology',  icon: Share2 },
   { id: 'engineering', label: 'Assets',    icon: Cpu },
+  { id: 'notes',       label: 'Notes',     icon: StickyNote },
 ];
 
 const TOOL_NAV = [

@@ -9,6 +9,7 @@ import CalculatorsView from './components/calculators/CalculatorsView';
 import CommTestView from './components/commtest/CommTestView';
 import SettingsView from './components/settings/SettingsView';
 import TopologyView from './components/topology/TopologyView';
+import NotesView from './components/notes/NotesView';
 
 function AppInner() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -18,6 +19,7 @@ function AppInner() {
       {activeView === 'dashboard'   && <DashboardView />}
       {activeView === 'topology'    && <TopologyView />}
       {activeView === 'engineering' && <EngineeringView />}
+      {activeView === 'notes'       && <NotesView />}
       {activeView === 'calculators' && <CalculatorsView />}
       {activeView === 'commtest'    && <CommTestView />}
       {activeView === 'settings'    && <SettingsView />}

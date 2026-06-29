@@ -28,6 +28,7 @@ function blankProject(name) {
       topics: [],
     },
     topology: { nodes: [], connections: [] },
+    notes: { tabs: [] },
   };
 }
 
