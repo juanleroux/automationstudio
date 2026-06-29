@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import Modal from './Modal';
 
-export default function ConfirmDialog({ title, message, onConfirm, onCancel, danger = false }) {
+export default function ConfirmDialog({ title, message, onConfirm, onCancel, danger = false, confirmLabel }) {
   return (
     <Modal
       title={title || 'Confirm'}
@@ -15,7 +15,7 @@ export default function ConfirmDialog({ title, message, onConfirm, onCancel, dan
             className={`btn ${danger ? 'btn-danger' : 'btn-primary'}`}
             onClick={onConfirm}
           >
-            {danger ? 'Delete' : 'Confirm'}
+            {confirmLabel ?? (danger ? 'Delete' : 'Confirm')}
           </button>
         </>
       }

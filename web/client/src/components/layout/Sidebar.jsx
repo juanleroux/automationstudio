@@ -289,6 +289,7 @@ export default function Sidebar({ activeView, onChangeView }) {
           title="Close Project"
           message={`"${project?.name}" has unsaved changes. Close anyway?`}
           danger
+          confirmLabel="Close"
           onConfirm={doClose}
           onCancel={() => setConfirmClose(false)}
         />
