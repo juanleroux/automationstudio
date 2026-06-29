@@ -174,7 +174,7 @@ export default function NotesView() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
       {/* ── Tab bar ─────────────────────────────────────────────── */}
-      <div className="tab-bar" style={{ flexShrink: 0, alignItems: 'stretch', paddingLeft: 4 }}>
+      <div className="tab-bar" style={{ flexShrink: 0, alignItems: 'center', paddingLeft: 4 }}>
         {tabs.map(tab => (
           <div
             key={tab.id}
