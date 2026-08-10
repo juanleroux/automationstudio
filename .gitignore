@@ -12,6 +12,11 @@ obj/
 # NuGet packages
 packages/
 
+# Legacy WPF app (removed from tracking — kept here so local copies are ignored)
+TagCreator/
+TagCreator.sln
+scr/
+
 # Node
 node_modules/
 web/client/dist/
