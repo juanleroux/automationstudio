@@ -1,0 +1,21 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build output
+bin/
+obj/
+
+# NuGet packages
+packages/
+
+# Node
+node_modules/
+web/client/dist/
+
+# Logs / misc
+*.log
+*.tmp
