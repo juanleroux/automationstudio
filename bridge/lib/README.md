@@ -1,18 +1,21 @@
-Copy all `Siemens.Engineering*.dll` files here before building.
+Copy all Siemens Openness DLL files here before building.
 
-They ship with TIA Portal under the PublicAPI folder for your installed version:
+The source location changed in V21:
 
-| TIA Version | DLL location |
-|-------------|--------------|
+| TIA Version | Copy DLLs from |
+|-------------|----------------|
 | V18 | `C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18\` |
 | V19 | `C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\` |
 | V20 | `C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20\` |
-| V21 | `C:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48\` |
+| V21+ | `C:\Program Files\Siemens\Automation\Portal V21\Bin\PublicAPI\` |
 
-> **V21 note:** Starting with V21, Siemens moved the .NET Framework 4.8 assemblies into a
-> `net48\` subfolder. Copy everything from that subfolder into this `lib\` directory.
+> **V21+ note:** Siemens no longer distributes `Siemens.Engineering.dll` as a single
+> assembly. The API is split across several DLLs (`Siemens.Engineering.Base.dll`,
+> `Siemens.Engineering.Step7.dll`, etc.) found in `Bin\PublicAPI\`. Copy everything
+> from that folder. The DLLs are also **not** GAC-registered in V21, so `Private=true`
+> in the .csproj ensures they are bundled alongside the exe at build time.
 
-### Quick copy (PowerShell — adjust version number as needed)
+### Quick copy (PowerShell — run as Administrator, adjust version)
 
 **V18 / V19 / V20:**
 ```powershell
@@ -21,9 +24,11 @@ Copy-Item "C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\*.dll" .
 
 **V21+:**
 ```powershell
-Copy-Item "C:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48\*.dll" .\lib\
+Copy-Item "C:\Program Files\Siemens\Automation\Portal V21\Bin\PublicAPI\*.dll" .\lib\
 ```
 
-The DLLs are GAC-registered by the TIA Portal installer. The bridge is built with
-`<Private>true</Private>` so the DLLs are also copied alongside the exe at build time,
-which ensures they are found at runtime even if the GAC registration is not on that account.
+Then rebuild:
+```powershell
+dotnet build -c Release
+.\bin\Release\net48\SiemensTiaBridge.exe 5180
+```
