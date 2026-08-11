@@ -126,7 +126,14 @@ namespace SiemensTiaBridge
             }
             catch (Exception ex)
             {
-                WriteJson(response, 500, new { error = ex.Message });
+                var sb = new StringBuilder();
+                var current = ex;
+                while (current != null)
+                {
+                    sb.AppendLine($"{current.GetType().Name}: {current.Message}");
+                    current = current.InnerException;
+                }
+                WriteJson(response, 500, new { error = sb.ToString().Trim() });
             }
             finally
             {
