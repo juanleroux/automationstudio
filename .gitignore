@@ -19,7 +19,7 @@ scr/
 
 # Node
 node_modules/
-web/client/dist/
+client/dist/
 
 # Logs / misc
 *.log
