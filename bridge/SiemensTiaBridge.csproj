@@ -25,13 +25,18 @@
     directly from the Program Files location).
   -->
   <ItemGroup>
-    <!-- Copy all Siemens Openness DLLs from the V19 PublicAPI folder into lib\ before building.
-         They are GAC-registered by the TIA Portal installer so Private=false keeps them
-         out of the build output — the runtime picks them up from the GAC. -->
+    <!--
+      Siemens Openness DLLs are referenced from lib\ for compilation only.
+      Private=false: the runtime loads them from the GAC (registered by the TIA Portal
+      installer). This avoids conflicts where Siemens.Engineering.dll's internal
+      dependencies (e.g. Siemens.Engineering.Contract) are only in the GAC and not
+      in the PublicAPI folder — mixing local + GAC copies causes TypeInitializationException.
+      The bridge must be run on the same machine that has TIA Portal installed.
+    -->
     <_SiemensDlls Include="lib\*.dll" />
     <Reference Include="@(_SiemensDlls->'%(Filename)')">
       <HintPath>%(Identity)</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
   </ItemGroup>
 
