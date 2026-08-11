@@ -27,17 +27,16 @@
   <ItemGroup>
     <!--
       Siemens Openness DLLs are referenced from lib\ for compilation only.
-      Private=true: copies all lib\ DLLs alongside the exe so the runtime can find them.
-      TIA Portal V19 and earlier register DLLs in the GAC; V21+ do not — the assemblies
-      live only in Bin\PublicAPI\ of the TIA Portal installation. Private=true works for
-      both cases. Copy ALL DLLs from the correct location for your TIA version:
-        V18–V20: C:\Program Files\Siemens\Automation\Portal VXX\PublicAPI\VXX\
-        V21+:    C:\Program Files\Siemens\Automation\Portal V21\Bin\PublicAPI\
+      Private=false: Siemens DLLs must NOT be copied to bin\. V21+ Openness detects
+      when assemblies are loaded from a local copy and throws FileLoadException with
+      "Copy Local must be false". The bridge uses an AssemblyResolve handler in Main()
+      to load them from registry-registered installation paths at runtime, which works
+      for V19, V20, and V21+ without relying on the GAC.
     -->
     <_SiemensDlls Include="lib\*.dll" />
     <Reference Include="@(_SiemensDlls->'%(Filename)')">
       <HintPath>%(Identity)</HintPath>
-      <Private>true</Private>
+      <Private>false</Private>
     </Reference>
   </ItemGroup>
 

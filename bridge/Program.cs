@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Threading;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 
 namespace SiemensTiaBridge
@@ -21,8 +24,89 @@ namespace SiemensTiaBridge
         private static TiaOpennessService _tia;
         private static TiaOpennessService Tia => _tia ??= new TiaOpennessService();
 
+        // Directories discovered from registry — used by the assembly resolver so that
+        // Siemens DLLs are loaded from their installation paths (not from bin\).
+        // V21+ requires Private/CopyLocal=false; loading from bin\ causes
+        // OpennessLocationProvider to refuse connection with a FileLoadException.
+        private static readonly List<string> _siemensSearchDirs = new List<string>();
+
+        private static Assembly OnResolveAssembly(object sender, ResolveEventArgs e)
+        {
+            var simpleName = new AssemblyName(e.Name).Name;
+            if (!simpleName.StartsWith("Siemens.", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            foreach (var dir in _siemensSearchDirs)
+            {
+                var path = Path.Combine(dir, simpleName + ".dll");
+                if (File.Exists(path))
+                {
+                    try { return Assembly.LoadFrom(path); } catch { }
+                }
+            }
+            return null;
+        }
+
+        private static void DiscoverSiemensDirs()
+        {
+            // Walk HKLM\SOFTWARE\Siemens\Automation\Openness\*\PublicAPI\*\net48
+            // to find where Siemens.Engineering.Base.dll lives, then derive sibling dirs.
+            try
+            {
+                using (var openness = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Siemens\Automation\Openness"))
+                {
+                    if (openness == null) return;
+                    foreach (var ver in openness.GetSubKeyNames())
+                    {
+                        using (var pubApi = openness.OpenSubKey(ver + @"\PublicAPI"))
+                        {
+                            if (pubApi == null) continue;
+                            foreach (var apiVer in pubApi.GetSubKeyNames())
+                            {
+                                using (var net48 = pubApi.OpenSubKey(apiVer + @"\net48"))
+                                {
+                                    if (net48 == null) continue;
+                                    foreach (var valueName in net48.GetValueNames())
+                                    {
+                                        var dllPath = net48.GetValue(valueName) as string;
+                                        if (string.IsNullOrEmpty(dllPath) || !File.Exists(dllPath)) continue;
+
+                                        // Add the PublicAPI\VXX\net48 folder
+                                        var apiDir = Path.GetDirectoryName(dllPath);
+                                        AddDir(apiDir);
+
+                                        // Derive the TIA Portal root (4 levels up from net48)
+                                        // e.g. C:\...\Portal V21\PublicAPI\V21\net48 → C:\...\Portal V21
+                                        var root = apiDir;
+                                        for (int i = 0; i < 3; i++)
+                                            root = Path.GetDirectoryName(root) ?? root;
+
+                                        // Add Bin\PublicAPI and Bin\PublicAPI\Client
+                                        AddDir(Path.Combine(root, "Bin", "PublicAPI"));
+                                        AddDir(Path.Combine(root, "Bin", "PublicAPI", "Client"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { /* registry unavailable — resolver returns null, .NET falls back */ }
+        }
+
+        private static void AddDir(string dir)
+        {
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir) && !_siemensSearchDirs.Contains(dir))
+                _siemensSearchDirs.Add(dir);
+        }
+
         public static void Main(string[] args)
         {
+            // Register resolver BEFORE any Siemens type is touched so that the runtime
+            // loads the assemblies from their installation paths, not from bin\.
+            DiscoverSiemensDirs();
+            AppDomain.CurrentDomain.AssemblyResolve += OnResolveAssembly;
+
             int port = 5180;
             if (args.Length > 0 && int.TryParse(args[0], out var parsed)) port = parsed;
 
