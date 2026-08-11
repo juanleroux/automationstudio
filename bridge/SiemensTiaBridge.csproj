@@ -31,7 +31,7 @@
     <_SiemensDlls Include="lib\*.dll" />
     <Reference Include="@(_SiemensDlls->'%(Filename)')">
       <HintPath>%(Identity)</HintPath>
-      <Private>false</Private>
+      <Private>true</Private>
     </Reference>
   </ItemGroup>
 
