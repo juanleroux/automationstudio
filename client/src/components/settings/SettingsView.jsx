@@ -796,7 +796,7 @@ export default function SettingsView() {
                     e.target.value = '';
                   }}
                 />
-                <p className="text-xs text-text-muted mt-1">Full path to the TIA Portal project file on this machine</p>
+                <p className="text-xs text-text-muted mt-1">Full path to the TIA Portal project file on the machine running the bridge service</p>
                 <div className="flex gap-2 mt-2">
                   <button
                     className="btn btn-secondary"
