@@ -7,6 +7,7 @@ import {
   Server as ServerIcon, Laptop, Network, Shield, Activity,
   Settings as SettingsIcon, Plug, Cloud as CloudIcon, BarChart2, LayoutGrid,
   AlignLeft, AlignCenter, AlignRight,
+  ArrowLeftRight, ArrowUpDown, Minus,
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { pingNode } from '../../api/client';
@@ -120,6 +121,7 @@ const NODE_W  = 84;
 const NODE_H  = 52;
 const SVG_W   = 4000;
 const PANEL_W = 280;
+const SPACING_STEP = 20;
 
 function getDefaultLevelHeights() {
   return Object.fromEntries(LEVELS.map(lv => [lv.id, DEFAULT_LEVEL_H]));
@@ -137,6 +139,26 @@ function abbrev(type) {
   if (type === 'Actuator')    return 'ACT';
   if (type === 'Custom')      return 'CUST';
   return type.slice(0, 6).toUpperCase();
+}
+
+function DistHIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 14 14" style={{ display: 'block' }}>
+      <rect x={0}   y={2} width={3} height={10} rx={0.5} fill="currentColor"/>
+      <rect x={5.5} y={2} width={3} height={10} rx={0.5} fill="currentColor"/>
+      <rect x={11}  y={2} width={3} height={10} rx={0.5} fill="currentColor"/>
+    </svg>
+  );
+}
+
+function DistVIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 14 14" style={{ display: 'block' }}>
+      <rect x={2} y={0}   width={10} height={3} rx={0.5} fill="currentColor"/>
+      <rect x={2} y={5.5} width={10} height={3} rx={0.5} fill="currentColor"/>
+      <rect x={2} y={11}  width={10} height={3} rx={0.5} fill="currentColor"/>
+    </svg>
+  );
 }
 
 function ConnectionPath({ conn, nodes, selected, onPointerDown }) {
@@ -648,6 +670,71 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
     }));
   }, [selectedNodeIds, nodes, updateTopology]);
 
+  // Distribute selected nodes with equal gaps along an axis
+  const distributeNodes = useCallback((axis) => {
+    if (selectedNodeIds.size < 2) return;
+    const sel = nodes.filter(n => selectedNodeIds.has(n.id));
+    if (axis === 'h') {
+      const sorted = [...sel].sort((a, b) => a.x - b.x);
+      const first = sorted[0];
+      const last  = sorted[sorted.length - 1];
+      const gap = sorted.length > 1
+        ? ((last.x + NODE_W) - first.x - sorted.length * NODE_W) / (sorted.length - 1)
+        : 0;
+      updateTopology(t => ({
+        ...t,
+        nodes: t.nodes.map(n => {
+          const idx = sorted.findIndex(s => s.id === n.id);
+          if (idx < 0) return n;
+          return { ...n, x: first.x + idx * (NODE_W + gap) };
+        }),
+      }));
+    } else {
+      const sorted = [...sel].sort((a, b) => a.y - b.y);
+      const first = sorted[0];
+      const last  = sorted[sorted.length - 1];
+      const gap = sorted.length > 1
+        ? ((last.y + NODE_H) - first.y - sorted.length * NODE_H) / (sorted.length - 1)
+        : 0;
+      updateTopology(t => ({
+        ...t,
+        nodes: t.nodes.map(n => {
+          const idx = sorted.findIndex(s => s.id === n.id);
+          if (idx < 0) return n;
+          return { ...n, y: first.y + idx * (NODE_H + gap) };
+        }),
+      }));
+    }
+  }, [selectedNodeIds, nodes, updateTopology]);
+
+  // Expand (+1) or compress (-1) gaps between nodes by SPACING_STEP, anchored to the first node
+  const nudgeSpacing = useCallback((axis, delta) => {
+    if (selectedNodeIds.size < 2) return;
+    const sel = nodes.filter(n => selectedNodeIds.has(n.id));
+    const step = delta * SPACING_STEP;
+    if (axis === 'h') {
+      const sorted = [...sel].sort((a, b) => a.x - b.x);
+      updateTopology(t => ({
+        ...t,
+        nodes: t.nodes.map(n => {
+          const idx = sorted.findIndex(s => s.id === n.id);
+          if (idx <= 0) return n;
+          return { ...n, x: n.x + idx * step };
+        }),
+      }));
+    } else {
+      const sorted = [...sel].sort((a, b) => a.y - b.y);
+      updateTopology(t => ({
+        ...t,
+        nodes: t.nodes.map(n => {
+          const idx = sorted.findIndex(s => s.id === n.id);
+          if (idx <= 0) return n;
+          return { ...n, y: n.y + idx * step };
+        }),
+      }));
+    }
+  }, [selectedNodeIds, nodes, updateTopology]);
+
   const addNode = useCallback((type, atWorldX, atWorldY) => {
     if (!project) return;
     const { lvlY: _lvlY, lvlToLevel: _lvlToLevel, svgH: _svgH, levelHeights: _lh } = dynamicRef.current;
@@ -995,6 +1082,16 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
             {toolbarBtn(false,
               <AlignRight size={14} style={{ transform: 'rotate(-90deg)' }} />,
               () => alignNodes('bottom'), 'Align bottom edges')}
+            <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 2 }}>Distribute:</span>
+            {toolbarBtn(false, <DistHIcon />, () => distributeNodes('h'), 'Distribute horizontally')}
+            {toolbarBtn(false, <DistVIcon />, () => distributeNodes('v'), 'Distribute vertically')}
+            <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 2 }}>Spacing:</span>
+            {toolbarBtn(false, <><ArrowLeftRight size={12} /><Plus size={10} /></>, () => nudgeSpacing('h', +1), 'Increase horizontal spacing')}
+            {toolbarBtn(false, <><ArrowLeftRight size={12} /><Minus size={10} /></>, () => nudgeSpacing('h', -1), 'Decrease horizontal spacing')}
+            {toolbarBtn(false, <><ArrowUpDown size={12} /><Plus size={10} /></>, () => nudgeSpacing('v', +1), 'Increase vertical spacing')}
+            {toolbarBtn(false, <><ArrowUpDown size={12} /><Minus size={10} /></>, () => nudgeSpacing('v', -1), 'Decrease vertical spacing')}
           </>
         )}
 
