@@ -132,7 +132,9 @@ namespace SiemensTiaBridge
                 }
                 catch (Exception ex)
                 {
-                    skipped.Add($"{inst.Name}: {ex.Message}");
+                    var msg = $"{inst.Name}: {ex.Message}";
+                    skipped.Add(msg);
+                    Console.Error.WriteLine($"[SKIP] Instance DB '{inst.Name}': {ex}");
                 }
             }
 
@@ -146,7 +148,9 @@ namespace SiemensTiaBridge
                 }
                 catch (Exception ex)
                 {
-                    skipped.Add($"FC {fcName}: {ex.Message}");
+                    var msg = $"FC {fcName}: {ex.Message}";
+                    skipped.Add(msg);
+                    Console.Error.WriteLine($"[SKIP] FC '{fcName}': {ex}");
                 }
             }
 
@@ -280,7 +284,7 @@ namespace SiemensTiaBridge
                     sb.Append("<Parts>");
                     sb.Append($"<Call UId=\"{callUId}\">");
                     sb.Append($"<CallInfo Name=\"{XmlEsc(fbName)}\" BlockType=\"FB\">");
-                    sb.Append($"<Instance Declaration=\"GlobalVariable\" Name=\"{XmlEsc(inst.Name)}\" Scope=\"GlobalVariable\" UId=\"{instUId}\"/>");
+                    sb.Append($"<Instance Declaration=\"GlobalVariable\" Name=\"{XmlEsc(inst.Name)}\" UId=\"{instUId}\"/>");
                     sb.Append("</CallInfo>");
                     sb.Append("</Call>");
                     sb.Append("</Parts>");
