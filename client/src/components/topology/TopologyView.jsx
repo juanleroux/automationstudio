@@ -65,6 +65,27 @@ const NODE_ICON = {
   Custom:      LayoutGrid,
 };
 
+// SVG path data for each node icon — used in the static print SVG (Lucide 24×24 viewBox, stroke-based)
+const PRINT_ICON_PATHS = {
+  Cpu:             `<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>`,
+  Radio:           `<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/>`,
+  Sliders:         `<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>`,
+  Monitor:         `<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>`,
+  LayoutDashboard: `<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>`,
+  Database:        `<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>`,
+  Building2:       `<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>`,
+  Server:          `<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>`,
+  Laptop:          `<path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>`,
+  Network:         `<rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>`,
+  Shield:          `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>`,
+  Activity:        `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`,
+  Settings:        `<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>`,
+  Plug:            `<path d="M12 22v-5"/><path d="M9 7V2"/><path d="M15 7V2"/><path d="M6 13V8h12v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4Z"/>`,
+  Cloud:           `<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>`,
+  BarChart2:       `<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>`,
+  LayoutGrid:      `<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>`,
+};
+
 const CONNECTION_TYPES = [
   'Ethernet', 'Ethernet/IP', 'Profinet', 'Profibus', 'Modbus TCP', 'Modbus Serial',
   'Modbus RTU', 'Fieldbus', 'Foundation Fieldbus', 'ASi (AS-Interface)', 'OPC UA',
@@ -526,15 +547,23 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
     }).join('\n');
 
     // ── Nodes ────────────────────────────────────────────────────
+    const iconScale = 16 / 24;
+    const iconOffX  = (NODE_W - 16) / 2;
     const nodesHtml = nodes.map(node => {
-      const color   = node.color ?? NODE_TYPES[node.type]?.color ?? '#6b7280';
-      const iconKey = node.icon ?? node.type ?? 'Custom';
-      const name    = (node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name)
+      const color      = node.color ?? NODE_TYPES[node.type]?.color ?? '#6b7280';
+      const iconKey    = node.icon ?? node.type ?? 'Custom';
+      const iconPaths  = PRINT_ICON_PATHS[iconKey] ?? PRINT_ICON_PATHS.LayoutGrid;
+      const name       = (node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name)
         .replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      const badge = node.confirmed
+        ? `<circle cx="${NODE_W - 8}" cy="8" r="7" fill="#22c55e"/>
+           <path d="M${NODE_W - 11.5},8 L${NODE_W - 9},10.5 L${NODE_W - 4.5},5.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
+        : '';
       return `<g transform="translate(${node.x},${node.y})">
   <rect x="0" y="0" width="${NODE_W}" height="${NODE_H}" rx="5" fill="${color}" fill-opacity="0.9"/>
-  <text x="${NODE_W / 2}" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="white">${abbrev(iconKey)}</text>
-  <text x="${NODE_W / 2}" y="40" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.9)">${name}</text>
+  <g transform="translate(${iconOffX},4) scale(${iconScale})" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPaths}</g>
+  <text x="${NODE_W / 2}" y="38" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.9)">${name}</text>
+  ${badge}
 </g>`;
     }).join('\n');
 
@@ -582,10 +611,20 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
   .sub{font-size:9px;color:#aaa}
   .wrap{flex:1;min-height:0;display:flex}
   svg{flex:1;min-width:0;min-height:0}
+  .ftr{
+    flex-shrink:0;
+    text-align:center;
+    font-size:8px;
+    color:#aaa;
+    padding-top:3px;
+    border-top:1px solid #e0e0e0;
+    margin-top:4px;
+  }
 </style>
 </head><body>
 <div class="hdr"><h1>${title}</h1><span class="sub">ISA-95 Network Topology · ${dateStr}</span></div>
 <div class="wrap">${svgStr}</div>
+<div class="ftr">One Technology Limited &copy; ${new Date().getFullYear()}</div>
 <script>window.addEventListener('load',function(){window.print();setTimeout(function(){window.close()},600)});<\/script>
 </body></html>`);
     win.document.close();
