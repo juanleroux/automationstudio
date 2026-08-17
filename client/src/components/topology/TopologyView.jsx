@@ -114,8 +114,7 @@ const LINE_WIDTHS = [
 ];
 
 const DEFAULT_LEVEL_H = 130;
-const MIN_LEVEL_H     = 80;
-const MAX_LEVEL_H     = 300;
+const MIN_LEVEL_H     = 24; // just enough to keep the label visible
 const LABEL_W = 90;
 const NODE_W  = 84;
 const NODE_H  = 52;
@@ -780,7 +779,7 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
     if (levelResizeRef.current) {
       const { levelId, startClientY, startHeight } = levelResizeRef.current;
       const dy = (e.clientY - startClientY) / zoom;
-      const newH = Math.max(MIN_LEVEL_H, Math.min(MAX_LEVEL_H, Math.round(startHeight + dy)));
+      const newH = Math.max(MIN_LEVEL_H, Math.round(startHeight + dy));
       updateTopology(t => {
         const heights = t.levelHeights ?? getDefaultLevelHeights();
         return { ...t, levelHeights: { ...heights, [levelId]: newH } };
