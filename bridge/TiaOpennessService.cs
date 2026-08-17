@@ -172,6 +172,7 @@ namespace SiemensTiaBridge
             var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion, fbName, fcLanguage);
             var debugPath = Path.Combine(Path.GetTempPath(), $"SiemensTiaBridge_debug_{fcName}.xml");
             File.WriteAllText(debugPath, xml, new UTF8Encoding(false));
+            Console.WriteLine($"[DEBUG]  FC XML written to: {debugPath}");
             var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"{fcName}_{Guid.NewGuid()}.xml"));
             try
             {
@@ -284,7 +285,7 @@ namespace SiemensTiaBridge
                     sb.Append("<Parts>");
                     sb.Append($"<Call UId=\"{callUId}\">");
                     sb.Append($"<CallInfo Name=\"{XmlEsc(fbName)}\" BlockType=\"FB\">");
-                    sb.Append($"<Instance Declaration=\"GlobalVariable\" Name=\"{XmlEsc(inst.Name)}\" UId=\"{instUId}\"/>");
+                    sb.Append($"<Instance Scope=\"GlobalVariable\" Name=\"{XmlEsc(inst.Name)}\" UId=\"{instUId}\"/>");
                     sb.Append("</CallInfo>");
                     sb.Append("</Call>");
                     sb.Append("</Parts>");
