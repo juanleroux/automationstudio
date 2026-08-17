@@ -8,6 +8,7 @@ import {
   Settings as SettingsIcon, Plug, Cloud as CloudIcon, BarChart2, LayoutGrid,
   AlignLeft, AlignCenter, AlignRight,
   ArrowLeftRight, ArrowUpDown, Minus,
+  Check,
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { pingNode } from '../../api/client';
@@ -291,6 +292,20 @@ function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown })
       >
         {node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name}
       </text>
+      {/* Confirmed badge — green circle with checkmark in top-right corner */}
+      {node.confirmed && (
+        <g style={{ pointerEvents: 'none' }}>
+          <circle cx={NODE_W - 8} cy={8} r={7} fill="#22c55e" />
+          <path
+            d={`M${NODE_W - 11.5},8 L${NODE_W - 9},10.5 L${NODE_W - 4.5},5.5`}
+            stroke="white"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </g>
+      )}
     </g>
   );
 }
@@ -730,7 +745,7 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
     const newNode = {
       id: uid(), type, level: lvl, name: type,
       icon: type, color: null,
-      description: '', ipAddress: '', vendor: '', model: '', notes: '', x, y,
+      description: '', ipAddress: '', vendor: '', model: '', notes: '', confirmed: false, x, y,
     };
     updateTopology(t => ({ ...t, nodes: [...(t.nodes ?? []), newNode] }));
     setSelectedNodeIds(new Set([newNode.id]));
@@ -1458,6 +1473,22 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
                       style={{ ...inputStyle, resize: 'vertical' }}
                     />
                   </PropField>
+                  <PropField label="Confirmed">
+                    <button
+                      onClick={() => updateNode(selectedNode.id, { confirmed: !selectedNode.confirmed })}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        width: '100%', padding: '5px 10px', borderRadius: 4, cursor: 'pointer',
+                        border: selectedNode.confirmed ? '1px solid #22c55e' : '1px solid var(--border)',
+                        background: selectedNode.confirmed ? 'rgba(34,197,94,0.1)' : 'var(--bg-main)',
+                        color: selectedNode.confirmed ? '#22c55e' : 'var(--text-muted)',
+                        fontSize: 12, fontWeight: selectedNode.confirmed ? 600 : 400,
+                      }}
+                    >
+                      <Check size={13} />
+                      {selectedNode.confirmed ? 'Confirmed' : 'Not confirmed'}
+                    </button>
+                  </PropField>
                   <button
                     className="btn"
                     onClick={() => { deleteSelected(); }}
@@ -1506,74 +1537,31 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
                       </select>
                     </PropField>
                     <PropField label="Line Style">
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {LINE_STYLES.map(ls => {
-                          const active = (selectedConn.lineStyle ?? 'auto') === ls.id;
-                          // For preview: 'solid' and 'auto' with null dash both show solid,
-                          // but 'auto' also shows the protocol pattern
-                          const previewDash = ls.id === 'auto'
-                            ? (CONN_STYLE[selectedConn.protocol]?.dash ?? null)
-                            : ls.dash;
-                          return (
-                            <button
-                              key={ls.id}
-                              title={ls.desc}
-                              onClick={() => updateConnection(selectedConn.id, { lineStyle: ls.id === 'auto' ? null : ls.id })}
-                              style={{
-                                padding: '5px 6px', borderRadius: 5, cursor: 'pointer',
-                                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-                                background: active ? 'var(--accent-bg)' : 'var(--bg-main)',
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                                minWidth: 46, flex: 1,
-                              }}
-                            >
-                              <svg width={38} height={10} style={{ display: 'block', overflow: 'visible' }}>
-                                <line
-                                  x1={2} y1={5} x2={36} y2={5}
-                                  stroke={active ? 'var(--accent)' : 'var(--text-muted)'}
-                                  strokeWidth={1.5}
-                                  strokeDasharray={previewDash ?? undefined}
-                                />
-                              </svg>
-                              <span style={{ fontSize: 9, color: active ? 'var(--accent)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                                {ls.label}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <select
+                        value={selectedConn.lineStyle ?? 'auto'}
+                        onChange={e => updateConnection(selectedConn.id, { lineStyle: e.target.value === 'auto' ? null : e.target.value })}
+                        style={inputStyle}
+                      >
+                        {LINE_STYLES.map(ls => (
+                          <option key={ls.id} value={ls.id}>{ls.label} — {ls.desc}</option>
+                        ))}
+                      </select>
                     </PropField>
                     <PropField label="Line Width">
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        {LINE_WIDTHS.map(lw => {
-                          const active = (selectedConn.lineWidth ?? null) === lw.w;
-                          const previewW = lw.w ?? 1.5;
-                          return (
-                            <button
-                              key={lw.id}
-                              title={lw.label}
-                              onClick={() => updateConnection(selectedConn.id, { lineWidth: lw.w })}
-                              style={{
-                                flex: 1, padding: '5px 4px', borderRadius: 5, cursor: 'pointer',
-                                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-                                background: active ? 'var(--accent-bg)' : 'var(--bg-main)',
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                              }}
-                            >
-                              <svg width={28} height={12} style={{ display: 'block' }}>
-                                <line
-                                  x1={2} y1={6} x2={26} y2={6}
-                                  stroke={active ? 'var(--accent)' : 'var(--text-muted)'}
-                                  strokeWidth={previewW}
-                                />
-                              </svg>
-                              <span style={{ fontSize: 9, color: active ? 'var(--accent)' : 'var(--text-muted)' }}>
-                                {lw.label}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <select
+                        value={selectedConn.lineWidth != null ? String(selectedConn.lineWidth) : 'auto'}
+                        onChange={e => {
+                          const v = e.target.value;
+                          updateConnection(selectedConn.id, { lineWidth: v === 'auto' ? null : Number(v) });
+                        }}
+                        style={inputStyle}
+                      >
+                        {LINE_WIDTHS.map(lw => (
+                          <option key={lw.id} value={lw.w != null ? String(lw.w) : 'auto'}>
+                            {lw.label}{lw.w != null ? ` (${lw.w}px)` : ' — protocol default'}
+                          </option>
+                        ))}
+                      </select>
                     </PropField>
                     <PropField label="Description">
                       <textarea
