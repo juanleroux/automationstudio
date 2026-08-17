@@ -105,7 +105,8 @@ namespace SiemensTiaBridge
             string targetFolder = null,
             string fcName = null,
             int? fcNumber = null,
-            string tiaVersion = null)
+            string tiaVersion = null,
+            string fcLanguage = null)
         {
             if (_project == null)
                 throw new InvalidOperationException("No project open");
@@ -140,7 +141,7 @@ namespace SiemensTiaBridge
             {
                 try
                 {
-                    CreateFcWithNetworks(targetGroup, fcName, fcNumber, instances, tiaVersion ?? "V19", fbName);
+                    CreateFcWithNetworks(targetGroup, fcName, fcNumber, instances, tiaVersion ?? "V19", fbName, fcLanguage ?? "LAD");
                     fcCreated = fcName;
                 }
                 catch (Exception ex)
@@ -161,9 +162,10 @@ namespace SiemensTiaBridge
             int? fcNumber,
             List<InstanceInfo> instances,
             string tiaVersion,
-            string fbName)
+            string fbName,
+            string fcLanguage)
         {
-            var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion, fbName);
+            var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion, fbName, fcLanguage);
             var debugPath = Path.Combine(Path.GetTempPath(), $"SiemensTiaBridge_debug_{fcName}.xml");
             File.WriteAllText(debugPath, xml, new UTF8Encoding(false));
             var tmpFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"{fcName}_{Guid.NewGuid()}.xml"));
@@ -183,8 +185,13 @@ namespace SiemensTiaBridge
             int? fcNumber,
             List<InstanceInfo> instances,
             string tiaVersion,
-            string fbName)
+            string fbName,
+            string fcLanguage)
         {
+            // Normalise — only FBD, LAD and SCL are valid; default to LAD
+            var lang = (fcLanguage ?? "LAD").ToUpperInvariant();
+            if (lang != "FBD" && lang != "LAD" && lang != "SCL") lang = "LAD";
+
             var sb = new StringBuilder();
             sb.Append("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
             sb.Append("<Document>");
@@ -196,58 +203,115 @@ namespace SiemensTiaBridge
             if (fcNumber.HasValue)
                 sb.Append($"<Number>{fcNumber.Value}</Number>");
             sb.Append("<Namespace></Namespace>");
-            sb.Append("<ProgrammingLanguage>SCL</ProgrammingLanguage>");
+            sb.Append($"<ProgrammingLanguage>{lang}</ProgrammingLanguage>");
             sb.Append("</AttributeList>");
             sb.Append("<ObjectList>");
 
-            // SCL supports only one CompileUnit per block — all calls go in a single network
             int nextId = 1;
-            int cuId      = nextId++;
-            int titleId   = nextId++;
-            int titleItem = nextId++;
 
-            sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
-            sb.Append("<AttributeList>");
-            sb.Append("<NetworkSource>");
-            sb.Append("<StructuredText xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v2\">");
-            foreach (var inst in instances)
+            if (lang == "SCL")
             {
-                var n         = XmlEsc(inst.Name);
-                var comment   = XmlEsc(inst.LongDesc);
-                int accessUId = nextId++;
-                int symbolUId = nextId++;
-                int compUId   = nextId++;
-                int tokenOpen = nextId++;
-                int tokenClose= nextId++;
-                int tokenSemi = nextId++;
-                int commentId = nextId++;
-                int commentTextId = nextId++;
-                int newLineId = nextId++;
-                sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\"><Symbol UId=\"{symbolUId}\"><Component Name=\"{n}\" UId=\"{compUId}\"/></Symbol></Access>");
-                sb.Append($"<Token Text=\"(\" UId=\"{tokenOpen}\"/>");
-                sb.Append($"<Token Text=\")\" UId=\"{tokenClose}\"/>");
-                sb.Append($"<Token Text=\";\" UId=\"{tokenSemi}\"/>");
-                if (!string.IsNullOrEmpty(inst.LongDesc))
-                    sb.Append($"<LineComment UId=\"{commentId}\"><Text UId=\"{commentTextId}\">{comment}</Text></LineComment>");
-                sb.Append($"<NewLine UId=\"{newLineId}\"/>");
+                // SCL: all calls in a single CompileUnit using StructuredText
+                int cuId      = nextId++;
+                int titleId   = nextId++;
+                int titleItem = nextId++;
+
+                sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
+                sb.Append("<AttributeList>");
+                sb.Append("<NetworkSource>");
+                sb.Append("<StructuredText xmlns=\"http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v2\">");
+                foreach (var inst in instances)
+                {
+                    var n             = XmlEsc(inst.Name);
+                    var comment       = XmlEsc(inst.LongDesc);
+                    int accessUId     = nextId++;
+                    int symbolUId     = nextId++;
+                    int compUId       = nextId++;
+                    int tokenOpen     = nextId++;
+                    int tokenClose    = nextId++;
+                    int tokenSemi     = nextId++;
+                    int commentId     = nextId++;
+                    int commentTextId = nextId++;
+                    int newLineId     = nextId++;
+                    sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\"><Symbol UId=\"{symbolUId}\"><Component Name=\"{n}\" UId=\"{compUId}\"/></Symbol></Access>");
+                    sb.Append($"<Token Text=\"(\" UId=\"{tokenOpen}\"/>");
+                    sb.Append($"<Token Text=\")\" UId=\"{tokenClose}\"/>");
+                    sb.Append($"<Token Text=\";\" UId=\"{tokenSemi}\"/>");
+                    if (!string.IsNullOrEmpty(inst.LongDesc))
+                        sb.Append($"<LineComment UId=\"{commentId}\"><Text UId=\"{commentTextId}\">{comment}</Text></LineComment>");
+                    sb.Append($"<NewLine UId=\"{newLineId}\"/>");
+                }
+                sb.Append("</StructuredText>");
+                sb.Append("</NetworkSource>");
+                sb.Append("<ProgrammingLanguage>SCL</ProgrammingLanguage>");
+                sb.Append("</AttributeList>");
+                sb.Append("<ObjectList>");
+                sb.Append($"<MultilingualText ID=\"{titleId}\" CompositionName=\"Title\">");
+                sb.Append("<ObjectList>");
+                sb.Append($"<MultilingualTextItem ID=\"{titleItem}\" CompositionName=\"Items\">");
+                sb.Append("<AttributeList>");
+                sb.Append("<Culture>en-US</Culture>");
+                sb.Append($"<Text>{XmlEsc(fcName)}</Text>");
+                sb.Append("</AttributeList>");
+                sb.Append("</MultilingualTextItem>");
+                sb.Append("</ObjectList>");
+                sb.Append("</MultilingualText>");
+                sb.Append("</ObjectList>");
+                sb.Append("</SW.Blocks.CompileUnit>");
             }
-            sb.Append("</StructuredText>");
-            sb.Append("</NetworkSource>");
-            sb.Append("<ProgrammingLanguage>SCL</ProgrammingLanguage>");
-            sb.Append("</AttributeList>");
-            sb.Append("<ObjectList>");
-            sb.Append($"<MultilingualText ID=\"{titleId}\" CompositionName=\"Title\">");
-            sb.Append("<ObjectList>");
-            sb.Append($"<MultilingualTextItem ID=\"{titleItem}\" CompositionName=\"Items\">");
-            sb.Append("<AttributeList>");
-            sb.Append("<Culture>en-US</Culture>");
-            sb.Append($"<Text>{XmlEsc(fcName)}</Text>");
-            sb.Append("</AttributeList>");
-            sb.Append("</MultilingualTextItem>");
-            sb.Append("</ObjectList>");
-            sb.Append("</MultilingualText>");
-            sb.Append("</ObjectList>");
-            sb.Append("</SW.Blocks.CompileUnit>");
+            else
+            {
+                // LAD / FBD: one CompileUnit (network) per instance call using FlgNet
+                const string flgNs = "http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4";
+                foreach (var inst in instances)
+                {
+                    int cuId       = nextId++;
+                    int titleId    = nextId++;
+                    int titleItem  = nextId++;
+                    int callUId    = nextId++;
+                    int instUId    = nextId++;
+                    int wireUId    = nextId++;
+                    int powerUId   = nextId++;
+
+                    sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
+                    sb.Append("<AttributeList>");
+                    sb.Append("<NetworkSource>");
+                    sb.Append($"<FlgNet xmlns=\"{flgNs}\">");
+                    sb.Append("<Parts>");
+                    sb.Append($"<Call UId=\"{callUId}\">");
+                    sb.Append($"<CallInfo Name=\"{XmlEsc(fbName)}\" BlockType=\"FB\">");
+                    sb.Append($"<Instance Declaration=\"GlobalVariable\" Name=\"{XmlEsc(inst.Name)}\" Scope=\"GlobalVariable\" UId=\"{instUId}\"/>");
+                    sb.Append("</CallInfo>");
+                    sb.Append("</Call>");
+                    sb.Append("</Parts>");
+                    sb.Append("<Wires>");
+                    sb.Append($"<Wire UId=\"{wireUId}\">");
+                    if (lang == "LAD")
+                        sb.Append("<Powerrail/>");
+                    else
+                        sb.Append($"<IdentCon UId=\"{powerUId}\"/>");
+                    sb.Append($"<NameCon UId=\"{callUId}\" Name=\"en\"/>");
+                    sb.Append("</Wire>");
+                    sb.Append("</Wires>");
+                    sb.Append("</FlgNet>");
+                    sb.Append("</NetworkSource>");
+                    sb.Append($"<ProgrammingLanguage>{lang}</ProgrammingLanguage>");
+                    sb.Append("</AttributeList>");
+                    sb.Append("<ObjectList>");
+                    sb.Append($"<MultilingualText ID=\"{titleId}\" CompositionName=\"Title\">");
+                    sb.Append("<ObjectList>");
+                    sb.Append($"<MultilingualTextItem ID=\"{titleItem}\" CompositionName=\"Items\">");
+                    sb.Append("<AttributeList>");
+                    sb.Append("<Culture>en-US</Culture>");
+                    sb.Append($"<Text>{XmlEsc(inst.Name)}</Text>");
+                    sb.Append("</AttributeList>");
+                    sb.Append("</MultilingualTextItem>");
+                    sb.Append("</ObjectList>");
+                    sb.Append("</MultilingualText>");
+                    sb.Append("</ObjectList>");
+                    sb.Append("</SW.Blocks.CompileUnit>");
+                }
+            }
 
             sb.Append("</ObjectList>");
             sb.Append("</SW.Blocks.FC>");

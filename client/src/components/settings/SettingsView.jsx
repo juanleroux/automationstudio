@@ -877,7 +877,7 @@ export default function SettingsView() {
                                     templateFBs: {
                                       ...prev.templateFBs,
                                       [t.id]: fb
-                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, targetFolder: existing?.targetFolder, fcName: existing?.fcName, fcNumber: existing?.fcNumber }
+                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, targetFolder: existing?.targetFolder, fcName: existing?.fcName, fcNumber: existing?.fcNumber, fcLanguage: existing?.fcLanguage ?? 'LAD' }
                                         : null,
                                     },
                                   };
@@ -931,7 +931,24 @@ export default function SettingsView() {
                           <tr style={{ background: 'var(--bg-surface)' }}>
                             <td colSpan={4} style={{ padding: '4px 12px 8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>FC Name:</span>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Language:</span>
+                                <select
+                                  value={mapped.fcLanguage ?? 'LAD'}
+                                  disabled={!project}
+                                  style={{ fontSize: 11, padding: '3px 6px' }}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setSiemens(prev => ({
+                                      ...prev,
+                                      templateFBs: { ...prev.templateFBs, [t.id]: { ...(prev.templateFBs?.[t.id] || {}), fcLanguage: val } },
+                                    }));
+                                  }}
+                                >
+                                  <option value="LAD">LAD</option>
+                                  <option value="FBD">FBD</option>
+                                  <option value="SCL">SCL</option>
+                                </select>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 8 }}>FC Name:</span>
                                 <input
                                   type="text"
                                   value={mapped.fcName || ''}

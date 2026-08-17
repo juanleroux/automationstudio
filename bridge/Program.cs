@@ -198,7 +198,7 @@ namespace SiemensTiaBridge
                         {
                             var body = ReadJsonBody<CreateInstancesRequest>(request);
                             var instances = body.Instances ?? new System.Collections.Generic.List<InstanceInfo>();
-                            var result = Tia.CreateInstances(body.FbName, instances, body.TargetFolder, body.FcName, body.FcNumber, body.TiaVersion);
+                            var result = Tia.CreateInstances(body.FbName, instances, body.TargetFolder, body.FcName, body.FcNumber, body.TiaVersion, body.FcLanguage);
                             WriteJson(response, 200, new { success = true, created = result.Created, skipped = result.Skipped, fcCreated = result.FcCreated });
                         }
                         break;
@@ -251,6 +251,7 @@ namespace SiemensTiaBridge
             public string FcName { get; set; }
             public int? FcNumber { get; set; }
             public string TiaVersion { get; set; }
+            public string FcLanguage { get; set; }
         }
 
         private class OpenProjectRequest
