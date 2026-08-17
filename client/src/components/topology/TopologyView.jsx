@@ -150,6 +150,25 @@ function getDefaultLevelHeights() {
 function nodeCenter(node) { return { x: node.x + NODE_W / 2, y: node.y + NODE_H / 2 }; }
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
+// Split a node name into 1 or 2 lines. Names ≤12 chars stay on one line;
+// longer names are split at the nearest space to the midpoint (or mid-char if no space).
+// Each line is truncated to 14 chars max to fit the node box.
+function splitNodeName(name) {
+  const MAX1 = 12, MAX_LINE = 14;
+  if (name.length <= MAX1) return [name];
+  const mid = Math.floor(name.length / 2);
+  let sp = -1;
+  for (let i = mid; i >= 1; i--)       { if (name[i] === ' ') { sp = i; break; } }
+  if (sp === -1) for (let i = mid + 1; i < name.length - 1; i++) { if (name[i] === ' ') { sp = i; break; } }
+  const cut = sp === -1 ? mid : sp;
+  const l1 = name.slice(0, cut);
+  const l2 = sp === -1 ? name.slice(cut) : name.slice(cut + 1);
+  return [
+    l1.length > MAX_LINE ? l1.slice(0, MAX_LINE - 1) + '…' : l1,
+    l2.length > MAX_LINE ? l2.slice(0, MAX_LINE - 1) + '…' : l2,
+  ];
+}
+
 function abbrev(type) {
   if (!type) return '?';
   if (type === 'Workstation') return 'WS';
@@ -269,7 +288,7 @@ function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown })
   const color     = node.color ?? NODE_TYPES[node.type]?.color ?? '#6b7280';
   const ringColor = isConnectFrom ? '#f59e0b' : selected ? 'var(--accent)' : 'transparent';
   const IconComp  = NODE_ICON[node.icon ?? node.type] ?? LayoutGrid;
-  const iconX     = (NODE_W - 20) / 2;
+  const lines     = splitNodeName(node.name);
 
   return (
     <g
@@ -296,22 +315,26 @@ function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown })
         fill={color}
         fillOpacity={0.85}
       />
-      {/* Node type icon */}
-      <foreignObject x={iconX} y={5} width={20} height={22} style={{ pointerEvents: 'none' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 22 }}>
-          <IconComp size={16} color="white" strokeWidth={2} />
+      {/* Node type icon — top-left corner */}
+      <foreignObject x={5} y={4} width={16} height={16} style={{ pointerEvents: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16 }}>
+          <IconComp size={14} color="white" strokeWidth={2} />
         </div>
       </foreignObject>
-      {/* Node name */}
-      <text
-        x={NODE_W / 2} y={43}
-        textAnchor="middle"
-        fontSize={9}
-        fill="rgba(255,255,255,0.9)"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name}
-      </text>
+      {/* Node name — centred, up to two lines */}
+      {lines.length === 1 ? (
+        <text
+          x={NODE_W / 2} y={37}
+          textAnchor="middle" fontSize={9}
+          fill="rgba(255,255,255,0.9)"
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
+        >{lines[0]}</text>
+      ) : (
+        <>
+          <text x={NODE_W / 2} y={30} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,0.9)" style={{ pointerEvents: 'none', userSelect: 'none' }}>{lines[0]}</text>
+          <text x={NODE_W / 2} y={43} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,0.9)" style={{ pointerEvents: 'none', userSelect: 'none' }}>{lines[1]}</text>
+        </>
+      )}
       {/* Confirmed badge — green circle with checkmark in top-right corner */}
       {node.confirmed && (
         <g style={{ pointerEvents: 'none' }}>
@@ -548,21 +571,24 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
 
     // ── Nodes ────────────────────────────────────────────────────
     const iconScale = 16 / 24;
-    const iconOffX  = (NODE_W - 16) / 2;
+    const esc = s => s.replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
     const nodesHtml = nodes.map(node => {
-      const color      = node.color ?? NODE_TYPES[node.type]?.color ?? '#6b7280';
-      const iconKey    = node.icon ?? node.type ?? 'Custom';
-      const iconPaths  = PRINT_ICON_PATHS[iconKey] ?? PRINT_ICON_PATHS.LayoutGrid;
-      const name       = (node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name)
-        .replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      const color     = node.color ?? NODE_TYPES[node.type]?.color ?? '#6b7280';
+      const iconKey   = node.icon ?? node.type ?? 'Custom';
+      const iconPaths = PRINT_ICON_PATHS[iconKey] ?? PRINT_ICON_PATHS.LayoutGrid;
+      const lines     = splitNodeName(node.name).map(esc);
+      const nameHtml  = lines.length === 1
+        ? `<text x="${NODE_W / 2}" y="37" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.9)">${lines[0]}</text>`
+        : `<text x="${NODE_W / 2}" y="30" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.9)">${lines[0]}</text>
+<text x="${NODE_W / 2}" y="43" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.9)">${lines[1]}</text>`;
       const badge = node.confirmed
         ? `<circle cx="${NODE_W - 8}" cy="8" r="7" fill="#22c55e"/>
-           <path d="M${NODE_W - 11.5},8 L${NODE_W - 9},10.5 L${NODE_W - 4.5},5.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
+<path d="M${NODE_W - 11.5},8 L${NODE_W - 9},10.5 L${NODE_W - 4.5},5.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
         : '';
       return `<g transform="translate(${node.x},${node.y})">
   <rect x="0" y="0" width="${NODE_W}" height="${NODE_H}" rx="5" fill="${color}" fill-opacity="0.9"/>
-  <g transform="translate(${iconOffX},4) scale(${iconScale})" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPaths}</g>
-  <text x="${NODE_W / 2}" y="38" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.9)">${name}</text>
+  <g transform="translate(5,4) scale(${iconScale})" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPaths}</g>
+  ${nameHtml}
   ${badge}
 </g>`;
     }).join('\n');
