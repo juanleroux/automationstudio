@@ -95,6 +95,22 @@ const CONN_STYLE = {
   'Custom':                { dash: '3 3 1 3',     w: 1.5 },
 };
 
+const LINE_STYLES = [
+  { id: 'auto',      label: 'Auto',      dash: null,       desc: 'From protocol' },
+  { id: 'solid',     label: 'Solid',     dash: null,       desc: 'Solid line',    solid: true },
+  { id: 'dashed',    label: 'Dashed',    dash: '8 4',      desc: 'Dashed' },
+  { id: 'dotted',    label: 'Dotted',    dash: '2 4',      desc: 'Dotted' },
+  { id: 'dash-dot',  label: 'Dash·dot',  dash: '8 2 2 2',  desc: 'Dash-dot' },
+  { id: 'long-dash', label: 'Long dash', dash: '16 4',     desc: 'Long dash' },
+];
+
+const LINE_WIDTHS = [
+  { id: 'auto', label: 'Auto', w: null },
+  { id: '1',    label: 'Thin', w: 1   },
+  { id: '2',    label: 'Std',  w: 2   },
+  { id: '3',    label: 'Bold', w: 3   },
+];
+
 const DEFAULT_LEVEL_H = 130;
 const MIN_LEVEL_H     = 80;
 const MAX_LEVEL_H     = 300;
@@ -141,9 +157,15 @@ function ConnectionPath({ conn, nodes, selected, onPointerDown }) {
   const midX = fc.x + dx * 0.5;
   const midY = fc.y + dy * 0.5;
 
-  const style = CONN_STYLE[conn.protocol] ?? { dash: null, w: 1.5 };
-  const strokeW = selected ? Math.max(style.w, 2) : style.w;
-  const dash    = selected ? null : style.dash;
+  const protocolStyle = CONN_STYLE[conn.protocol] ?? { dash: null, w: 1.5 };
+  let resolvedDash = protocolStyle.dash;
+  if (conn.lineStyle && conn.lineStyle !== 'auto') {
+    const ls = LINE_STYLES.find(s => s.id === conn.lineStyle);
+    if (ls) resolvedDash = ls.dash; // null = solid for explicit styles
+  }
+  const resolvedW = conn.lineWidth ?? protocolStyle.w;
+  const strokeW = selected ? Math.max(resolvedW, 2) : resolvedW;
+  const dash    = selected ? null : resolvedDash;
 
   const label = conn.name || conn.protocol || null;
 
@@ -476,10 +498,16 @@ export default function TopologyView() {
       const dx  = tcx - fcx, dy = tcy - fcy;
       const d   = `M${fcx},${fcy} C${fcx + dx * 0.4},${fcy} ${tcx - dx * 0.4},${tcy} ${tcx},${tcy}`;
       const cs  = CONN_STYLE[conn.protocol] ?? { dash: null, w: 1.5 };
+      let printDash = cs.dash;
+      if (conn.lineStyle && conn.lineStyle !== 'auto') {
+        const ls = LINE_STYLES.find(s => s.id === conn.lineStyle);
+        if (ls) printDash = ls.dash;
+      }
+      const printW = conn.lineWidth ?? cs.w;
       const lbl = (conn.name || conn.protocol || '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-      const da  = cs.dash ? ` stroke-dasharray="${cs.dash}"` : '';
+      const da  = printDash ? ` stroke-dasharray="${printDash}"` : '';
       const midX = fcx + dx * 0.5, midY = fcy + dy * 0.5;
-      return `<path d="${d}" fill="none" stroke="#666" stroke-width="${cs.w}" stroke-opacity="0.8"${da} marker-end="url(#pr-arrow)"/>
+      return `<path d="${d}" fill="none" stroke="#666" stroke-width="${printW}" stroke-opacity="0.8"${da} marker-end="url(#pr-arrow)"/>
 ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fill="#666">${lbl}</text>` : ''}`;
     }).join('\n');
 
@@ -1389,6 +1417,76 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
                         <option value="">— none —</option>
                         {CONNECTION_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
                       </select>
+                    </PropField>
+                    <PropField label="Line Style">
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {LINE_STYLES.map(ls => {
+                          const active = (selectedConn.lineStyle ?? 'auto') === ls.id;
+                          // For preview: 'solid' and 'auto' with null dash both show solid,
+                          // but 'auto' also shows the protocol pattern
+                          const previewDash = ls.id === 'auto'
+                            ? (CONN_STYLE[selectedConn.protocol]?.dash ?? null)
+                            : ls.dash;
+                          return (
+                            <button
+                              key={ls.id}
+                              title={ls.desc}
+                              onClick={() => updateConnection(selectedConn.id, { lineStyle: ls.id === 'auto' ? null : ls.id })}
+                              style={{
+                                padding: '5px 6px', borderRadius: 5, cursor: 'pointer',
+                                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                                background: active ? 'var(--accent-bg)' : 'var(--bg-main)',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                                minWidth: 46, flex: 1,
+                              }}
+                            >
+                              <svg width={38} height={10} style={{ display: 'block', overflow: 'visible' }}>
+                                <line
+                                  x1={2} y1={5} x2={36} y2={5}
+                                  stroke={active ? 'var(--accent)' : 'var(--text-muted)'}
+                                  strokeWidth={1.5}
+                                  strokeDasharray={previewDash ?? undefined}
+                                />
+                              </svg>
+                              <span style={{ fontSize: 9, color: active ? 'var(--accent)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                                {ls.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </PropField>
+                    <PropField label="Line Width">
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {LINE_WIDTHS.map(lw => {
+                          const active = (selectedConn.lineWidth ?? null) === lw.w;
+                          const previewW = lw.w ?? 1.5;
+                          return (
+                            <button
+                              key={lw.id}
+                              title={lw.label}
+                              onClick={() => updateConnection(selectedConn.id, { lineWidth: lw.w })}
+                              style={{
+                                flex: 1, padding: '5px 4px', borderRadius: 5, cursor: 'pointer',
+                                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                                background: active ? 'var(--accent-bg)' : 'var(--bg-main)',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              <svg width={28} height={12} style={{ display: 'block' }}>
+                                <line
+                                  x1={2} y1={6} x2={26} y2={6}
+                                  stroke={active ? 'var(--accent)' : 'var(--text-muted)'}
+                                  strokeWidth={previewW}
+                                />
+                              </svg>
+                              <span style={{ fontSize: 9, color: active ? 'var(--accent)' : 'var(--text-muted)' }}>
+                                {lw.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </PropField>
                     <PropField label="Description">
                       <textarea
