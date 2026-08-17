@@ -935,7 +935,7 @@ export default function SettingsView() {
                                 <select
                                   value={mapped.fcLanguage ?? 'LAD'}
                                   disabled={!project}
-                                  style={{ fontSize: 11, padding: '3px 6px' }}
+                                  style={{ fontSize: 11, padding: '3px 6px', width: 68 }}
                                   onChange={e => {
                                     const val = e.target.value;
                                     setSiemens(prev => ({

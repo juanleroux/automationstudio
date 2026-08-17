@@ -113,7 +113,9 @@ namespace SiemensTiaBridge
             var listener = new HttpListener();
             listener.Prefixes.Add($"http://+:{port}/");
             listener.Start();
-            Console.WriteLine($"SiemensTiaBridge listening on all interfaces, port {port}");
+            var ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            var verStr = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
+            Console.WriteLine($"SiemensTiaBridge {verStr} listening on all interfaces, port {port}");
             Console.WriteLine("Press Ctrl+C to stop.");
 
             Console.CancelKeyPress += (s, e) =>
