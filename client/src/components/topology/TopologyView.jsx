@@ -6,6 +6,7 @@ import {
   Cpu, Radio, Sliders, Box, Monitor, LayoutDashboard, Database, Building2,
   Server as ServerIcon, Laptop, Network, Shield, Activity,
   Settings as SettingsIcon, Plug, Cloud as CloudIcon, BarChart2, LayoutGrid,
+  AlignLeft, AlignCenter, AlignRight,
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { pingNode } from '../../api/client';
@@ -94,16 +95,20 @@ const CONN_STYLE = {
   'Custom':                { dash: '3 3 1 3',     w: 1.5 },
 };
 
-const LEVEL_H = 130;
+const DEFAULT_LEVEL_H = 130;
+const MIN_LEVEL_H     = 80;
+const MAX_LEVEL_H     = 300;
+const LEVEL_H_STEP    = 20;
 const LABEL_W = 90;
 const NODE_W  = 84;
 const NODE_H  = 52;
 const SVG_W   = 4000;
-const SVG_H   = LEVEL_H * 6;
 const PANEL_W = 280;
 
-function levelY(levelId) { return (5 - levelId) * LEVEL_H; }
-function yToLevel(y) { return 5 - Math.min(5, Math.max(0, Math.floor(y / LEVEL_H))); }
+function getDefaultLevelHeights() {
+  return Object.fromEntries(LEVELS.map(lv => [lv.id, DEFAULT_LEVEL_H]));
+}
+
 function nodeCenter(node) { return { x: node.x + NODE_W / 2, y: node.y + NODE_H / 2 }; }
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -247,17 +252,20 @@ function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown })
   );
 }
 
-function LevelBands() {
+function LevelBands({ levelHeights, onResize, lvlY, svgH }) {
   return (
     <>
       {LEVELS.map((lv, i) => {
-        const y = levelY(lv.id);
-        // The bottom-most band extends far down so panning never reveals a blank strip
-        const h = i === LEVELS.length - 1 ? 99999 : LEVEL_H;
+        const y = lvlY(lv.id);
+        const h = levelHeights[lv.id] ?? DEFAULT_LEVEL_H;
+        const isLast = i === LEVELS.length - 1;
+        const bgH = isLast ? 99999 : h;
+        const canDecrease = h > MIN_LEVEL_H;
+        const canIncrease = h < MAX_LEVEL_H;
         return (
           <g key={lv.id}>
-            <rect x={0} y={y} width={SVG_W} height={h} fill={lv.bg} />
-            <rect x={0} y={y} width={LABEL_W} height={LEVEL_H} fill={lv.color} />
+            <rect x={0} y={y} width={SVG_W} height={bgH} fill={lv.bg} />
+            <rect x={0} y={y} width={LABEL_W} height={h} fill={lv.color} />
             <text
               x={LABEL_W / 2} y={y + 22}
               textAnchor="middle"
@@ -277,14 +285,50 @@ function LevelBands() {
             >
               {lv.title.length > 13 ? lv.title.slice(0, 12) + '…' : lv.title}
             </text>
+            {/* −/+ row-height buttons */}
+            <foreignObject x={4} y={y + h - 22} width={82} height={20}>
+              <div
+                xmlns="http://www.w3.org/1999/xhtml"
+                style={{ display: 'flex', gap: 3, justifyContent: 'center', alignItems: 'center', height: '100%' }}
+              >
+                <button
+                  onClick={(e) => { e.stopPropagation(); onResize(lv.id, -LEVEL_H_STEP); }}
+                  disabled={!canDecrease}
+                  title="Decrease row height"
+                  style={{
+                    fontSize: 13, lineHeight: 1, padding: '1px 7px',
+                    background: 'rgba(255,255,255,0.18)', border: 'none', borderRadius: 3,
+                    color: canDecrease ? 'white' : 'rgba(255,255,255,0.25)',
+                    cursor: canDecrease ? 'pointer' : 'default',
+                    fontWeight: 700,
+                  }}
+                >
+                  −
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onResize(lv.id, +LEVEL_H_STEP); }}
+                  disabled={!canIncrease}
+                  title="Increase row height"
+                  style={{
+                    fontSize: 13, lineHeight: 1, padding: '1px 7px',
+                    background: 'rgba(255,255,255,0.18)', border: 'none', borderRadius: 3,
+                    color: canIncrease ? 'white' : 'rgba(255,255,255,0.25)',
+                    cursor: canIncrease ? 'pointer' : 'default',
+                    fontWeight: 700,
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            </foreignObject>
             <line
-              x1={0} y1={y + LEVEL_H}
-              x2={SVG_W} y2={y + LEVEL_H}
+              x1={0} y1={y + h}
+              x2={SVG_W} y2={y + h}
               stroke="rgba(120,120,120,0.15)"
               strokeWidth={1}
             />
             <text
-              x={SVG_W - 12} y={y + LEVEL_H - 10}
+              x={SVG_W - 12} y={y + h - 10}
               textAnchor="end"
               fontSize={9}
               fill="rgba(120,120,120,0.4)"
@@ -316,8 +360,38 @@ export default function TopologyView() {
   const nodes      = topology.nodes       ?? [];
   const connections = topology.connections ?? [];
 
+  // Per-level row heights — persisted in topology
+  const levelHeights = (topology.levelHeights && Object.keys(topology.levelHeights).length === 6)
+    ? topology.levelHeights
+    : getDefaultLevelHeights();
+
+  // Compute SVG total height and per-level Y helpers from current heights
+  const svgH = LEVELS.reduce((s, lv) => s + (levelHeights[lv.id] ?? DEFAULT_LEVEL_H), 0);
+
+  function lvlY(levelId) {
+    let y = 0;
+    for (let id = 5; id > levelId; id--) y += levelHeights[id] ?? DEFAULT_LEVEL_H;
+    return y;
+  }
+
+  function lvlToLevel(y) {
+    let accum = 0;
+    for (let id = 5; id >= 0; id--) {
+      const h = levelHeights[id] ?? DEFAULT_LEVEL_H;
+      if (y < accum + h) return id;
+      accum += h;
+    }
+    return 0;
+  }
+
+  // Store in a ref so callbacks can access current values without needing them as deps
+  const dynamicRef = useRef({ svgH, lvlY, lvlToLevel, levelHeights });
+  dynamicRef.current = { svgH, lvlY, lvlToLevel, levelHeights };
+
   const [tool, setTool]           = useState('select');
-  const [selected, setSelected]   = useState(null);
+  // Multi-select: set of selected node ids; separate state for selected connection
+  const [selectedNodeIds, setSelectedNodeIds] = useState(() => new Set());
+  const [selectedConnId, setSelectedConnId]   = useState(null);
   const [connectFrom, setConnectFrom] = useState(null);
   const [zoom, setZoom]           = useState(1);
   const [pan, setPan]             = useState({ x: 0, y: 0 });
@@ -334,15 +408,24 @@ export default function TopologyView() {
   const panRef         = useRef(null);
   const colorSwatchRef = useRef(null);
 
-  const selectedNode = selected?.type === 'node' ? nodes.find(n => n.id === selected.id) : null;
-  const selectedConn = selected?.type === 'conn' ? connections.find(c => c.id === selected.id) : null;
-  const panelOpen    = !!(selectedNode || selectedConn);
+  // Derived selection helpers
+  const selectedNodes = nodes.filter(n => selectedNodeIds.has(n.id));
+  const selectedNode  = selectedNodeIds.size === 1 ? (selectedNodes[0] ?? null) : null;
+  const selectedConn  = selectedConnId ? (connections.find(c => c.id === selectedConnId) ?? null) : null;
+  const multiSelected = selectedNodeIds.size >= 2;
+  const anySelected   = selectedNodeIds.size > 0 || !!selectedConnId;
+  const panelOpen     = !!(selectedNode || selectedConn);
+
+  const clearSelection = useCallback(() => {
+    setSelectedNodeIds(new Set());
+    setSelectedConnId(null);
+  }, []);
 
   useEffect(() => {
     setPingState({ status: 'idle', rtt: null, message: '' });
     setColorPickerOpen(false);
     setIconPickerOpen(false);
-  }, [selected?.id]);
+  }, [selectedNode?.id]);
 
   const handlePing = useCallback(async () => {
     if (!selectedNode?.ipAddress) return;
@@ -361,24 +444,26 @@ export default function TopologyView() {
 
   const handlePrint = useCallback(() => {
     if (!project) return;
+    const { lvlY: _lvlY, levelHeights: _lh, svgH: _svgH } = dynamicRef.current;
 
     // Bounding box: always show all 6 levels; width = rightmost node + margin
     const maxNodeX = nodes.length > 0
       ? Math.max(...nodes.map(n => n.x + NODE_W)) + 60
       : LABEL_W + 700;
     const vW = Math.max(maxNodeX, LABEL_W + 400);
-    const vH = SVG_H;
+    const vH = _svgH;
 
     // ── Level bands ─────────────────────────────────────────────
     const bandsHtml = LEVELS.map(lv => {
-      const y = levelY(lv.id);
+      const y = _lvlY(lv.id);
+      const h = _lh[lv.id] ?? DEFAULT_LEVEL_H;
       const t = lv.title.length > 13 ? lv.title.slice(0, 12) + '…' : lv.title;
-      return `<rect x="0" y="${y}" width="${vW}" height="${LEVEL_H}" fill="${lv.bg}"/>
-<rect x="0" y="${y}" width="${LABEL_W}" height="${LEVEL_H}" fill="${lv.color}"/>
+      return `<rect x="0" y="${y}" width="${vW}" height="${h}" fill="${lv.bg}"/>
+<rect x="0" y="${y}" width="${LABEL_W}" height="${h}" fill="${lv.color}"/>
 <text x="${LABEL_W / 2}" y="${y + 22}" text-anchor="middle" font-size="10" font-weight="700" fill="rgba(255,255,255,0.95)">${lv.label}</text>
 <text x="${LABEL_W / 2}" y="${y + 36}" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.7)">${t}</text>
-<line x1="0" y1="${y + LEVEL_H}" x2="${vW}" y2="${y + LEVEL_H}" stroke="rgba(120,120,120,0.2)" stroke-width="1"/>
-<text x="${vW - 10}" y="${y + LEVEL_H - 10}" text-anchor="end" font-size="8" fill="rgba(120,120,120,0.45)">${lv.desc}</text>`;
+<line x1="0" y1="${y + h}" x2="${vW}" y2="${y + h}" stroke="rgba(120,120,120,0.2)" stroke-width="1"/>
+<text x="${vW - 10}" y="${y + h - 10}" text-anchor="end" font-size="8" fill="rgba(120,120,120,0.45)">${lv.desc}</text>`;
     }).join('\n');
 
     // ── Connections ─────────────────────────────────────────────
@@ -434,9 +519,7 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
 <title>${title}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  /* Zero page margins — browser header/footer live outside this area */
   @page{size:landscape;margin:8mm}
-  /* html+body fill exactly one page; overflow:hidden is the hard stop */
   html{height:100%}
   body{
     height:100%;
@@ -455,7 +538,6 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
   }
   h1{font-size:11px;font-weight:600;color:#222}
   .sub{font-size:9px;color:#aaa}
-  /* SVG wrapper grows to fill all remaining height */
   .wrap{flex:1;min-height:0;display:flex}
   svg{flex:1;min-width:0;min-height:0}
 </style>
@@ -490,34 +572,69 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
   }, [updateTopology]);
 
   const deleteSelected = useCallback(() => {
-    if (!selected) return;
-    if (selected.type === 'node') {
-      updateTopology(t => ({
-        nodes: t.nodes.filter(n => n.id !== selected.id),
-        connections: t.connections.filter(c => c.fromId !== selected.id && c.toId !== selected.id),
-      }));
-    } else {
+    if (selectedNodeIds.size > 0) {
+      const ids = selectedNodeIds;
       updateTopology(t => ({
         ...t,
-        connections: t.connections.filter(c => c.id !== selected.id),
+        nodes: t.nodes.filter(n => !ids.has(n.id)),
+        connections: t.connections.filter(c => !ids.has(c.fromId) && !ids.has(c.toId)),
       }));
+      setSelectedNodeIds(new Set());
+    } else if (selectedConnId) {
+      const id = selectedConnId;
+      updateTopology(t => ({ ...t, connections: t.connections.filter(c => c.id !== id) }));
+      setSelectedConnId(null);
     }
-    setSelected(null);
-  }, [selected, updateTopology]);
+  }, [selectedNodeIds, selectedConnId, updateTopology]);
+
+  const handleLevelResize = useCallback((levelId, delta) => {
+    updateTopology(t => {
+      const heights = t.levelHeights ?? getDefaultLevelHeights();
+      const current = heights[levelId] ?? DEFAULT_LEVEL_H;
+      const next = Math.min(MAX_LEVEL_H, Math.max(MIN_LEVEL_H, current + delta));
+      return { ...t, levelHeights: { ...heights, [levelId]: next } };
+    });
+  }, [updateTopology]);
+
+  const alignNodes = useCallback((direction) => {
+    if (selectedNodeIds.size < 2) return;
+    const sel = nodes.filter(n => selectedNodeIds.has(n.id));
+    const minX = Math.min(...sel.map(s => s.x));
+    const maxX = Math.max(...sel.map(s => s.x + NODE_W));
+    const minY = Math.min(...sel.map(s => s.y));
+    const maxY = Math.max(...sel.map(s => s.y + NODE_H));
+    const cX = (minX + maxX) / 2 - NODE_W / 2;
+    const cY = (minY + maxY) / 2 - NODE_H / 2;
+    const targetX = direction === 'left' ? minX : direction === 'right' ? maxX - NODE_W : direction === 'centerH' ? cX : null;
+    const targetY = direction === 'top' ? minY : direction === 'bottom' ? maxY - NODE_H : direction === 'centerV' ? cY : null;
+    updateTopology(t => ({
+      ...t,
+      nodes: t.nodes.map(n => {
+        if (!selectedNodeIds.has(n.id)) return n;
+        return {
+          ...n,
+          ...(targetX !== null ? { x: targetX } : {}),
+          ...(targetY !== null ? { y: targetY } : {}),
+        };
+      }),
+    }));
+  }, [selectedNodeIds, nodes, updateTopology]);
 
   const addNode = useCallback((type, atWorldX, atWorldY) => {
     if (!project) return;
+    const { lvlY: _lvlY, lvlToLevel: _lvlToLevel, svgH: _svgH, levelHeights: _lh } = dynamicRef.current;
     const cfg = NODE_TYPES[type];
     let x, y, lvl;
     if (atWorldX !== undefined && atWorldY !== undefined) {
       x   = Math.max(LABEL_W, Math.min(SVG_W - NODE_W, atWorldX - NODE_W / 2));
-      y   = Math.max(0, Math.min(SVG_H - NODE_H, atWorldY - NODE_H / 2));
-      lvl = yToLevel(atWorldY);
+      y   = Math.max(0, Math.min(_svgH - NODE_H, atWorldY - NODE_H / 2));
+      lvl = _lvlToLevel(atWorldY);
     } else {
       lvl = cfg.defaultLevel;
       const sameLevelCount = nodes.filter(n => n.level === lvl).length;
       x = LABEL_W + 20 + sameLevelCount * (NODE_W + 12);
-      y = levelY(lvl) + (LEVEL_H - NODE_H) / 2;
+      const lh = _lh[lvl] ?? DEFAULT_LEVEL_H;
+      y = _lvlY(lvl) + (lh - NODE_H) / 2;
     }
     const newNode = {
       id: uid(), type, level: lvl, name: type,
@@ -525,7 +642,8 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
       description: '', ipAddress: '', vendor: '', model: '', notes: '', x, y,
     };
     updateTopology(t => ({ ...t, nodes: [...(t.nodes ?? []), newNode] }));
-    setSelected({ type: 'node', id: newNode.id });
+    setSelectedNodeIds(new Set([newNode.id]));
+    setSelectedConnId(null);
     setAddMenuOpen(false);
     setContextMenu(null);
   }, [project, nodes, updateTopology]);
@@ -567,14 +685,14 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
 
   const handleSvgPointerUp = useCallback((e) => {
     if (panRef.current && !panRef.current.moved) {
-      setSelected(null);
+      clearSelection();
       if (tool === 'connect') {
         setConnectFrom(null);
         setPreviewPt(null);
       }
     }
     panRef.current = null;
-  }, [tool]);
+  }, [tool, clearSelection]);
 
   const handleSvgWheel = useCallback((e) => {
     e.preventDefault();
@@ -612,7 +730,8 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
           notes: '',
         };
         updateTopology(t => ({ ...t, connections: [...(t.connections ?? []), newConn] }));
-        setSelected({ type: 'conn', id: newConn.id });
+        setSelectedConnId(newConn.id);
+        setSelectedNodeIds(new Set());
         setConnectFrom(null);
         setPreviewPt(null);
         setTool('select');
@@ -620,20 +739,41 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
       return;
     }
 
-    setSelected({ type: 'node', id: nodeId });
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
+    // Shift+click: toggle this node in/out of selection without starting a drag
+    if (e.shiftKey) {
+      setSelectedNodeIds(prev => {
+        const next = new Set(prev);
+        if (next.has(nodeId)) next.delete(nodeId);
+        else next.add(nodeId);
+        return next;
+      });
+      setSelectedConnId(null);
+      return;
+    }
+
+    // If clicking a node that's part of an existing multi-selection, drag all selected nodes
+    const isInMultiSelect = selectedNodeIds.has(nodeId) && selectedNodeIds.size > 1;
+    if (!isInMultiSelect) {
+      setSelectedNodeIds(new Set([nodeId]));
+      setSelectedConnId(null);
+    }
+
+    // Build start positions for all nodes being dragged
+    const nodesToDrag = isInMultiSelect ? [...selectedNodeIds] : [nodeId];
+    const nodeStartPositions = {};
+    for (const id of nodesToDrag) {
+      const n = nodes.find(nd => nd.id === id);
+      if (n) nodeStartPositions[id] = { x: n.x, y: n.y };
+    }
 
     dragRef.current = {
-      nodeId,
+      nodeStartPositions,
       startClientX: e.clientX,
       startClientY: e.clientY,
-      startNodeX: node.x,
-      startNodeY: node.y,
       moved: false,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
-  }, [tool, connectFrom, nodes, svgToWorld, updateTopology]);
+  }, [tool, connectFrom, nodes, svgToWorld, updateTopology, selectedNodeIds]);
 
   const handleNodePointerMove = useCallback((e) => {
     if (!dragRef.current) return;
@@ -643,14 +783,20 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragRef.current.moved = true;
     if (!dragRef.current.moved) return;
 
-    const rawX = dragRef.current.startNodeX + dx;
-    const rawY = dragRef.current.startNodeY + dy;
-    const clampedX = Math.max(LABEL_W, Math.min(SVG_W - NODE_W, rawX));
-    const clampedY = Math.max(0, Math.min(SVG_H - NODE_H, rawY));
-    const newLevel = yToLevel(clampedY + NODE_H / 2);
+    const { svgH: _svgH, lvlToLevel: _lvlToLevel } = dynamicRef.current;
+    const startPositions = dragRef.current.nodeStartPositions;
 
-    updateNode(dragRef.current.nodeId, { x: clampedX, y: clampedY, level: newLevel });
-  }, [zoom, updateNode]);
+    updateTopology(t => ({
+      ...t,
+      nodes: t.nodes.map(n => {
+        const start = startPositions[n.id];
+        if (!start) return n;
+        const clampedX = Math.max(LABEL_W, Math.min(SVG_W - NODE_W, start.x + dx));
+        const clampedY = Math.max(0, Math.min(_svgH - NODE_H, start.y + dy));
+        return { ...n, x: clampedX, y: clampedY, level: _lvlToLevel(clampedY + NODE_H / 2) };
+      }),
+    }));
+  }, [zoom, updateTopology]);
 
   const handleNodePointerUp = useCallback((e) => {
     dragRef.current = null;
@@ -664,12 +810,12 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
         setConnectFrom(null);
         setPreviewPt(null);
         if (tool === 'connect') setTool('select');
-        setSelected(null);
+        clearSelection();
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [deleteSelected, tool]);
+  }, [deleteSelected, tool, clearSelection]);
 
   const handleSvgContextMenu = useCallback((e) => {
     e.preventDefault();
@@ -801,7 +947,28 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
           )}
         </div>
 
-        {toolbarBtn(false, <><Trash2 size={14} /> Delete</>, deleteSelected, 'Delete selected', !selected, true)}
+        {toolbarBtn(false, <><Trash2 size={14} /> Delete</>, deleteSelected, 'Delete selected', !anySelected, true)}
+
+        {/* Alignment controls — visible when 2+ nodes are selected */}
+        {multiSelected && (
+          <>
+            <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 2 }}>Align:</span>
+            {toolbarBtn(false, <AlignLeft size={14} />, () => alignNodes('left'), 'Align left edges')}
+            {toolbarBtn(false, <AlignCenter size={14} />, () => alignNodes('centerH'), 'Center horizontally')}
+            {toolbarBtn(false, <AlignRight size={14} />, () => alignNodes('right'), 'Align right edges')}
+            <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 2px' }} />
+            {toolbarBtn(false,
+              <AlignLeft size={14} style={{ transform: 'rotate(-90deg)' }} />,
+              () => alignNodes('top'), 'Align top edges')}
+            {toolbarBtn(false,
+              <AlignCenter size={14} style={{ transform: 'rotate(-90deg)' }} />,
+              () => alignNodes('centerV'), 'Center vertically')}
+            {toolbarBtn(false,
+              <AlignRight size={14} style={{ transform: 'rotate(-90deg)' }} />,
+              () => alignNodes('bottom'), 'Align bottom edges')}
+          </>
+        )}
 
         <div style={{ flex: 1 }} />
 
@@ -839,7 +1006,12 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
             </defs>
 
             <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-              <LevelBands />
+              <LevelBands
+                levelHeights={levelHeights}
+                onResize={handleLevelResize}
+                lvlY={lvlY}
+                svgH={svgH}
+              />
 
               {/* Connections */}
               {connections.map(conn => (
@@ -847,11 +1019,12 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
                   key={conn.id}
                   conn={conn}
                   nodes={nodes}
-                  selected={selected?.type === 'conn' && selected.id === conn.id}
+                  selected={selectedConnId === conn.id}
                   onPointerDown={(e) => {
                     e.stopPropagation();
                     if (e.button !== 0) return;
-                    setSelected({ type: 'conn', id: conn.id });
+                    setSelectedConnId(conn.id);
+                    setSelectedNodeIds(new Set());
                   }}
                 />
               ))}
@@ -874,7 +1047,7 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
                 <NodeShape
                   key={node.id}
                   node={node}
-                  selected={selected?.type === 'node' && selected.id === node.id}
+                  selected={selectedNodeIds.has(node.id)}
                   connecting={tool === 'connect'}
                   isConnectFrom={connectFrom === node.id}
                   onPointerDown={(e) => handleNodePointerDown(e, node.id)}
@@ -964,7 +1137,7 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
                 {selectedNode ? 'Node Properties' : 'Connection'}
               </span>
               <button
-                onClick={() => setSelected(null)}
+                onClick={clearSelection}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}
               >
                 <X size={14} />
@@ -1086,7 +1259,9 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
                       value={selectedNode.level}
                       onChange={e => {
                         const lvl = Number(e.target.value);
-                        const y = levelY(lvl) + (LEVEL_H - NODE_H) / 2;
+                        const { lvlY: _lvlY, levelHeights: _lh } = dynamicRef.current;
+                        const lh = _lh[lvl] ?? DEFAULT_LEVEL_H;
+                        const y = _lvlY(lvl) + (lh - NODE_H) / 2;
                         updateNode(selectedNode.id, { level: lvl, y });
                       }}
                       style={inputStyle}
