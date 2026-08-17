@@ -115,7 +115,6 @@ const LINE_WIDTHS = [
 const DEFAULT_LEVEL_H = 130;
 const MIN_LEVEL_H     = 80;
 const MAX_LEVEL_H     = 300;
-const LEVEL_H_STEP    = 20;
 const LABEL_W = 90;
 const NODE_W  = 84;
 const NODE_H  = 52;
@@ -296,7 +295,8 @@ function NodeShape({ node, selected, connecting, isConnectFrom, onPointerDown })
   );
 }
 
-function LevelBands({ levelHeights, onResize, lvlY, svgH }) {
+function LevelBands({ levelHeights, onResizeStart, lvlY, svgH }) {
+  const [hoverDiv, setHoverDiv] = useState(null);
   return (
     <>
       {LEVELS.map((lv, i) => {
@@ -304,8 +304,7 @@ function LevelBands({ levelHeights, onResize, lvlY, svgH }) {
         const h = levelHeights[lv.id] ?? DEFAULT_LEVEL_H;
         const isLast = i === LEVELS.length - 1;
         const bgH = isLast ? 99999 : h;
-        const canDecrease = h > MIN_LEVEL_H;
-        const canIncrease = h < MAX_LEVEL_H;
+        const divHovered = hoverDiv === lv.id;
         return (
           <g key={lv.id}>
             <rect x={0} y={y} width={SVG_W} height={bgH} fill={lv.bg} />
@@ -329,47 +328,11 @@ function LevelBands({ levelHeights, onResize, lvlY, svgH }) {
             >
               {lv.title.length > 13 ? lv.title.slice(0, 12) + '…' : lv.title}
             </text>
-            {/* −/+ row-height buttons */}
-            <foreignObject x={4} y={y + h - 22} width={82} height={20}>
-              <div
-                xmlns="http://www.w3.org/1999/xhtml"
-                style={{ display: 'flex', gap: 3, justifyContent: 'center', alignItems: 'center', height: '100%' }}
-              >
-                <button
-                  onClick={(e) => { e.stopPropagation(); onResize(lv.id, -LEVEL_H_STEP); }}
-                  disabled={!canDecrease}
-                  title="Decrease row height"
-                  style={{
-                    fontSize: 13, lineHeight: 1, padding: '1px 7px',
-                    background: 'rgba(255,255,255,0.18)', border: 'none', borderRadius: 3,
-                    color: canDecrease ? 'white' : 'rgba(255,255,255,0.25)',
-                    cursor: canDecrease ? 'pointer' : 'default',
-                    fontWeight: 700,
-                  }}
-                >
-                  −
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onResize(lv.id, +LEVEL_H_STEP); }}
-                  disabled={!canIncrease}
-                  title="Increase row height"
-                  style={{
-                    fontSize: 13, lineHeight: 1, padding: '1px 7px',
-                    background: 'rgba(255,255,255,0.18)', border: 'none', borderRadius: 3,
-                    color: canIncrease ? 'white' : 'rgba(255,255,255,0.25)',
-                    cursor: canIncrease ? 'pointer' : 'default',
-                    fontWeight: 700,
-                  }}
-                >
-                  +
-                </button>
-              </div>
-            </foreignObject>
             <line
               x1={0} y1={y + h}
               x2={SVG_W} y2={y + h}
-              stroke="rgba(120,120,120,0.15)"
-              strokeWidth={1}
+              stroke={divHovered ? 'rgba(120,120,120,0.55)' : 'rgba(120,120,120,0.15)'}
+              strokeWidth={divHovered ? 2 : 1}
             />
             <text
               x={SVG_W - 12} y={y + h - 10}
@@ -380,6 +343,20 @@ function LevelBands({ levelHeights, onResize, lvlY, svgH }) {
             >
               {lv.desc}
             </text>
+            {/* Drag-to-resize handle — invisible wide strip centred on the divider line */}
+            {!isLast && (
+              <rect
+                x={0}
+                y={y + h - 5}
+                width={SVG_W}
+                height={10}
+                fill="transparent"
+                style={{ cursor: 'ns-resize' }}
+                onPointerDown={(e) => onResizeStart(e, lv.id, h)}
+                onMouseEnter={() => setHoverDiv(lv.id)}
+                onMouseLeave={() => setHoverDiv(null)}
+              />
+            )}
           </g>
         );
       })}
@@ -446,11 +423,12 @@ export default function TopologyView() {
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen]   = useState(false);
 
-  const svgRef         = useRef(null);
-  const addBtnRef      = useRef(null);
-  const dragRef        = useRef(null);
-  const panRef         = useRef(null);
-  const colorSwatchRef = useRef(null);
+  const svgRef          = useRef(null);
+  const addBtnRef       = useRef(null);
+  const dragRef         = useRef(null);
+  const panRef          = useRef(null);
+  const colorSwatchRef  = useRef(null);
+  const levelResizeRef  = useRef(null);
 
   // Derived selection helpers
   const selectedNodes = nodes.filter(n => selectedNodeIds.has(n.id));
@@ -637,14 +615,12 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
     }
   }, [selectedNodeIds, selectedConnId, updateTopology]);
 
-  const handleLevelResize = useCallback((levelId, delta) => {
-    updateTopology(t => {
-      const heights = t.levelHeights ?? getDefaultLevelHeights();
-      const current = heights[levelId] ?? DEFAULT_LEVEL_H;
-      const next = Math.min(MAX_LEVEL_H, Math.max(MIN_LEVEL_H, current + delta));
-      return { ...t, levelHeights: { ...heights, [levelId]: next } };
-    });
-  }, [updateTopology]);
+  const handleLevelResizeStart = useCallback((e, levelId, currentHeight) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    levelResizeRef.current = { levelId, startClientY: e.clientY, startHeight: currentHeight };
+    svgRef.current?.setPointerCapture(e.pointerId);
+  }, []);
 
   const alignNodes = useCallback((direction) => {
     if (selectedNodeIds.size < 2) return;
@@ -786,6 +762,16 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
   }, [pan]);
 
   const handleSvgPointerMove = useCallback((e) => {
+    if (levelResizeRef.current) {
+      const { levelId, startClientY, startHeight } = levelResizeRef.current;
+      const dy = (e.clientY - startClientY) / zoom;
+      const newH = Math.max(MIN_LEVEL_H, Math.min(MAX_LEVEL_H, Math.round(startHeight + dy)));
+      updateTopology(t => {
+        const heights = t.levelHeights ?? getDefaultLevelHeights();
+        return { ...t, levelHeights: { ...heights, [levelId]: newH } };
+      });
+      return;
+    }
     if (tool === 'connect' && connectFrom) {
       setPreviewPt(svgToWorld(e.clientX, e.clientY));
     }
@@ -796,9 +782,13 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
     if (panRef.current.moved) {
       setPan({ x: panRef.current.panX + dx, y: panRef.current.panY + dy });
     }
-  }, [tool, connectFrom, svgToWorld]);
+  }, [tool, connectFrom, svgToWorld, zoom, updateTopology]);
 
   const handleSvgPointerUp = useCallback((e) => {
+    if (levelResizeRef.current) {
+      levelResizeRef.current = null;
+      return;
+    }
     if (panRef.current && !panRef.current.moved) {
       clearSelection();
       if (tool === 'connect') {
@@ -1133,7 +1123,7 @@ ${lbl ? `<text x="${midX}" y="${midY - 6}" text-anchor="middle" font-size="8" fi
             <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
               <LevelBands
                 levelHeights={levelHeights}
-                onResize={handleLevelResize}
+                onResizeStart={handleLevelResizeStart}
                 lvlY={lvlY}
                 svgH={svgH}
               />
