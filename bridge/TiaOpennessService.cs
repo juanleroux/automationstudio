@@ -287,10 +287,10 @@ namespace SiemensTiaBridge
                     sb.Append($"<FlgNet xmlns=\"{flgNs}\">");
                     sb.Append("<Parts>");
 
-                    // FB call — Instance UId references the Access element below
+                    // FB call — Instance has required Scope attr; UId cross-refs Access element
                     sb.Append($"<Call UId=\"{callUId}\">");
                     sb.Append($"<CallInfo Name=\"{XmlEsc(fbName)}\" BlockType=\"FB\">");
-                    sb.Append($"<Instance UId=\"{accessUId}\"/>");
+                    sb.Append($"<Instance Scope=\"GlobalVariable\" UId=\"{accessUId}\"/>");
                     sb.Append("</CallInfo>");
                     sb.Append("</Call>");
 
