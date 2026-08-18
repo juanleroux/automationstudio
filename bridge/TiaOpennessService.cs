@@ -368,9 +368,9 @@ namespace SiemensTiaBridge
                             sb.Append($"<IdentCon UId=\"{rPowerUId}\"/>");
                         sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"in\"/>");
                         sb.Append("</Wire>");
-                        // Access to coil operand
+                        // Access to coil operand — Access elements connect via IdentCon, not NameCon
                         sb.Append($"<Wire UId=\"{rWire2UId}\">");
-                        sb.Append($"<NameCon UId=\"{rAccessUId}\" Name=\"out\"/>");
+                        sb.Append($"<IdentCon UId=\"{rAccessUId}\"/>");
                         sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"operand\"/>");
                         sb.Append("</Wire>");
                         sb.Append("</Wires>");
