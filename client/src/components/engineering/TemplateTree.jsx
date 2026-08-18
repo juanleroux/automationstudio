@@ -809,6 +809,13 @@ export default function TemplateTree({ selected, onSelect }) {
     return { ...t, instances };
   }).filter(Boolean).sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
+  // Duplicate instance name detection (across all templates, not just filtered view)
+  const duplicateNames = (() => {
+    const counts = {};
+    for (const t of templates) for (const i of (t.instances || [])) counts[i.name] = (counts[i.name] || 0) + 1;
+    return new Set(Object.keys(counts).filter(n => counts[n] > 1));
+  })();
+
   const isSelected = (type, templateId, instanceId) => {
     if (!selected) return false;
     if (type === 'template') return selected.type === 'template' && selected.templateId === templateId && !selected.instanceId;
@@ -917,6 +924,7 @@ export default function TemplateTree({ selected, onSelect }) {
           const isExp = expanded.has(template.id);
           const instCount = template.instances?.length || 0;
           const isTSelected = isSelected('template', template.id);
+          const hasDuplicateInst = (template.instances || []).some(i => duplicateNames.has(i.name));
 
           return (
             <div
@@ -956,7 +964,8 @@ export default function TemplateTree({ selected, onSelect }) {
                   />
                 ) : (
                   <span
-                    className="flex-1 text-sm text-text-primary truncate"
+                    className="flex-1 text-sm truncate"
+                    style={{ color: hasDuplicateInst ? '#e55353' : 'var(--text-primary)' }}
                     onDoubleClick={e => { e.stopPropagation(); startRename('template', template.id, null, template.name); }}
                   >
                     {template.name}
@@ -969,6 +978,7 @@ export default function TemplateTree({ selected, onSelect }) {
               {/* Instances */}
               {isExp && (template.instances || []).map(inst => {
                 const isISelected = isSelected('instance', template.id, inst.id);
+                const isDuplicate = duplicateNames.has(inst.name);
                 return (
                   <div
                     key={inst.id}
@@ -1006,7 +1016,8 @@ export default function TemplateTree({ selected, onSelect }) {
                       />
                     ) : (
                       <span
-                        className="flex-1 text-xs text-text-secondary truncate"
+                        className="flex-1 text-xs truncate"
+                        style={{ color: isDuplicate ? '#e55353' : 'var(--text-secondary)' }}
                         onDoubleClick={e => { e.stopPropagation(); startRename('instance', template.id, inst.id, inst.name); }}
                       >
                         {inst.name}
