@@ -326,26 +326,19 @@ namespace SiemensTiaBridge
                     sb.Append("</Parts>");
                     sb.Append("<Wires>");
 
-                    // Power → FB call enable
+                    // Single power rail wire fans out to FB call and (if addReset) the Reset coil
                     sb.Append($"<Wire UId=\"{wireUId}\">");
                     if (lang == "LAD")
                         sb.Append("<Powerrail/>");
                     else
                         sb.Append($"<IdentCon UId=\"{powerUId}\"/>");
                     sb.Append($"<NameCon UId=\"{callUId}\" Name=\"en\"/>");
+                    if (addReset)
+                        sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"in\"/>");
                     sb.Append("</Wire>");
 
                     if (addReset)
                     {
-                        // Power → Reset coil enable
-                        sb.Append($"<Wire UId=\"{rWire1UId}\">");
-                        if (lang == "LAD")
-                            sb.Append("<Powerrail/>");
-                        else
-                            sb.Append($"<IdentCon UId=\"{rPowerUId}\"/>");
-                        sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"in\"/>");
-                        sb.Append("</Wire>");
-
                         // instanceName.RST → Reset coil operand
                         sb.Append($"<Wire UId=\"{rWire2UId}\">");
                         sb.Append($"<IdentCon UId=\"{rAccessUId}\"/>");
