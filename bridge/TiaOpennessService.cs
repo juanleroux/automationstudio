@@ -267,7 +267,7 @@ namespace SiemensTiaBridge
             else
             {
                 // LAD / FBD: one CompileUnit (network) per instance call using FlgNet.
-                // Instance UId is a cross-reference to the matching Access element in Parts.
+                // Instance requires Scope attr and a Component child element naming the global DB.
                 const string flgNs = "http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4";
                 foreach (var inst in instances)
                 {
@@ -275,8 +275,7 @@ namespace SiemensTiaBridge
                     int titleId   = nextId++;
                     int titleItem = nextId++;
                     int callUId   = nextId++;
-                    int accessUId = nextId++;  // Access element UId, also referenced by Instance
-                    int symbolUId = nextId++;
+                    int instUId   = nextId++;
                     int compUId   = nextId++;
                     int wireUId   = nextId++;
                     int powerUId  = nextId++;
@@ -287,19 +286,14 @@ namespace SiemensTiaBridge
                     sb.Append($"<FlgNet xmlns=\"{flgNs}\">");
                     sb.Append("<Parts>");
 
-                    // FB call — Instance has required Scope attr; UId cross-refs Access element
+                    // FB call — Instance names the global DB via a Component child element
                     sb.Append($"<Call UId=\"{callUId}\">");
                     sb.Append($"<CallInfo Name=\"{XmlEsc(fbName)}\" BlockType=\"FB\">");
-                    sb.Append($"<Instance Scope=\"GlobalVariable\" UId=\"{accessUId}\"/>");
+                    sb.Append($"<Instance Scope=\"GlobalVariable\" UId=\"{instUId}\">");
+                    sb.Append($"<Component Name=\"{XmlEsc(inst.Name)}\" UId=\"{compUId}\"/>");
+                    sb.Append("</Instance>");
                     sb.Append("</CallInfo>");
                     sb.Append("</Call>");
-
-                    // Global variable reference for the instance DB
-                    sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\">");
-                    sb.Append($"<Symbol UId=\"{symbolUId}\">");
-                    sb.Append($"<Component Name=\"{XmlEsc(inst.Name)}\" UId=\"{compUId}\"/>");
-                    sb.Append("</Symbol>");
-                    sb.Append("</Access>");
 
                     sb.Append("</Parts>");
                     sb.Append("<Wires>");
