@@ -106,7 +106,8 @@ namespace SiemensTiaBridge
             string fcName = null,
             int? fcNumber = null,
             string tiaVersion = null,
-            string fcLanguage = null)
+            string fcLanguage = null,
+            bool addReset = true)
         {
             if (_project == null)
                 throw new InvalidOperationException("No project open");
@@ -143,7 +144,7 @@ namespace SiemensTiaBridge
             {
                 try
                 {
-                    CreateFcWithNetworks(targetGroup, fcName, fcNumber, instances, tiaVersion ?? "V19", fbName, fcLanguage ?? "LAD");
+                    CreateFcWithNetworks(targetGroup, fcName, fcNumber, instances, tiaVersion ?? "V19", fbName, fcLanguage ?? "LAD", addReset);
                     fcCreated = fcName;
                 }
                 catch (Exception ex)
@@ -167,9 +168,10 @@ namespace SiemensTiaBridge
             List<InstanceInfo> instances,
             string tiaVersion,
             string fbName,
-            string fcLanguage)
+            string fcLanguage,
+            bool addReset = true)
         {
-            var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion, fbName, fcLanguage);
+            var xml = BuildFcXml(fcName, fcNumber, instances, tiaVersion, fbName, fcLanguage, addReset);
             var debugPath = Path.Combine(Path.GetTempPath(), $"SiemensTiaBridge_debug_{fcName}.xml");
             File.WriteAllText(debugPath, xml, new UTF8Encoding(false));
             Console.WriteLine($"[DEBUG]  FC XML written to: {debugPath}");
@@ -191,7 +193,8 @@ namespace SiemensTiaBridge
             List<InstanceInfo> instances,
             string tiaVersion,
             string fbName,
-            string fcLanguage)
+            string fcLanguage,
+            bool addReset = true)
         {
             // Normalise — only FBD, LAD and SCL are valid; default to LAD
             var lang = (fcLanguage ?? "LAD").ToUpperInvariant();
@@ -315,13 +318,80 @@ namespace SiemensTiaBridge
                     sb.Append($"<MultilingualTextItem ID=\"{titleItem}\" CompositionName=\"Items\">");
                     sb.Append("<AttributeList>");
                     sb.Append("<Culture>en-US</Culture>");
-                    sb.Append($"<Text>{XmlEsc(inst.Name)}</Text>");
+                    var networkTitle = string.IsNullOrWhiteSpace(inst.LongDesc)
+                        ? inst.Name
+                        : $"{inst.Name} {inst.LongDesc.Trim()}";
+                    sb.Append($"<Text>{XmlEsc(networkTitle)}</Text>");
                     sb.Append("</AttributeList>");
                     sb.Append("</MultilingualTextItem>");
                     sb.Append("</ObjectList>");
                     sb.Append("</MultilingualText>");
                     sb.Append("</ObjectList>");
                     sb.Append("</SW.Blocks.CompileUnit>");
+
+                    // Reset coil network: one additional CompileUnit per instance with -(R)- on instanceName.RST
+                    if (addReset && lang != "SCL")
+                    {
+                        int rCuId      = nextId++;
+                        int rTitleId   = nextId++;
+                        int rTitleItem = nextId++;
+                        int rCoilUId   = nextId++;
+                        int rAccessUId = nextId++;
+                        int rSymUId    = nextId++;
+                        int rComp1UId  = nextId++;
+                        int rComp2UId  = nextId++;
+                        int rPowerUId  = nextId++;
+                        int rWire1UId  = nextId++;
+                        int rWire2UId  = nextId++;
+
+                        sb.Append($"<SW.Blocks.CompileUnit ID=\"{rCuId}\" CompositionName=\"CompileUnits\">");
+                        sb.Append("<AttributeList>");
+                        sb.Append("<NetworkSource>");
+                        sb.Append($"<FlgNet xmlns=\"{flgNs}\">");
+                        sb.Append("<Parts>");
+                        // Reset coil
+                        sb.Append($"<Coil UId=\"{rCoilUId}\"><CallInfo Name=\"R\" /></Coil>");
+                        // Access to instanceName.RST global variable
+                        sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{rAccessUId}\">");
+                        sb.Append($"<Symbol UId=\"{rSymUId}\">");
+                        sb.Append($"<Component Name=\"{XmlEsc(inst.Name)}\" UId=\"{rComp1UId}\"/>");
+                        sb.Append($"<Component Name=\"RST\" UId=\"{rComp2UId}\"/>");
+                        sb.Append("</Symbol>");
+                        sb.Append("</Access>");
+                        sb.Append("</Parts>");
+                        sb.Append("<Wires>");
+                        // Power to coil enable pin
+                        sb.Append($"<Wire UId=\"{rWire1UId}\">");
+                        if (lang == "LAD")
+                            sb.Append("<Powerrail/>");
+                        else
+                            sb.Append($"<IdentCon UId=\"{rPowerUId}\"/>");
+                        sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"in\"/>");
+                        sb.Append("</Wire>");
+                        // Access to coil operand
+                        sb.Append($"<Wire UId=\"{rWire2UId}\">");
+                        sb.Append($"<NameCon UId=\"{rAccessUId}\" Name=\"out\"/>");
+                        sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"operand\"/>");
+                        sb.Append("</Wire>");
+                        sb.Append("</Wires>");
+                        sb.Append("</FlgNet>");
+                        sb.Append("</NetworkSource>");
+                        sb.Append($"<ProgrammingLanguage>{lang}</ProgrammingLanguage>");
+                        sb.Append("</AttributeList>");
+                        sb.Append("<ObjectList>");
+                        sb.Append($"<MultilingualText ID=\"{rTitleId}\" CompositionName=\"Title\">");
+                        sb.Append("<ObjectList>");
+                        sb.Append($"<MultilingualTextItem ID=\"{rTitleItem}\" CompositionName=\"Items\">");
+                        sb.Append("<AttributeList>");
+                        sb.Append("<Culture>en-US</Culture>");
+                        sb.Append($"<Text>{XmlEsc(networkTitle + " - Reset")}</Text>");
+                        sb.Append("</AttributeList>");
+                        sb.Append("</MultilingualTextItem>");
+                        sb.Append("</ObjectList>");
+                        sb.Append("</MultilingualText>");
+                        sb.Append("</ObjectList>");
+                        sb.Append("</SW.Blocks.CompileUnit>");
+                    }
                 }
             }
 

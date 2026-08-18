@@ -1448,6 +1448,7 @@ export default function TemplateTree({ selected, onSelect }) {
                                     ...(fbMapping.fcName ? { fcName: fbMapping.fcName } : {}),
                                     ...(fbMapping.fcNumber != null ? { fcNumber: fbMapping.fcNumber } : {}),
                                     fcLanguage: fbMapping.fcLanguage ?? 'LAD',
+                                    addReset: fbMapping.addReset !== false,
                                     tiaVersion: project?.siemens?.tiaVersion || 'V19',
                                   });
                                   if (result.skipped?.length) {

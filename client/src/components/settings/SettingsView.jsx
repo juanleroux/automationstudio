@@ -877,7 +877,7 @@ export default function SettingsView() {
                                     templateFBs: {
                                       ...prev.templateFBs,
                                       [t.id]: fb
-                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, targetFolder: existing?.targetFolder, fcName: existing?.fcName, fcNumber: existing?.fcNumber, fcLanguage: existing?.fcLanguage ?? 'LAD' }
+                                        ? { fbName: fb.Name, fbNumber: fb.Number, parameters: fb.Parameters, targetFolder: existing?.targetFolder, fcName: existing?.fcName, fcNumber: existing?.fcNumber, fcLanguage: existing?.fcLanguage ?? 'LAD', addReset: existing?.addReset !== false }
                                         : null,
                                     },
                                   };
@@ -948,6 +948,20 @@ export default function SettingsView() {
                                   <option value="FBD">FBD</option>
                                   <option value="SCL">SCL</option>
                                 </select>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 8 }}>Add Reset:</span>
+                                <input
+                                  type="checkbox"
+                                  checked={mapped.addReset !== false}
+                                  disabled={!project}
+                                  style={{ width: 14, height: 14, flexShrink: 0 }}
+                                  onChange={e => {
+                                    const val = e.target.checked;
+                                    setSiemens(prev => ({
+                                      ...prev,
+                                      templateFBs: { ...prev.templateFBs, [t.id]: { ...(prev.templateFBs?.[t.id] || {}), addReset: val } },
+                                    }));
+                                  }}
+                                />
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 8 }}>FC Name:</span>
                                 <input
                                   type="text"
