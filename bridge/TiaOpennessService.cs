@@ -349,8 +349,10 @@ namespace SiemensTiaBridge
                         sb.Append("<NetworkSource>");
                         sb.Append($"<FlgNet xmlns=\"{flgNs}\">");
                         sb.Append("<Parts>");
-                        // Reset coil
-                        sb.Append($"<Coil UId=\"{rCoilUId}\"><CallInfo Name=\"R\" /></Coil>");
+                        // Reset coil — Part element, not Coil (valid Parts children: Access, Part, Call)
+                        sb.Append($"<Part Name=\"RCoil\" UId=\"{rCoilUId}\">");
+                        sb.Append("<TemplateValue Name=\"Operand\" Type=\"Cardinality\">1</TemplateValue>");
+                        sb.Append("</Part>");
                         // Access to instanceName.RST global variable
                         sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{rAccessUId}\">");
                         sb.Append($"<Symbol UId=\"{rSymUId}\">");
