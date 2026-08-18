@@ -269,19 +269,32 @@ namespace SiemensTiaBridge
             }
             else
             {
-                // LAD / FBD: one CompileUnit (network) per instance call using FlgNet.
+                // LAD / FBD: one CompileUnit (network) per instance. FB call and Reset coil share the same network.
                 // Instance requires Scope attr and a Component child element naming the global DB.
                 const string flgNs = "http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4";
                 foreach (var inst in instances)
                 {
-                    int cuId      = nextId++;
-                    int titleId   = nextId++;
-                    int titleItem = nextId++;
-                    int callUId   = nextId++;
-                    int instUId   = nextId++;
-                    int compUId   = nextId++;
-                    int wireUId   = nextId++;
-                    int powerUId  = nextId++;
+                    int cuId        = nextId++;
+                    int titleId     = nextId++;
+                    int titleItem   = nextId++;
+                    int callUId     = nextId++;
+                    int instUId     = nextId++;
+                    int compUId     = nextId++;
+                    int wireUId     = nextId++;
+                    int powerUId    = nextId++;
+                    // Reset coil IDs (allocated always to keep nextId stable; only written when addReset)
+                    int rCoilUId    = nextId++;
+                    int rAccessUId  = nextId++;
+                    int rSymUId     = nextId++;
+                    int rComp1UId   = nextId++;
+                    int rComp2UId   = nextId++;
+                    int rPowerUId   = nextId++;
+                    int rWire1UId   = nextId++;
+                    int rWire2UId   = nextId++;
+
+                    var networkTitle = string.IsNullOrWhiteSpace(inst.LongDesc)
+                        ? inst.Name
+                        : $"{inst.Name} {inst.LongDesc.Trim()}";
 
                     sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
                     sb.Append("<AttributeList>");
@@ -298,8 +311,22 @@ namespace SiemensTiaBridge
                     sb.Append("</CallInfo>");
                     sb.Append("</Call>");
 
+                    // Reset coil in the same network/Parts section
+                    if (addReset)
+                    {
+                        sb.Append($"<Part Name=\"RCoil\" UId=\"{rCoilUId}\"/>");
+                        sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{rAccessUId}\">");
+                        sb.Append($"<Symbol UId=\"{rSymUId}\">");
+                        sb.Append($"<Component Name=\"{XmlEsc(inst.Name)}\" UId=\"{rComp1UId}\"/>");
+                        sb.Append($"<Component Name=\"RST\" UId=\"{rComp2UId}\"/>");
+                        sb.Append("</Symbol>");
+                        sb.Append("</Access>");
+                    }
+
                     sb.Append("</Parts>");
                     sb.Append("<Wires>");
+
+                    // Power → FB call enable
                     sb.Append($"<Wire UId=\"{wireUId}\">");
                     if (lang == "LAD")
                         sb.Append("<Powerrail/>");
@@ -307,6 +334,25 @@ namespace SiemensTiaBridge
                         sb.Append($"<IdentCon UId=\"{powerUId}\"/>");
                     sb.Append($"<NameCon UId=\"{callUId}\" Name=\"en\"/>");
                     sb.Append("</Wire>");
+
+                    if (addReset)
+                    {
+                        // Power → Reset coil enable
+                        sb.Append($"<Wire UId=\"{rWire1UId}\">");
+                        if (lang == "LAD")
+                            sb.Append("<Powerrail/>");
+                        else
+                            sb.Append($"<IdentCon UId=\"{rPowerUId}\"/>");
+                        sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"in\"/>");
+                        sb.Append("</Wire>");
+
+                        // instanceName.RST → Reset coil operand
+                        sb.Append($"<Wire UId=\"{rWire2UId}\">");
+                        sb.Append($"<IdentCon UId=\"{rAccessUId}\"/>");
+                        sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"operand\"/>");
+                        sb.Append("</Wire>");
+                    }
+
                     sb.Append("</Wires>");
                     sb.Append("</FlgNet>");
                     sb.Append("</NetworkSource>");
@@ -318,9 +364,6 @@ namespace SiemensTiaBridge
                     sb.Append($"<MultilingualTextItem ID=\"{titleItem}\" CompositionName=\"Items\">");
                     sb.Append("<AttributeList>");
                     sb.Append("<Culture>en-US</Culture>");
-                    var networkTitle = string.IsNullOrWhiteSpace(inst.LongDesc)
-                        ? inst.Name
-                        : $"{inst.Name} {inst.LongDesc.Trim()}";
                     sb.Append($"<Text>{XmlEsc(networkTitle)}</Text>");
                     sb.Append("</AttributeList>");
                     sb.Append("</MultilingualTextItem>");
@@ -328,70 +371,6 @@ namespace SiemensTiaBridge
                     sb.Append("</MultilingualText>");
                     sb.Append("</ObjectList>");
                     sb.Append("</SW.Blocks.CompileUnit>");
-
-                    // Reset coil network: one additional CompileUnit per instance with -(R)- on instanceName.RST
-                    if (addReset && lang != "SCL")
-                    {
-                        int rCuId      = nextId++;
-                        int rTitleId   = nextId++;
-                        int rTitleItem = nextId++;
-                        int rCoilUId   = nextId++;
-                        int rAccessUId = nextId++;
-                        int rSymUId    = nextId++;
-                        int rComp1UId  = nextId++;
-                        int rComp2UId  = nextId++;
-                        int rPowerUId  = nextId++;
-                        int rWire1UId  = nextId++;
-                        int rWire2UId  = nextId++;
-
-                        sb.Append($"<SW.Blocks.CompileUnit ID=\"{rCuId}\" CompositionName=\"CompileUnits\">");
-                        sb.Append("<AttributeList>");
-                        sb.Append("<NetworkSource>");
-                        sb.Append($"<FlgNet xmlns=\"{flgNs}\">");
-                        sb.Append("<Parts>");
-                        // Reset coil — self-closing Part, no TemplateValue children for single-operand coils
-                        sb.Append($"<Part Name=\"RCoil\" UId=\"{rCoilUId}\"/>");
-                        // Access to instanceName.RST global variable
-                        sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{rAccessUId}\">");
-                        sb.Append($"<Symbol UId=\"{rSymUId}\">");
-                        sb.Append($"<Component Name=\"{XmlEsc(inst.Name)}\" UId=\"{rComp1UId}\"/>");
-                        sb.Append($"<Component Name=\"RST\" UId=\"{rComp2UId}\"/>");
-                        sb.Append("</Symbol>");
-                        sb.Append("</Access>");
-                        sb.Append("</Parts>");
-                        sb.Append("<Wires>");
-                        // Power to coil enable pin
-                        sb.Append($"<Wire UId=\"{rWire1UId}\">");
-                        if (lang == "LAD")
-                            sb.Append("<Powerrail/>");
-                        else
-                            sb.Append($"<IdentCon UId=\"{rPowerUId}\"/>");
-                        sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"in\"/>");
-                        sb.Append("</Wire>");
-                        // Access to coil operand — Access elements connect via IdentCon, not NameCon
-                        sb.Append($"<Wire UId=\"{rWire2UId}\">");
-                        sb.Append($"<IdentCon UId=\"{rAccessUId}\"/>");
-                        sb.Append($"<NameCon UId=\"{rCoilUId}\" Name=\"operand\"/>");
-                        sb.Append("</Wire>");
-                        sb.Append("</Wires>");
-                        sb.Append("</FlgNet>");
-                        sb.Append("</NetworkSource>");
-                        sb.Append($"<ProgrammingLanguage>{lang}</ProgrammingLanguage>");
-                        sb.Append("</AttributeList>");
-                        sb.Append("<ObjectList>");
-                        sb.Append($"<MultilingualText ID=\"{rTitleId}\" CompositionName=\"Title\">");
-                        sb.Append("<ObjectList>");
-                        sb.Append($"<MultilingualTextItem ID=\"{rTitleItem}\" CompositionName=\"Items\">");
-                        sb.Append("<AttributeList>");
-                        sb.Append("<Culture>en-US</Culture>");
-                        sb.Append($"<Text>{XmlEsc(networkTitle + " - Reset")}</Text>");
-                        sb.Append("</AttributeList>");
-                        sb.Append("</MultilingualTextItem>");
-                        sb.Append("</ObjectList>");
-                        sb.Append("</MultilingualText>");
-                        sb.Append("</ObjectList>");
-                        sb.Append("</SW.Blocks.CompileUnit>");
-                    }
                 }
             }
 
