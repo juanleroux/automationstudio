@@ -266,28 +266,41 @@ namespace SiemensTiaBridge
             }
             else
             {
-                // LAD / FBD: one CompileUnit (network) per instance call using FlgNet
+                // LAD / FBD: one CompileUnit (network) per instance call using FlgNet.
+                // Instance UId is a cross-reference to the matching Access element in Parts.
                 const string flgNs = "http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v4";
                 foreach (var inst in instances)
                 {
-                    int cuId       = nextId++;
-                    int titleId    = nextId++;
-                    int titleItem  = nextId++;
-                    int callUId    = nextId++;
-                    int instUId    = nextId++;
-                    int wireUId    = nextId++;
-                    int powerUId   = nextId++;
+                    int cuId      = nextId++;
+                    int titleId   = nextId++;
+                    int titleItem = nextId++;
+                    int callUId   = nextId++;
+                    int accessUId = nextId++;  // Access element UId, also referenced by Instance
+                    int symbolUId = nextId++;
+                    int compUId   = nextId++;
+                    int wireUId   = nextId++;
+                    int powerUId  = nextId++;
 
                     sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
                     sb.Append("<AttributeList>");
                     sb.Append("<NetworkSource>");
                     sb.Append($"<FlgNet xmlns=\"{flgNs}\">");
                     sb.Append("<Parts>");
+
+                    // FB call — Instance UId references the Access element below
                     sb.Append($"<Call UId=\"{callUId}\">");
                     sb.Append($"<CallInfo Name=\"{XmlEsc(fbName)}\" BlockType=\"FB\">");
-                    sb.Append($"<Instance Scope=\"GlobalVariable\" Name=\"{XmlEsc(inst.Name)}\" UId=\"{instUId}\"/>");
+                    sb.Append($"<Instance UId=\"{accessUId}\"/>");
                     sb.Append("</CallInfo>");
                     sb.Append("</Call>");
+
+                    // Global variable reference for the instance DB
+                    sb.Append($"<Access Scope=\"GlobalVariable\" UId=\"{accessUId}\">");
+                    sb.Append($"<Symbol UId=\"{symbolUId}\">");
+                    sb.Append($"<Component Name=\"{XmlEsc(inst.Name)}\" UId=\"{compUId}\"/>");
+                    sb.Append("</Symbol>");
+                    sb.Append("</Access>");
+
                     sb.Append("</Parts>");
                     sb.Append("<Wires>");
                     sb.Append($"<Wire UId=\"{wireUId}\">");
