@@ -1440,11 +1440,18 @@ export default function TemplateTree({ selected, onSelect }) {
                                 if (disabled) return;
                                 setContextMenu(null);
                                 const longDescAttr = (t?.attributes || []).find(a => a.name === 'LongDesc');
+                                const descAttr = (t?.attributes || []).find(a => a.name === 'Description');
                                 const dbAttr = (t?.attributes || []).find(a => a.name === 'DB');
                                 const instances = ctxInsts.map(item => {
                                   const inst = item.instance;
                                   const la = longDescAttr ? (inst.attributes || []).find(a => a.id === longDescAttr.id) : null;
-                                  const longDesc = (la?.value != null ? la.value : longDescAttr?.value) || '';
+                                  const longDescVal = la?.value != null ? la.value : (longDescAttr?.value ?? '');
+                                  // Fall back to Description attribute when LongDesc is absent
+                                  let longDesc = longDescVal;
+                                  if (!longDesc && descAttr) {
+                                    const da2 = (inst.attributes || []).find(a => a.id === descAttr.id);
+                                    longDesc = (da2?.value != null ? da2.value : descAttr?.value) || '';
+                                  }
                                   const da = dbAttr ? (inst.attributes || []).find(a => a.id === dbAttr.id) : null;
                                   const dbVal = da?.value != null ? da.value : dbAttr?.value;
                                   const dbNumber = (dbVal != null && dbVal !== '') ? parseInt(dbVal, 10) : undefined;

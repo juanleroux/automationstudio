@@ -292,9 +292,10 @@ namespace SiemensTiaBridge
                     int rWire1UId   = nextId++;
                     int rWire2UId   = nextId++;
 
+                    // Network title = description only; fall back to tag name when description is absent
                     var networkTitle = string.IsNullOrWhiteSpace(inst.LongDesc)
                         ? inst.Name
-                        : $"{inst.Name} {inst.LongDesc.Trim()}";
+                        : inst.LongDesc.Trim();
 
                     sb.Append($"<SW.Blocks.CompileUnit ID=\"{cuId}\" CompositionName=\"CompileUnits\">");
                     sb.Append("<AttributeList>");
