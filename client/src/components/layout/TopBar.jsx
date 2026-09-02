@@ -1,4 +1,5 @@
 import React from 'react';
+import { Sparkles } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 
 const VIEW_LABELS = {
@@ -12,7 +13,7 @@ const VIEW_LABELS = {
   settings:    'Settings',
 };
 
-export default function TopBar({ activeView }) {
+export default function TopBar({ activeView, onToggleAiChat }) {
   const { project, filename, isDirty } = useProject();
 
   return (
@@ -45,8 +46,21 @@ export default function TopBar({ activeView }) {
           </>
         )}
       </div>
-      <div className="flex items-center gap-2 text-xs text-text-muted">
+      <div className="flex items-center gap-3 text-xs text-text-muted">
         <span>One Technology Limited &copy;</span>
+        <button
+          title="AI Assistant"
+          onClick={onToggleAiChat}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)',
+            background: 'var(--bg-main)', cursor: 'pointer', color: 'var(--accent)',
+            fontSize: 12, fontWeight: 500,
+          }}
+        >
+          <Sparkles size={13} />
+          AI
+        </button>
       </div>
     </div>
   );

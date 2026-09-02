@@ -9,6 +9,7 @@ const siemensRouter = require('./routes/siemens');
 const configRouter = require('./routes/config');
 const commtestRouter = require('./routes/commtest');
 const connectionsRouter = require('./routes/connections');
+const aiRouter = require('./routes/ai');
 
 const app = express();
 const PORT = 3001;
@@ -57,6 +58,7 @@ app.use('/api/siemens', siemensRouter);
 app.use('/api/config', configRouter);
 app.use('/api/commtest', commtestRouter);
 app.use('/api/connections', connectionsRouter);
+app.use('/api/ai', aiRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
