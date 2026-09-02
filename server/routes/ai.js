@@ -240,7 +240,7 @@ router.post('/chat', async (req, res) => {
       }
     }
     // Exceeded loop limit — return whatever we have
-    res.json({ reply: 'I've queued several actions. Check the results above.', actions: allActions });
+    res.json({ reply: "I've queued several actions. Check the results above.", actions: allActions });
   } catch (err) {
     console.error('[AI] Error:', err);
     res.status(500).json({ error: err.message });
