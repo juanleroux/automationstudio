@@ -1540,13 +1540,13 @@ export default function SettingsView() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Provider</label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[
-                    { id: 'anthropic', label: 'Anthropic', sub: 'Paid — Claude models' },
-                    { id: 'groq',      label: 'Groq',      sub: 'Free tier — LLaMA, Mixtral' },
-                    { id: 'ollama',    label: 'Ollama',    sub: 'Free — runs locally' },
+                    { id: 'anthropic', label: 'Anthropic', sub: 'Paid — Claude models',       defaultModel: 'claude-haiku-4-5-20251001' },
+                    { id: 'groq',      label: 'Groq',      sub: 'Free tier — LLaMA, Mixtral', defaultModel: 'llama-3.3-70b-versatile' },
+                    { id: 'ollama',    label: 'Ollama',    sub: 'Free — runs locally',         defaultModel: '' },
                   ].map(p => (
                     <button
                       key={p.id}
-                      onClick={() => setAiConfig(prev => ({ ...prev, provider: p.id, model: '' }))}
+                      onClick={() => setAiConfig(prev => ({ ...prev, provider: p.id, model: p.defaultModel }))}
                       style={{
                         flex: 1, padding: '10px 12px', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
                         border: aiConfig.provider === p.id ? '2px solid var(--accent)' : '2px solid var(--border)',
