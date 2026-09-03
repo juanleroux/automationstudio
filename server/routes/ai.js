@@ -1,7 +1,23 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const axios = require('axios');
 const Anthropic = require('@anthropic-ai/sdk');
 
+const configPath = path.join(__dirname, '..', 'config', 'app.config.json');
+
+function readAiConfig() {
+  try {
+    if (fs.existsSync(configPath)) {
+      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      return cfg.ai || {};
+    }
+  } catch (_) {}
+  return {};
+}
+
+// ── System prompt ─────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are an AI assistant embedded in Automation Studio — an industrial automation project management tool built by One Technology Limited.
 
 You have full access to the user's project and can control every feature of the application.
@@ -17,15 +33,12 @@ You have full access to the user's project and can control every feature of the 
 - settings: App settings including Ignition, Siemens TIA Portal, and Studio 5000 integration
 
 ## Project Data Model
-- project.name: Project name
 - project.templates[]: Asset templates/types, each with:
   - id (number), name (string)
   - attributes[]: { id, name, type (String|Int32|Float|Bool|DateTime), value (default), required }
   - instances[]: { id, name, description, isFlagged, attributes: [{ id, value }] }
 - project.nodes[]: Topology nodes — { id, name, type, x, y, level, color, confirmed }
 - project.connections[]: Topology edges — { id, from, to, label, style, width }
-- project.siemens: { bridgeUrl, tiaVersion, templateFBs }
-- project.engineering: { ignitionGateway, apiKey }
 
 ## Instructions
 - Be concise and direct. When asked to do something, do it using the available tools.
@@ -58,38 +71,34 @@ function buildProjectSummary(project) {
   }, null, 2);
 }
 
-const TOOLS = [
+// ── Tool definitions (Anthropic format) ───────────────────────────────────────
+const TOOLS_ANTHROPIC = [
   {
     name: 'navigate_to_view',
     description: 'Switch the application to a different view/tab',
     input_schema: {
       type: 'object',
       properties: {
-        view: {
-          type: 'string',
-          enum: ['dashboard', 'topology', 'engineering', 'notes', 'proposal', 'calculators', 'commtest', 'settings'],
-          description: 'The view to navigate to',
-        },
+        view: { type: 'string', enum: ['dashboard', 'topology', 'engineering', 'notes', 'proposal', 'calculators', 'commtest', 'settings'] },
       },
       required: ['view'],
     },
   },
   {
     name: 'create_template',
-    description: 'Create a new asset template (type) in the engineering/assets view',
+    description: 'Create a new asset template in the engineering/assets view',
     input_schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Template name' },
+        name: { type: 'string' },
         attributes: {
           type: 'array',
-          description: 'Attributes to add to the template',
           items: {
             type: 'object',
             properties: {
               name: { type: 'string' },
               type: { type: 'string', enum: ['String', 'Int32', 'Float', 'Bool', 'DateTime'] },
-              value: { type: 'string', description: 'Default value' },
+              value: { type: 'string' },
               required: { type: 'boolean' },
             },
             required: ['name', 'type'],
@@ -105,25 +114,25 @@ const TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        templateId: { type: 'number', description: 'ID of the template to add the instance to' },
-        templateName: { type: 'string', description: 'Template name (used to look up the template if templateId is unknown)' },
-        name: { type: 'string', description: 'Instance name (tag name)' },
-        attributes: { type: 'object', description: 'Attribute name → value pairs to set on this instance' },
+        templateId: { type: 'number' },
+        templateName: { type: 'string' },
+        name: { type: 'string' },
+        attributes: { type: 'object' },
       },
       required: ['name'],
     },
   },
   {
     name: 'update_instance',
-    description: 'Update an existing instance — rename it, change its attributes, or flag/unflag it',
+    description: 'Update an existing instance — rename, change attributes, or flag/unflag',
     input_schema: {
       type: 'object',
       properties: {
         templateId: { type: 'number' },
         instanceId: { type: 'number' },
-        instanceName: { type: 'string', description: 'Current instance name (used to look up if IDs not known)' },
-        newName: { type: 'string', description: 'New name for the instance' },
-        attributes: { type: 'object', description: 'Attribute name → value pairs to update' },
+        instanceName: { type: 'string' },
+        newName: { type: 'string' },
+        attributes: { type: 'object' },
         isFlagged: { type: 'boolean' },
       },
     },
@@ -136,7 +145,7 @@ const TOOLS = [
       properties: {
         templateId: { type: 'number' },
         instanceId: { type: 'number' },
-        instanceName: { type: 'string', description: 'Instance name to look up if IDs not known' },
+        instanceName: { type: 'string' },
       },
     },
   },
@@ -158,11 +167,8 @@ const TOOLS = [
       type: 'object',
       properties: {
         name: { type: 'string' },
-        type: {
-          type: 'string',
-          enum: ['PLC', 'PAC', 'RTU', 'DCS', 'HMI', 'SCADA', 'Historian', 'MES', 'Server', 'Workstation', 'Switch', 'Firewall', 'Sensor', 'Actuator', 'I/O Card', 'Cloud', 'ERP', 'Custom'],
-        },
-        level: { type: 'number', description: 'Hierarchy level: 0 = Field, 1 = Control, 2 = Supervisory, 3 = Enterprise' },
+        type: { type: 'string', enum: ['PLC', 'PAC', 'RTU', 'DCS', 'HMI', 'SCADA', 'Historian', 'MES', 'Server', 'Workstation', 'Switch', 'Firewall', 'Sensor', 'Actuator', 'I/O Card', 'Cloud', 'ERP', 'Custom'] },
+        level: { type: 'number' },
       },
       required: ['name', 'type'],
     },
@@ -173,17 +179,7 @@ const TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        items: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              templateId: { type: 'number' },
-              instanceId: { type: 'number' },
-              instanceName: { type: 'string' },
-            },
-          },
-        },
+        items: { type: 'array', items: { type: 'object', properties: { templateId: { type: 'number' }, instanceId: { type: 'number' }, instanceName: { type: 'string' } } } },
         isFlagged: { type: 'boolean' },
       },
       required: ['isFlagged'],
@@ -196,54 +192,119 @@ const TOOLS = [
   },
 ];
 
-router.post('/chat', async (req, res) => {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: 'ANTHROPIC_API_KEY not set on the server. Add it to your Docker environment.' });
-  }
+// Convert Anthropic tools to OpenAI function-calling format
+function toOpenAITools(tools) {
+  return tools.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema,
+    },
+  }));
+}
 
+// ── Anthropic provider ─────────────────────────────────────────────────────────
+async function callAnthropic(apiKey, model, messages, systemWithContext, allActions) {
+  const client = new Anthropic({ apiKey });
+  const resolvedModel = model || 'claude-haiku-4-5-20251001';
+  let apiMessages = messages.map(m => ({ role: m.role, content: m.content }));
+
+  for (let i = 0; i < 5; i++) {
+    const response = await client.messages.create({
+      model: resolvedModel,
+      max_tokens: 2048,
+      system: systemWithContext,
+      tools: TOOLS_ANTHROPIC,
+      messages: apiMessages,
+    });
+
+    if (response.stop_reason === 'tool_use') {
+      const toolUses = response.content.filter(b => b.type === 'tool_use');
+      const toolResults = toolUses.map(tu => {
+        allActions.push({ tool: tu.name, input: tu.input, id: tu.id });
+        return { type: 'tool_result', tool_use_id: tu.id, content: 'Action queued for client execution.' };
+      });
+      apiMessages = [
+        ...apiMessages,
+        { role: 'assistant', content: response.content },
+        { role: 'user', content: toolResults },
+      ];
+    } else {
+      const text = response.content.find(b => b.type === 'text')?.text ?? '';
+      return text;
+    }
+  }
+  return "I've queued several actions. Check the results above.";
+}
+
+// ── OpenAI-compatible provider (Ollama, Groq, etc.) ───────────────────────────
+async function callOpenAICompat(apiKey, model, baseUrl, messages, systemWithContext, allActions) {
+  const url = `${(baseUrl || 'http://localhost:11434').replace(/\/$/, '')}/v1/chat/completions`;
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+  const openAIMessages = [
+    { role: 'system', content: systemWithContext },
+    ...messages.map(m => ({ role: m.role, content: m.content })),
+  ];
+  const tools = toOpenAITools(TOOLS_ANTHROPIC);
+
+  for (let i = 0; i < 5; i++) {
+    const payload = { model, messages: openAIMessages, max_tokens: 2048, tools, tool_choice: 'auto' };
+    const resp = await axios.post(url, payload, { headers, timeout: 60000 });
+    const choice = resp.data.choices?.[0];
+    const msg = choice?.message;
+
+    if (choice?.finish_reason === 'tool_calls' && msg?.tool_calls?.length) {
+      openAIMessages.push({ role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls });
+      const toolResults = msg.tool_calls.map(tc => {
+        let input = {};
+        try { input = JSON.parse(tc.function.arguments); } catch (_) {}
+        allActions.push({ tool: tc.function.name, input, id: tc.id });
+        return { role: 'tool', tool_call_id: tc.id, content: 'Action queued for client execution.' };
+      });
+      openAIMessages.push(...toolResults);
+    } else {
+      return msg?.content || '';
+    }
+  }
+  return "I've queued several actions. Check the results above.";
+}
+
+// ── Chat endpoint ──────────────────────────────────────────────────────────────
+router.post('/chat', async (req, res) => {
   const { messages, project, activeView } = req.body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages array required' });
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const systemWithContext = `${SYSTEM_PROMPT}\n\n## Current State\nActive view: ${activeView || 'unknown'}\n\n## Project Data\n\`\`\`json\n${buildProjectSummary(project)}\n\`\`\``;
+  const cfg = readAiConfig();
+  const provider = cfg.provider || 'anthropic';
+  const model    = cfg.model    || '';
+  const apiKey   = cfg.apiKey   || (provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.GROQ_API_KEY) || '';
+  const baseUrl  = provider === 'groq'
+    ? 'https://api.groq.com/openai'
+    : (cfg.baseUrl || 'http://localhost:11434');
 
+  const systemWithContext = `${SYSTEM_PROMPT}\n\n## Current State\nActive view: ${activeView || 'unknown'}\n\n## Project Data\n\`\`\`json\n${buildProjectSummary(project)}\n\`\`\``;
   const allActions = [];
-  let apiMessages = messages.map(m => ({ role: m.role, content: m.content }));
 
   try {
-    // Agentic tool-use loop — keep calling until end_turn or max iterations
-    for (let iteration = 0; iteration < 5; iteration++) {
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
-        system: systemWithContext,
-        tools: TOOLS,
-        messages: apiMessages,
-      });
-
-      if (response.stop_reason === 'tool_use') {
-        const toolUses = response.content.filter(b => b.type === 'tool_use');
-        const toolResults = toolUses.map(tu => {
-          allActions.push({ tool: tu.name, input: tu.input, id: tu.id });
-          return { type: 'tool_result', tool_use_id: tu.id, content: 'Action queued for client execution.' };
-        });
-        apiMessages = [
-          ...apiMessages,
-          { role: 'assistant', content: response.content },
-          { role: 'user', content: toolResults },
-        ];
-      } else {
-        const textBlock = response.content.find(b => b.type === 'text');
-        return res.json({ reply: textBlock?.text ?? '', actions: allActions });
-      }
+    let reply = '';
+    if (provider === 'anthropic') {
+      if (!apiKey) return res.status(503).json({ error: 'No Anthropic API key configured. Add it in Settings → AI Assistant.' });
+      reply = await callAnthropic(apiKey, model, messages, systemWithContext, allActions);
+    } else {
+      // OpenAI-compatible (Ollama, Groq, etc.)
+      if (!model) return res.status(503).json({ error: 'No model specified. Configure it in Settings → AI Assistant.' });
+      reply = await callOpenAICompat(apiKey, model, baseUrl, messages, systemWithContext, allActions);
     }
-    // Exceeded loop limit — return whatever we have
-    res.json({ reply: "I've queued several actions. Check the results above.", actions: allActions });
+    res.json({ reply, actions: allActions });
   } catch (err) {
-    console.error('[AI] Error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[AI] Error:', err.response?.data || err.message);
+    const msg = err.response?.data?.error?.message || err.response?.data?.error || err.message;
+    res.status(500).json({ error: msg });
   }
 });
 

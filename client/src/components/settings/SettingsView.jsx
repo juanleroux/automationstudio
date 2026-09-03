@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Wifi, WifiOff, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw, Layers } from 'lucide-react';
+import { Wifi, WifiOff, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw, Layers, Sparkles } from 'lucide-react';
 import ColorPicker from '../shared/ColorPicker';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -60,6 +60,12 @@ export default function SettingsView() {
   const ceXDBFileRef = useRef(null);
   const ceProjectXDBFileRef = useRef(null);
   const [cePendingTemplateId, setCePendingTemplateId] = useState(null);
+  // AI Assistant settings — loaded from server config
+  const [aiConfig, setAiConfig] = useState({ provider: 'anthropic', model: '', apiKey: '', baseUrl: 'http://localhost:11434' });
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiTestResult, setAiTestResult] = useState(null);
+  const [aiTesting, setAiTesting] = useState(false);
+
   const [siemens, setSiemens] = useState(
     project?.siemens || {
       tiaVersion: 'V21',
@@ -88,14 +94,19 @@ export default function SettingsView() {
   const tiaProjectFileRef = useRef(null);
 
   useEffect(() => {
-    loadConfig().then(setConfig).catch(() => setConfig({
-      proposal: {
-        companyName: '', contactName: '', phoneNumber: '', emailAddress: '',
-        address: '', taxNumber: '', currencySymbol: '$', taxAmount: '0',
-        logoFilePath: '', previewBodyColor: '#FFFFFF', previewHeaderColor: '#528ED2',
-        previewFooterColor: '#DDDDDD', previewSummaryColor: '#AAAAAA'
-      }
-    }));
+    loadConfig().then(cfg => {
+      setConfig(cfg);
+      if (cfg?.ai) setAiConfig(prev => ({ ...prev, ...cfg.ai }));
+    }).catch(() => {
+      setConfig({
+        proposal: {
+          companyName: '', contactName: '', phoneNumber: '', emailAddress: '',
+          address: '', taxNumber: '', currencySymbol: '$', taxAmount: '0',
+          logoFilePath: '', previewBodyColor: '#FFFFFF', previewHeaderColor: '#528ED2',
+          previewFooterColor: '#DDDDDD', previewSummaryColor: '#AAAAAA'
+        }
+      });
+    });
   }, []);
 
   const setCompany = (field, value) => {
@@ -243,12 +254,58 @@ export default function SettingsView() {
     }
   };
 
+  const handleSaveAiConfig = async () => {
+    setAiSaving(true);
+    try {
+      const merged = { ...(config || {}), ai: aiConfig };
+      await saveConfig(merged);
+      setConfig(merged);
+      toast.success('AI settings saved');
+    } catch (err) {
+      toast.error('Failed to save AI settings: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setAiSaving(false);
+    }
+  };
+
+  const handleTestAi = async () => {
+    setAiTesting(true);
+    setAiTestResult(null);
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'Reply with exactly: OK' }], project: null, activeView: 'settings' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      setAiTestResult({ success: true, message: 'Connection successful — model responded.' });
+    } catch (err) {
+      setAiTestResult({ success: false, message: err.message });
+    } finally {
+      setAiTesting(false);
+    }
+  };
+
+  const GROQ_MODELS = [
+    { value: 'llama-3.3-70b-versatile', label: 'LLaMA 3.3 70B Versatile (recommended)' },
+    { value: 'llama-3.1-8b-instant',    label: 'LLaMA 3.1 8B Instant (fast)' },
+    { value: 'mixtral-8x7b-32768',      label: 'Mixtral 8x7B' },
+    { value: 'gemma2-9b-it',            label: 'Gemma 2 9B' },
+  ];
+
+  const ANTHROPIC_MODELS = [
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fast & cheap)' },
+    { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 (best quality)' },
+  ];
+
   const tabs = [
     { id: 'general',       label: 'General',              desc: 'Project & Appearance',   icon: SlidersHorizontal },
     { id: 'engineering',   label: 'Ignition',             desc: 'Project Settings',        icon: Zap },
     { id: 'siemens',       label: 'Siemens',              desc: 'Project Settings',        icon: Cpu },
     { id: 'studio5000',    label: 'Rockwell Automation',  desc: 'Project Settings',        icon: FileCode },
     { id: 'controlExpert', label: 'Schneider Electric',   desc: 'Project Settings',        icon: Layers },
+    { id: 'ai',            label: 'AI Assistant',         desc: 'Provider & Model',        icon: Sparkles },
   ];
 
   return (
@@ -1465,6 +1522,182 @@ export default function SettingsView() {
                   Adds "Export to Control Expert" to the template right-click menu in Assets. Requires an XDB file to be configured for the template.
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── AI Assistant tab ─────────────────────────────────────────── */}
+          {activeTab === 'ai' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>AI Assistant</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Select your AI provider and model. Free options (Ollama, Groq) are available. Settings are saved to the server config and apply immediately.
+                </div>
+              </div>
+
+              {/* Provider */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Provider</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[
+                    { id: 'anthropic', label: 'Anthropic', sub: 'Paid — Claude models' },
+                    { id: 'groq',      label: 'Groq',      sub: 'Free tier — LLaMA, Mixtral' },
+                    { id: 'ollama',    label: 'Ollama',    sub: 'Free — runs locally' },
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => setAiConfig(prev => ({ ...prev, provider: p.id, model: '' }))}
+                      style={{
+                        flex: 1, padding: '10px 12px', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                        border: aiConfig.provider === p.id ? '2px solid var(--accent)' : '2px solid var(--border)',
+                        background: aiConfig.provider === p.id ? 'var(--bg-active, rgba(59,130,246,0.08))' : 'var(--bg-main)',
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{p.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{p.sub}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Anthropic settings */}
+              {aiConfig.provider === 'anthropic' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model</label>
+                    <select
+                      value={aiConfig.model || 'claude-haiku-4-5-20251001'}
+                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                      className="form-input"
+                      style={{ fontSize: 13 }}
+                    >
+                      {ANTHROPIC_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>API Key</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      value={aiConfig.apiKey || ''}
+                      onChange={e => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                      placeholder="sk-ant-…  (leave blank to use server ANTHROPIC_API_KEY env var)"
+                      style={{ fontSize: 13 }}
+                    />
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      Get your key at <span style={{ color: 'var(--accent)' }}>console.anthropic.com</span>. If left blank, the server will fall back to the <code>ANTHROPIC_API_KEY</code> environment variable.
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Groq settings */}
+              {aiConfig.provider === 'groq' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model</label>
+                    <select
+                      value={aiConfig.model || 'llama-3.3-70b-versatile'}
+                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                      className="form-input"
+                      style={{ fontSize: 13 }}
+                    >
+                      {GROQ_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Groq API Key</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      value={aiConfig.apiKey || ''}
+                      onChange={e => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                      placeholder="gsk_…"
+                      style={{ fontSize: 13 }}
+                    />
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      Free tier available at <span style={{ color: 'var(--accent)' }}>console.groq.com</span>. No credit card required.
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Ollama settings */}
+              {aiConfig.provider === 'ollama' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={aiConfig.model || ''}
+                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                      placeholder="e.g. llama3.2, mistral, qwen2.5-coder"
+                      style={{ fontSize: 13 }}
+                    />
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      Pull a model first: <code>ollama pull llama3.2</code>. See <span style={{ color: 'var(--accent)' }}>ollama.com/library</span> for available models.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Ollama Base URL</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={aiConfig.baseUrl || 'http://localhost:11434'}
+                      onChange={e => setAiConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
+                      placeholder="http://localhost:11434"
+                      style={{ fontSize: 13 }}
+                    />
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      Default is <code>http://localhost:11434</code>. Change this if Ollama runs on a different host or port.
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Test + Save */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingTop: 4 }}>
+                <button className="btn btn-secondary" onClick={handleTestAi} disabled={aiTesting} style={{ fontSize: 12 }}>
+                  {aiTesting ? 'Testing…' : 'Test Connection'}
+                </button>
+                <button className="btn btn-primary" onClick={handleSaveAiConfig} disabled={aiSaving} style={{ fontSize: 12 }}>
+                  {aiSaving ? 'Saving…' : 'Save AI Settings'}
+                </button>
+                {aiTestResult && (
+                  <span style={{ fontSize: 12, color: aiTestResult.success ? 'var(--success, #22c55e)' : 'var(--danger, #e55353)' }}>
+                    {aiTestResult.success ? '✓ ' : '✗ '}{aiTestResult.message}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>Provider Comparison</div>
+                <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: 'var(--text-muted)' }}>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>Provider</th>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>Cost</th>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>Privacy</th>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>Quality</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { name: 'Anthropic', cost: 'Pay per token', privacy: 'Cloud', quality: '⭐⭐⭐⭐⭐' },
+                      { name: 'Groq',      cost: 'Free tier',     privacy: 'Cloud', quality: '⭐⭐⭐⭐' },
+                      { name: 'Ollama',    cost: 'Free',          privacy: 'Local', quality: 'Model-dependent' },
+                    ].map(row => (
+                      <tr key={row.name} style={{ color: 'var(--text-secondary)' }}>
+                        <td style={{ padding: '4px 8px' }}>{row.name}</td>
+                        <td style={{ padding: '4px 8px' }}>{row.cost}</td>
+                        <td style={{ padding: '4px 8px' }}>{row.privacy}</td>
+                        <td style={{ padding: '4px 8px' }}>{row.quality}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
