@@ -47,46 +47,61 @@ You have full access to the user's project and can control every feature of the 
 - When showing data, be structured and clear.
 - If a task is ambiguous, ask one focused clarifying question.`;
 
-const MAX_INSTANCES_PER_TEMPLATE = 50;
-const MAX_SUMMARY_CHARS = 6000;
+const MAX_SUMMARY_CHARS = 8000;
 
 function buildProjectSummary(project) {
   if (!project) return 'No project currently loaded.';
 
-  const templates = (project.templates || []).map(t => {
-    const instances = (t.instances || []);
-    const shown = instances.slice(0, MAX_INSTANCES_PER_TEMPLATE).map(i => ({
-      id: i.id,
-      name: i.name,
-      ...(i.isFlagged ? { flagged: true } : {}),
-    }));
-    return {
-      id: t.id,
-      name: t.name,
-      attributes: (t.attributes || []).map(a => ({ id: a.id, name: a.name, type: a.type })),
-      instanceCount: instances.length,
-      instances: shown,
-      ...(instances.length > MAX_INSTANCES_PER_TEMPLATE
-        ? { truncated: `${instances.length - MAX_INSTANCES_PER_TEMPLATE} more instances not shown` }
-        : {}),
-    };
-  });
+  // Build compact text format: one line per instance with all attribute values
+  const lines = [`Project: ${project.name}`, ''];
 
-  const summary = JSON.stringify({
-    name: project.name,
-    templates,
-    nodes: (project.nodes || []).map(n => ({ id: n.id, name: n.name, type: n.type, level: n.level })),
-    connections: (project.connections || []).map(c => ({ from: c.from, to: c.to, label: c.label })),
-  }, null, 2);
+  for (const t of (project.templates || [])) {
+    const attrs = t.attributes || [];
+    lines.push(`Template: ${t.name} (id:${t.id})`);
+    lines.push(`Attributes: ${attrs.map(a => a.name).join(', ')}`);
 
-  if (summary.length > MAX_SUMMARY_CHARS) {
-    // Ultra-compact fallback: just names and counts
-    const compact = (project.templates || []).map(t =>
-      `${t.name} (id:${t.id}, ${(t.instances||[]).length} instances, attrs: ${(t.attributes||[]).map(a=>a.name).join(', ')})`
-    ).join('\n');
-    return `Project: ${project.name}\nTemplates:\n${compact}`;
+    const instances = t.instances || [];
+    for (const inst of instances) {
+      // Build key=value pairs for non-empty attributes only
+      const vals = attrs
+        .map(a => {
+          const ia = (inst.attributes || []).find(x => x.id === a.id);
+          const v = ia?.value ?? a.value ?? '';
+          return v !== '' && v !== null && v !== undefined ? `${a.name}=${v}` : null;
+        })
+        .filter(Boolean)
+        .join(', ');
+      const flag = inst.isFlagged ? ' [FLAGGED]' : '';
+      lines.push(`  ${inst.name}${flag}${vals ? ': ' + vals : ''}`);
+    }
+    lines.push('');
   }
-  return summary;
+
+  if ((project.nodes || []).length > 0) {
+    lines.push('Topology nodes: ' + project.nodes.map(n => `${n.name}(${n.type})`).join(', '));
+  }
+
+  const summary = lines.join('\n');
+  if (summary.length <= MAX_SUMMARY_CHARS) return summary;
+
+  // Too large — truncate instances per template proportionally
+  const maxPerTemplate = Math.max(5, Math.floor(MAX_SUMMARY_CHARS / Math.max(1, (project.templates||[]).length) / 60));
+  const truncLines = [`Project: ${project.name}`, ''];
+  for (const t of (project.templates || [])) {
+    const attrs = t.attributes || [];
+    const instances = t.instances || [];
+    truncLines.push(`Template: ${t.name} (id:${t.id}, ${instances.length} instances)`);
+    truncLines.push(`Attributes: ${attrs.map(a => a.name).join(', ')}`);
+    for (const inst of instances.slice(0, maxPerTemplate)) {
+      const vals = attrs
+        .map(a => { const ia = (inst.attributes||[]).find(x=>x.id===a.id); const v=ia?.value??a.value??''; return v!==''&&v!==null?`${a.name}=${v}`:null; })
+        .filter(Boolean).join(', ');
+      truncLines.push(`  ${inst.name}${inst.isFlagged?' [FLAGGED]':''}${vals?': '+vals:''}`);
+    }
+    if (instances.length > maxPerTemplate) truncLines.push(`  ... ${instances.length - maxPerTemplate} more instances`);
+    truncLines.push('');
+  }
+  return truncLines.join('\n');
 }
 
 // ── Tool definitions (Anthropic format) ───────────────────────────────────────
