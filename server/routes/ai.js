@@ -319,7 +319,10 @@ router.post('/chat', async (req, res) => {
   // Anthropic/DeepSeek: full tools + generous context
   // Ollama: full tools + medium context (local, no rate limits)
   const groqLite = provider === 'groq';
-  const summaryBudget = groqLite ? 2000 : provider === 'anthropic' || provider === 'deepseek' ? 80000 : 20000;
+  // Groq: hard 8k TPM limit, keep project data tiny
+  // Anthropic/DeepSeek: 200k token context — send everything, no cap
+  // Ollama: generous but bounded
+  const summaryBudget = groqLite ? 2000 : provider === 'anthropic' || provider === 'deepseek' ? Number.MAX_SAFE_INTEGER : 30000;
   const systemWithContext = `${SYSTEM_PROMPT}\n\nCurrent view: ${activeView || 'unknown'}\n\nProject Data:\n${buildProjectSummary(project, summaryBudget)}`;
   // Keep only the last 6 messages for Groq, 10 for others
   const trimmedMessages = messages.slice(groqLite ? -6 : -10);
