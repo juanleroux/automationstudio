@@ -47,61 +47,39 @@ You have full access to the user's project and can control every feature of the 
 - When showing data, be structured and clear.
 - If a task is ambiguous, ask one focused clarifying question.`;
 
-const MAX_SUMMARY_CHARS = 8000;
+function buildInstanceLine(inst, attrs) {
+  const vals = attrs
+    .map(a => { const ia = (inst.attributes||[]).find(x=>x.id===a.id); const v=ia?.value??a.value??''; return v!==''&&v!==null&&v!==undefined?`${a.name}=${v}`:null; })
+    .filter(Boolean).join(', ');
+  return `  ${inst.name}${inst.isFlagged?' [!]':''}${vals?': '+vals:''}`;
+}
 
-function buildProjectSummary(project) {
+function buildProjectSummary(project, maxChars = 4000) {
   if (!project) return 'No project currently loaded.';
 
-  // Build compact text format: one line per instance with all attribute values
-  const lines = [`Project: ${project.name}`, ''];
+  const templates = project.templates || [];
+  const totalInstances = templates.reduce((s, t) => s + (t.instances||[]).length, 0);
 
-  for (const t of (project.templates || [])) {
+  // Budget instances per template based on total count
+  const budgetPerTemplate = totalInstances > 0
+    ? Math.max(3, Math.floor((maxChars * 0.8) / Math.max(1, templates.length) / 60))
+    : 999;
+
+  const lines = [`Project: ${project.name}  (${templates.length} templates, ${totalInstances} instances total)`, ''];
+
+  for (const t of templates) {
     const attrs = t.attributes || [];
-    lines.push(`Template: ${t.name} (id:${t.id})`);
-    lines.push(`Attributes: ${attrs.map(a => a.name).join(', ')}`);
-
     const instances = t.instances || [];
-    for (const inst of instances) {
-      // Build key=value pairs for non-empty attributes only
-      const vals = attrs
-        .map(a => {
-          const ia = (inst.attributes || []).find(x => x.id === a.id);
-          const v = ia?.value ?? a.value ?? '';
-          return v !== '' && v !== null && v !== undefined ? `${a.name}=${v}` : null;
-        })
-        .filter(Boolean)
-        .join(', ');
-      const flag = inst.isFlagged ? ' [FLAGGED]' : '';
-      lines.push(`  ${inst.name}${flag}${vals ? ': ' + vals : ''}`);
-    }
+    lines.push(`[${t.name}] id:${t.id}  attrs: ${attrs.map(a=>a.name).join(', ')}`);
+    const shown = instances.slice(0, budgetPerTemplate);
+    for (const inst of shown) lines.push(buildInstanceLine(inst, attrs));
+    if (instances.length > budgetPerTemplate) lines.push(`  ... +${instances.length - budgetPerTemplate} more`);
     lines.push('');
   }
 
-  if ((project.nodes || []).length > 0) {
-    lines.push('Topology nodes: ' + project.nodes.map(n => `${n.name}(${n.type})`).join(', '));
-  }
-
-  const summary = lines.join('\n');
-  if (summary.length <= MAX_SUMMARY_CHARS) return summary;
-
-  // Too large — truncate instances per template proportionally
-  const maxPerTemplate = Math.max(5, Math.floor(MAX_SUMMARY_CHARS / Math.max(1, (project.templates||[]).length) / 60));
-  const truncLines = [`Project: ${project.name}`, ''];
-  for (const t of (project.templates || [])) {
-    const attrs = t.attributes || [];
-    const instances = t.instances || [];
-    truncLines.push(`Template: ${t.name} (id:${t.id}, ${instances.length} instances)`);
-    truncLines.push(`Attributes: ${attrs.map(a => a.name).join(', ')}`);
-    for (const inst of instances.slice(0, maxPerTemplate)) {
-      const vals = attrs
-        .map(a => { const ia = (inst.attributes||[]).find(x=>x.id===a.id); const v=ia?.value??a.value??''; return v!==''&&v!==null?`${a.name}=${v}`:null; })
-        .filter(Boolean).join(', ');
-      truncLines.push(`  ${inst.name}${inst.isFlagged?' [FLAGGED]':''}${vals?': '+vals:''}`);
-    }
-    if (instances.length > maxPerTemplate) truncLines.push(`  ... ${instances.length - maxPerTemplate} more instances`);
-    truncLines.push('');
-  }
-  return truncLines.join('\n');
+  const result = lines.join('\n');
+  // Hard cap — trim trailing content if still over
+  return result.length <= maxChars ? result : result.slice(0, maxChars) + '\n[truncated]';
 }
 
 // ── Tool definitions (Anthropic format) ───────────────────────────────────────
@@ -346,7 +324,9 @@ router.post('/chat', async (req, res) => {
     ? 'https://api.groq.com/openai'
     : (cfg.baseUrl || 'http://localhost:11434');
 
-  const systemWithContext = `${SYSTEM_PROMPT}\n\n## Current State\nActive view: ${activeView || 'unknown'}\n\n## Project Data\n\`\`\`\n${buildProjectSummary(project)}\n\`\`\``;
+  // Anthropic and local Ollama have generous context; Groq free tier is capped at 8k TPM
+  const summaryBudget = provider === 'groq' ? 3000 : provider === 'anthropic' ? 12000 : 8000;
+  const systemWithContext = `${SYSTEM_PROMPT}\n\n## Current State\nActive view: ${activeView || 'unknown'}\n\n## Project Data\n\`\`\`\n${buildProjectSummary(project, summaryBudget)}\n\`\`\``;
   // Keep only the last 10 messages to avoid context overflow
   const trimmedMessages = messages.slice(-10);
   const allActions = [];
