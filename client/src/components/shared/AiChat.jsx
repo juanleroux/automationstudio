@@ -419,12 +419,12 @@ export default function AiChat({ activeView, onChangeView, open, onSetOpen }) {
                 onClick={send}
                 disabled={!input.trim() || loading}
                 style={{
-                  width: 36, height: 36, borderRadius: 10, border: 'none',
+                  width: 36, height: 36, borderRadius: 10,
                   background: input.trim() && !loading ? 'var(--accent)' : 'var(--bg-surface)',
                   color: input.trim() && !loading ? 'white' : 'var(--text-disabled)',
                   cursor: input.trim() && !loading ? 'pointer' : 'default',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid var(--border)',
+                  border: input.trim() && !loading ? 'none' : '1px solid var(--border)',
                   transition: 'all 0.15s', flexShrink: 0,
                 }}
               >
