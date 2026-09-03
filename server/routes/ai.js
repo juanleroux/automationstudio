@@ -239,6 +239,11 @@ async function callAnthropic(apiKey, model, messages, systemWithContext, allActi
 }
 
 // ── OpenAI-compatible provider (Ollama, Groq, etc.) ───────────────────────────
+function isToolCallUnsupportedError(err) {
+  const msg = (err.response?.data?.error?.message || err.response?.data?.error || err.message || '').toLowerCase();
+  return msg.includes('tool') || msg.includes('function call') || msg.includes('not supported');
+}
+
 async function callOpenAICompat(apiKey, model, baseUrl, messages, systemWithContext, allActions) {
   const url = `${(baseUrl || 'http://localhost:11434').replace(/\/$/, '')}/v1/chat/completions`;
   const headers = { 'Content-Type': 'application/json' };
@@ -250,13 +255,33 @@ async function callOpenAICompat(apiKey, model, baseUrl, messages, systemWithCont
   ];
   const tools = toOpenAITools(TOOLS_ANTHROPIC);
 
+  // Try with tool calling first; fall back to plain chat if unsupported
+  let useTools = true;
+
   for (let i = 0; i < 5; i++) {
-    const payload = { model, messages: openAIMessages, max_tokens: 2048, tools, tool_choice: 'auto' };
-    const resp = await axios.post(url, payload, { headers, timeout: 60000 });
+    const payload = useTools
+      ? { model, messages: openAIMessages, max_tokens: 2048, tools, tool_choice: 'auto' }
+      : { model, messages: openAIMessages, max_tokens: 2048 };
+
+    let resp;
+    try {
+      resp = await axios.post(url, payload, { headers, timeout: 60000 });
+    } catch (err) {
+      if (useTools && isToolCallUnsupportedError(err)) {
+        // Model doesn't support tool calling — retry without tools
+        useTools = false;
+        const plainPayload = { model, messages: openAIMessages, max_tokens: 2048 };
+        resp = await axios.post(url, plainPayload, { headers, timeout: 60000 });
+        return (resp.data.choices?.[0]?.message?.content || '') +
+          '\n\n*Note: this model does not support actions. Switch to a tool-capable model in Settings → AI Assistant to enable full app control.*';
+      }
+      throw err;
+    }
+
     const choice = resp.data.choices?.[0];
     const msg = choice?.message;
 
-    if (choice?.finish_reason === 'tool_calls' && msg?.tool_calls?.length) {
+    if (useTools && choice?.finish_reason === 'tool_calls' && msg?.tool_calls?.length) {
       openAIMessages.push({ role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls });
       const toolResults = msg.tool_calls.map(tc => {
         let input = {};
@@ -329,8 +354,9 @@ router.get('/models', async (req, res) => {
         headers: { Authorization: `Bearer ${key}` },
         timeout: 10000,
       });
+      const EXCLUDED = ['whisper', 'guard', 'tts', 'vision', 'distil', 'allam'];
       const models = (resp.data.data || [])
-        .filter(m => m.id && !m.id.includes('whisper') && !m.id.includes('guard'))
+        .filter(m => m.id && !EXCLUDED.some(ex => m.id.toLowerCase().includes(ex)))
         .sort((a, b) => a.id.localeCompare(b.id))
         .map(m => ({ id: m.id, name: m.id }));
       return res.json({ models });
