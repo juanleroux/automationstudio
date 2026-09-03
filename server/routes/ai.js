@@ -47,28 +47,46 @@ You have full access to the user's project and can control every feature of the 
 - When showing data, be structured and clear.
 - If a task is ambiguous, ask one focused clarifying question.`;
 
+const MAX_INSTANCES_PER_TEMPLATE = 50;
+const MAX_SUMMARY_CHARS = 6000;
+
 function buildProjectSummary(project) {
   if (!project) return 'No project currently loaded.';
-  return JSON.stringify({
-    name: project.name,
-    templates: (project.templates || []).map(t => ({
+
+  const templates = (project.templates || []).map(t => {
+    const instances = (t.instances || []);
+    const shown = instances.slice(0, MAX_INSTANCES_PER_TEMPLATE).map(i => ({
+      id: i.id,
+      name: i.name,
+      ...(i.isFlagged ? { flagged: true } : {}),
+    }));
+    return {
       id: t.id,
       name: t.name,
-      attributes: (t.attributes || []).map(a => ({ id: a.id, name: a.name, type: a.type, defaultValue: a.value })),
-      instances: (t.instances || []).map(i => ({
-        id: i.id,
-        name: i.name,
-        isFlagged: i.isFlagged || false,
-        attributes: (i.attributes || []).reduce((acc, ia) => {
-          const ta = (t.attributes || []).find(a => a.id === ia.id);
-          if (ta) acc[ta.name] = ia.value;
-          return acc;
-        }, {}),
-      })),
-    })),
+      attributes: (t.attributes || []).map(a => ({ id: a.id, name: a.name, type: a.type })),
+      instanceCount: instances.length,
+      instances: shown,
+      ...(instances.length > MAX_INSTANCES_PER_TEMPLATE
+        ? { truncated: `${instances.length - MAX_INSTANCES_PER_TEMPLATE} more instances not shown` }
+        : {}),
+    };
+  });
+
+  const summary = JSON.stringify({
+    name: project.name,
+    templates,
     nodes: (project.nodes || []).map(n => ({ id: n.id, name: n.name, type: n.type, level: n.level })),
     connections: (project.connections || []).map(c => ({ from: c.from, to: c.to, label: c.label })),
   }, null, 2);
+
+  if (summary.length > MAX_SUMMARY_CHARS) {
+    // Ultra-compact fallback: just names and counts
+    const compact = (project.templates || []).map(t =>
+      `${t.name} (id:${t.id}, ${(t.instances||[]).length} instances, attrs: ${(t.attributes||[]).map(a=>a.name).join(', ')})`
+    ).join('\n');
+    return `Project: ${project.name}\nTemplates:\n${compact}`;
+  }
+  return summary;
 }
 
 // ── Tool definitions (Anthropic format) ───────────────────────────────────────
@@ -260,8 +278,8 @@ async function callOpenAICompat(apiKey, model, baseUrl, messages, systemWithCont
 
   for (let i = 0; i < 5; i++) {
     const payload = useTools
-      ? { model, messages: openAIMessages, max_tokens: 2048, tools, tool_choice: 'auto' }
-      : { model, messages: openAIMessages, max_tokens: 2048 };
+      ? { model, messages: openAIMessages, max_tokens: 1024, tools, tool_choice: 'auto' }
+      : { model, messages: openAIMessages, max_tokens: 1024 };
 
     let resp;
     try {
@@ -270,7 +288,7 @@ async function callOpenAICompat(apiKey, model, baseUrl, messages, systemWithCont
       if (useTools && isToolCallUnsupportedError(err)) {
         // Model doesn't support tool calling — retry without tools
         useTools = false;
-        const plainPayload = { model, messages: openAIMessages, max_tokens: 2048 };
+        const plainPayload = { model, messages: openAIMessages, max_tokens: 1024 };
         resp = await axios.post(url, plainPayload, { headers, timeout: 60000 });
         return (resp.data.choices?.[0]?.message?.content || '') +
           '\n\n*Note: this model does not support actions. Switch to a tool-capable model in Settings → AI Assistant to enable full app control.*';
@@ -313,18 +331,20 @@ router.post('/chat', async (req, res) => {
     ? 'https://api.groq.com/openai'
     : (cfg.baseUrl || 'http://localhost:11434');
 
-  const systemWithContext = `${SYSTEM_PROMPT}\n\n## Current State\nActive view: ${activeView || 'unknown'}\n\n## Project Data\n\`\`\`json\n${buildProjectSummary(project)}\n\`\`\``;
+  const systemWithContext = `${SYSTEM_PROMPT}\n\n## Current State\nActive view: ${activeView || 'unknown'}\n\n## Project Data\n\`\`\`\n${buildProjectSummary(project)}\n\`\`\``;
+  // Keep only the last 10 messages to avoid context overflow
+  const trimmedMessages = messages.slice(-10);
   const allActions = [];
 
   try {
     let reply = '';
     if (provider === 'anthropic') {
       if (!apiKey) return res.status(503).json({ error: 'No Anthropic API key configured. Add it in Settings → AI Assistant.' });
-      reply = await callAnthropic(apiKey, model, messages, systemWithContext, allActions);
+      reply = await callAnthropic(apiKey, model, trimmedMessages, systemWithContext, allActions);
     } else {
       // OpenAI-compatible (Ollama, Groq, etc.)
       if (!model) return res.status(503).json({ error: 'No model specified. Configure it in Settings → AI Assistant.' });
-      reply = await callOpenAICompat(apiKey, model, baseUrl, messages, systemWithContext, allActions);
+      reply = await callOpenAICompat(apiKey, model, baseUrl, trimmedMessages, systemWithContext, allActions);
     }
     res.json({ reply, actions: allActions });
   } catch (err) {
