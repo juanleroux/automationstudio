@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Version>1.2.85</Version>
+    <Version>1.2.86</Version>
     <OutputType>Exe</OutputType>
     <!-- TIA Portal Openness ships as a .NET Framework 4.8 assembly, so the bridge
          must target net48 rather than .NET Core/5+ to load it in-process. -->
