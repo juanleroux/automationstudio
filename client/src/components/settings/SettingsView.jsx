@@ -61,7 +61,7 @@ export default function SettingsView() {
   const ceProjectXDBFileRef = useRef(null);
   const [cePendingTemplateId, setCePendingTemplateId] = useState(null);
   // AI Assistant settings — loaded from server config
-  const [aiConfig, setAiConfig] = useState({ provider: 'anthropic', model: '', apiKey: '', baseUrl: 'http://host.docker.internal:11434' });
+  const [aiConfig, setAiConfig] = useState({ provider: 'anthropic', model: '', apiKey: '', baseUrl: 'http://ollama:11434' });
   const [aiSaving, setAiSaving] = useState(false);
   const [aiTestResult, setAiTestResult] = useState(null);
   const [aiTesting, setAiTesting] = useState(false);
@@ -1615,9 +1615,9 @@ export default function SettingsView() {
                     <input
                       type="text"
                       className="form-input"
-                      value={aiConfig.baseUrl || 'http://host.docker.internal:11434'}
+                      value={aiConfig.baseUrl || 'http://ollama:11434'}
                       onChange={e => { setAiConfig(prev => ({ ...prev, baseUrl: e.target.value })); setAiModels([]); }}
-                      placeholder="http://host.docker.internal:11434"
+                      placeholder="http://ollama:11434"
                       style={{ fontSize: 13, flex: 1 }}
                     />
                     <button

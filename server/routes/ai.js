@@ -256,7 +256,7 @@ function isToolCallUnsupportedError(err) {
 }
 
 async function callOpenAICompat(apiKey, model, baseUrl, messages, systemWithContext, allActions) {
-  const url = `${(baseUrl || 'http://host.docker.internal:11434').replace(/\/$/, '')}/v1/chat/completions`;
+  const url = `${(baseUrl || 'http://ollama:11434').replace(/\/$/, '')}/v1/chat/completions`;
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
@@ -322,7 +322,7 @@ router.post('/chat', async (req, res) => {
   const apiKey   = cfg.apiKey   || (provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.GROQ_API_KEY) || '';
   const baseUrl  = provider === 'groq'
     ? 'https://api.groq.com/openai'
-    : (cfg.baseUrl || 'http://host.docker.internal:11434');
+    : (cfg.baseUrl || 'http://ollama:11434');
 
   // Anthropic and local Ollama have generous context; Groq free tier is capped at 8k TPM
   const summaryBudget = provider === 'groq' ? 3000 : provider === 'anthropic' ? 12000 : 8000;
@@ -378,7 +378,7 @@ router.get('/models', async (req, res) => {
     }
 
     if (provider === 'ollama') {
-      const base = (baseUrl || 'http://host.docker.internal:11434').replace(/\/$/, '');
+      const base = (baseUrl || 'http://ollama:11434').replace(/\/$/, '');
       const resp = await axios.get(`${base}/api/tags`, { timeout: 5000 });
       const models = (resp.data.models || []).map(m => ({ id: m.name, name: m.name }));
       return res.json({ models });
