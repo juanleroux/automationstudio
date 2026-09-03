@@ -305,11 +305,14 @@ router.post('/chat', async (req, res) => {
     ? 'https://api.groq.com/openai'
     : (cfg.baseUrl || 'http://ollama:11434');
 
-  // Anthropic and local Ollama have generous context; Groq free tier is capped at 8k TPM
-  const summaryBudget = provider === 'groq' ? 3000 : provider === 'anthropic' ? 12000 : 8000;
-  const systemWithContext = `${SYSTEM_PROMPT}\n\n## Current State\nActive view: ${activeView || 'unknown'}\n\n## Project Data\n\`\`\`\n${buildProjectSummary(project, summaryBudget)}\n\`\`\``;
-  // Keep only the last 10 messages to avoid context overflow
-  const trimmedMessages = messages.slice(-10);
+  // Groq free tier: skip tools (saves ~3000 tokens) and use a tight project budget
+  // Anthropic: full tools + generous context
+  // Ollama: full tools + medium context (local, no rate limits)
+  const groqLite = provider === 'groq';
+  const summaryBudget = groqLite ? 2000 : provider === 'anthropic' ? 12000 : 8000;
+  const systemWithContext = `${SYSTEM_PROMPT}\n\nCurrent view: ${activeView || 'unknown'}\n\nProject Data:\n${buildProjectSummary(project, summaryBudget)}`;
+  // Keep only the last 6 messages for Groq, 10 for others
+  const trimmedMessages = messages.slice(groqLite ? -6 : -10);
   const allActions = [];
 
   try {
@@ -317,8 +320,22 @@ router.post('/chat', async (req, res) => {
     if (provider === 'anthropic') {
       if (!apiKey) return res.status(503).json({ error: 'No Anthropic API key configured. Add it in Settings → AI Assistant.' });
       reply = await callAnthropic(apiKey, model, trimmedMessages, systemWithContext, allActions);
+    } else if (groqLite) {
+      // Groq free tier: plain chat only, no tools (tool schemas alone cost ~3k tokens)
+      if (!apiKey) return res.status(503).json({ error: 'No Groq API key configured. Add it in Settings → AI Assistant.' });
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
+      const openAIMessages = [
+        { role: 'system', content: systemWithContext },
+        ...trimmedMessages.map(m => ({ role: m.role, content: m.content })),
+      ];
+      const resp = await axios.post('https://api.groq.com/openai/v1/chat/completions',
+        { model, messages: openAIMessages, max_tokens: 1024 },
+        { headers, timeout: 30000 }
+      );
+      reply = resp.data.choices?.[0]?.message?.content || '';
+      if (!reply) throw new Error('Empty response from Groq');
     } else {
-      // OpenAI-compatible (Ollama, Groq, etc.)
+      // OpenAI-compatible (Ollama, etc.)
       if (!model) return res.status(503).json({ error: 'No model specified. Configure it in Settings → AI Assistant.' });
       reply = await callOpenAICompat(apiKey, model, baseUrl, trimmedMessages, systemWithContext, allActions);
     }
