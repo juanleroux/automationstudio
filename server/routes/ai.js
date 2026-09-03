@@ -41,26 +41,34 @@ function buildProjectSummary(project, maxChars = 4000) {
   const templates = project.templates || [];
   const totalInstances = templates.reduce((s, t) => s + (t.instances||[]).length, 0);
 
-  // Budget instances per template based on total count
-  const budgetPerTemplate = totalInstances > 0
-    ? Math.max(3, Math.floor((maxChars * 0.8) / Math.max(1, templates.length) / 60))
-    : 999;
-
-  const lines = [`Project: ${project.name}  (${templates.length} templates, ${totalInstances} instances total)`, ''];
+  const header = `Project: ${project.name}  (${templates.length} templates, ${totalInstances} instances total)\n\n`;
+  let result = header;
 
   for (const t of templates) {
     const attrs = t.attributes || [];
     const instances = t.instances || [];
-    lines.push(`[${t.name}] id:${t.id}  attrs: ${attrs.map(a=>a.name).join(', ')}`);
-    const shown = instances.slice(0, budgetPerTemplate);
-    for (const inst of shown) lines.push(buildInstanceLine(inst, attrs));
-    if (instances.length > budgetPerTemplate) lines.push(`  ... +${instances.length - budgetPerTemplate} more`);
-    lines.push('');
+    const templateHeader = `[${t.name}] id:${t.id}  attrs: ${attrs.map(a=>a.name).join(', ')}\n`;
+
+    // Always include the template header
+    result += templateHeader;
+
+    for (let i = 0; i < instances.length; i++) {
+      const line = buildInstanceLine(instances[i], attrs) + '\n';
+      if (result.length + line.length > maxChars) {
+        const remaining = instances.length - i;
+        result += `  ... +${remaining} more (increase context budget to see all)\n`;
+        result += '\n';
+        // Skip remaining templates too since we're at limit
+        const remainingTemplates = templates.length - templates.indexOf(t) - 1;
+        if (remainingTemplates > 0) result += `[${remainingTemplates} more templates not shown — context limit reached]\n`;
+        return result;
+      }
+      result += line;
+    }
+    result += '\n';
   }
 
-  const result = lines.join('\n');
-  // Hard cap — trim trailing content if still over
-  return result.length <= maxChars ? result : result.slice(0, maxChars) + '\n[truncated]';
+  return result;
 }
 
 // ── Tool definitions (Anthropic format) ───────────────────────────────────────
@@ -311,7 +319,7 @@ router.post('/chat', async (req, res) => {
   // Anthropic/DeepSeek: full tools + generous context
   // Ollama: full tools + medium context (local, no rate limits)
   const groqLite = provider === 'groq';
-  const summaryBudget = groqLite ? 2000 : provider === 'anthropic' || provider === 'deepseek' ? 12000 : 8000;
+  const summaryBudget = groqLite ? 2000 : provider === 'anthropic' || provider === 'deepseek' ? 80000 : 20000;
   const systemWithContext = `${SYSTEM_PROMPT}\n\nCurrent view: ${activeView || 'unknown'}\n\nProject Data:\n${buildProjectSummary(project, summaryBudget)}`;
   // Keep only the last 6 messages for Groq, 10 for others
   const trimmedMessages = messages.slice(groqLite ? -6 : -10);
