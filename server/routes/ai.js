@@ -298,18 +298,20 @@ router.post('/chat', async (req, res) => {
 
   const cfg = readAiConfig();
   const provider = cfg.provider || 'anthropic';
-  const PROVIDER_DEFAULT_MODELS = { anthropic: 'claude-haiku-4-5-20251001', groq: 'llama-3.1-8b-instant', ollama: '' };
+  const PROVIDER_DEFAULT_MODELS = { anthropic: 'claude-haiku-4-5-20251001', groq: 'llama-3.1-8b-instant', deepseek: 'deepseek-chat', ollama: '' };
   const model    = cfg.model    || PROVIDER_DEFAULT_MODELS[provider] || '';
-  const apiKey   = cfg.apiKey   || (provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.GROQ_API_KEY) || '';
+  const apiKey   = cfg.apiKey   || (provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : provider === 'groq' ? process.env.GROQ_API_KEY : '') || '';
   const baseUrl  = provider === 'groq'
     ? 'https://api.groq.com/openai'
+    : provider === 'deepseek'
+    ? 'https://api.deepseek.com'
     : (cfg.baseUrl || 'http://ollama:11434');
 
   // Groq free tier: skip tools (saves ~3000 tokens) and use a tight project budget
-  // Anthropic: full tools + generous context
+  // Anthropic/DeepSeek: full tools + generous context
   // Ollama: full tools + medium context (local, no rate limits)
   const groqLite = provider === 'groq';
-  const summaryBudget = groqLite ? 2000 : provider === 'anthropic' ? 12000 : 8000;
+  const summaryBudget = groqLite ? 2000 : provider === 'anthropic' || provider === 'deepseek' ? 12000 : 8000;
   const systemWithContext = `${SYSTEM_PROMPT}\n\nCurrent view: ${activeView || 'unknown'}\n\nProject Data:\n${buildProjectSummary(project, summaryBudget)}`;
   // Keep only the last 6 messages for Groq, 10 for others
   const trimmedMessages = messages.slice(groqLite ? -6 : -10);
@@ -335,8 +337,9 @@ router.post('/chat', async (req, res) => {
       reply = resp.data.choices?.[0]?.message?.content || '';
       if (!reply) throw new Error('Empty response from Groq');
     } else {
-      // OpenAI-compatible (Ollama, etc.)
+      // OpenAI-compatible (DeepSeek, Ollama, etc.)
       if (!model) return res.status(503).json({ error: 'No model specified. Configure it in Settings → AI Assistant.' });
+      if (provider === 'deepseek' && !apiKey) return res.status(503).json({ error: 'No DeepSeek API key configured. Add it in Settings → AI Assistant.' });
       reply = await callOpenAICompat(apiKey, model, baseUrl, trimmedMessages, systemWithContext, allActions);
     }
     res.json({ reply, actions: allActions });
@@ -370,6 +373,19 @@ router.get('/models', async (req, res) => {
       const EXCLUDED = ['whisper', 'guard', 'tts', 'vision', 'distil', 'allam'];
       const models = (resp.data.data || [])
         .filter(m => m.id && !EXCLUDED.some(ex => m.id.toLowerCase().includes(ex)))
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map(m => ({ id: m.id, name: m.id }));
+      return res.json({ models });
+    }
+
+    if (provider === 'deepseek') {
+      const key = apiKey || '';
+      if (!key) return res.status(400).json({ error: 'API key required to fetch DeepSeek models' });
+      const resp = await axios.get('https://api.deepseek.com/v1/models', {
+        headers: { Authorization: `Bearer ${key}` },
+        timeout: 10000,
+      });
+      const models = (resp.data.data || [])
         .sort((a, b) => a.id.localeCompare(b.id))
         .map(m => ({ id: m.id, name: m.id }));
       return res.json({ models });

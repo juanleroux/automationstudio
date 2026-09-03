@@ -1550,9 +1550,10 @@ export default function SettingsView() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Provider</label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[
-                    { id: 'anthropic', label: 'Anthropic', sub: 'Paid — Claude models',       defaultModel: 'claude-haiku-4-5-20251001' },
-                    { id: 'groq',      label: 'Groq',      sub: 'Free tier — LLaMA, Mixtral', defaultModel: 'llama-3.1-8b-instant' },
-                    { id: 'ollama',    label: 'Ollama',    sub: 'Free — runs locally',         defaultModel: '' },
+                    { id: 'anthropic', label: 'Anthropic', sub: 'Paid — Claude models',        defaultModel: 'claude-haiku-4-5-20251001' },
+                    { id: 'deepseek',  label: 'DeepSeek',  sub: 'Paid — very cheap + capable', defaultModel: 'deepseek-chat' },
+                    { id: 'groq',      label: 'Groq',       sub: 'Free tier — Q&A only',       defaultModel: 'llama-3.1-8b-instant' },
+                    { id: 'ollama',    label: 'Ollama',     sub: 'Free — runs locally',         defaultModel: '' },
                   ].map(p => (
                     <button
                       key={p.id}
@@ -1570,11 +1571,11 @@ export default function SettingsView() {
                 </div>
               </div>
 
-              {/* API Key (Anthropic + Groq) */}
+              {/* API Key (Anthropic + Groq + DeepSeek) */}
               {aiConfig.provider !== 'ollama' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {aiConfig.provider === 'anthropic' ? 'Anthropic API Key' : 'Groq API Key'}
+                    {{ anthropic: 'Anthropic API Key', groq: 'Groq API Key', deepseek: 'DeepSeek API Key' }[aiConfig.provider] || 'API Key'}
                   </label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input
@@ -1582,7 +1583,7 @@ export default function SettingsView() {
                       className="form-input"
                       value={aiConfig.apiKey || ''}
                       onChange={e => { setAiConfig(prev => ({ ...prev, apiKey: e.target.value })); setAiModels([]); }}
-                      placeholder={aiConfig.provider === 'anthropic' ? 'sk-ant-… (blank = use ANTHROPIC_API_KEY env var)' : 'gsk_…'}
+                      placeholder={aiConfig.provider === 'anthropic' ? 'sk-ant-… (blank = use ANTHROPIC_API_KEY env var)' : aiConfig.provider === 'deepseek' ? 'sk-…' : 'gsk_…'}
                       style={{ fontSize: 13, flex: 1 }}
                     />
                     <button
@@ -1599,9 +1600,14 @@ export default function SettingsView() {
                       Get your key at <span style={{ color: 'var(--accent)' }}>console.anthropic.com</span>.
                     </div>
                   )}
+                  {aiConfig.provider === 'deepseek' && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      Get your key at <span style={{ color: 'var(--accent)' }}>platform.deepseek.com</span>. Very cheap — ~10× less than Anthropic. Full tool/action support.
+                    </div>
+                  )}
                   {aiConfig.provider === 'groq' && (
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Free tier at <span style={{ color: 'var(--accent)' }}>console.groq.com</span> — no credit card required.
+                      Free tier at <span style={{ color: 'var(--accent)' }}>console.groq.com</span> — no credit card required. Q&A only (no actions).
                     </div>
                   )}
                 </div>
