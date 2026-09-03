@@ -287,13 +287,6 @@ export default function SettingsView() {
     }
   };
 
-  const GROQ_MODELS = [
-    { value: 'llama-3.3-70b-versatile', label: 'LLaMA 3.3 70B Versatile (recommended)' },
-    { value: 'llama-3.1-70b-versatile', label: 'LLaMA 3.1 70B Versatile' },
-    { value: 'llama-3.1-8b-instant',    label: 'LLaMA 3.1 8B Instant (fast)' },
-    { value: 'gemma2-9b-it',            label: 'Gemma 2 9B' },
-  ];
-
   const ANTHROPIC_MODELS = [
     { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fast & cheap)' },
     { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 (best quality)' },
@@ -1541,7 +1534,7 @@ export default function SettingsView() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[
                     { id: 'anthropic', label: 'Anthropic', sub: 'Paid — Claude models',       defaultModel: 'claude-haiku-4-5-20251001' },
-                    { id: 'groq',      label: 'Groq',      sub: 'Free tier — LLaMA, Mixtral', defaultModel: 'llama-3.3-70b-versatile' },
+                    { id: 'groq',      label: 'Groq',      sub: 'Free tier — LLaMA, Mixtral', defaultModel: 'llama-3.1-8b-instant' },
                     { id: 'ollama',    label: 'Ollama',    sub: 'Free — runs locally',         defaultModel: '' },
                   ].map(p => (
                     <button
@@ -1595,15 +1588,20 @@ export default function SettingsView() {
               {aiConfig.provider === 'groq' && (
                 <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model</label>
-                    <select
-                      value={aiConfig.model || 'llama-3.3-70b-versatile'}
-                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model ID</label>
+                    <input
+                      type="text"
                       className="form-input"
+                      value={aiConfig.model || ''}
+                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                      placeholder="e.g. llama-3.1-8b-instant"
                       style={{ fontSize: 13 }}
-                    >
-                      {GROQ_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
+                    />
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      Copy the exact model ID from{' '}
+                      <span style={{ color: 'var(--accent)', fontWeight: 500 }}>console.groq.com/docs/models</span>
+                      {' '}— Groq frequently adds and retires models. Common IDs: <code>llama-3.1-8b-instant</code>, <code>gemma2-9b-it</code>.
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Groq API Key</label>
