@@ -309,4 +309,45 @@ router.post('/chat', async (req, res) => {
   }
 });
 
+// ── Models list endpoint ───────────────────────────────────────────────────────
+router.get('/models', async (req, res) => {
+  const { provider, apiKey, baseUrl } = req.query;
+
+  try {
+    if (provider === 'anthropic') {
+      // Anthropic doesn't have a public models list endpoint — return static list
+      return res.json({ models: [
+        { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5 (fast & cheap)' },
+        { id: 'claude-sonnet-4-6',         name: 'Claude Sonnet 4.6 (best quality)' },
+      ]});
+    }
+
+    if (provider === 'groq') {
+      const key = apiKey || process.env.GROQ_API_KEY || '';
+      if (!key) return res.status(400).json({ error: 'API key required to fetch Groq models' });
+      const resp = await axios.get('https://api.groq.com/openai/v1/models', {
+        headers: { Authorization: `Bearer ${key}` },
+        timeout: 10000,
+      });
+      const models = (resp.data.data || [])
+        .filter(m => m.id && !m.id.includes('whisper') && !m.id.includes('guard'))
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map(m => ({ id: m.id, name: m.id }));
+      return res.json({ models });
+    }
+
+    if (provider === 'ollama') {
+      const base = (baseUrl || 'http://localhost:11434').replace(/\/$/, '');
+      const resp = await axios.get(`${base}/api/tags`, { timeout: 5000 });
+      const models = (resp.data.models || []).map(m => ({ id: m.name, name: m.name }));
+      return res.json({ models });
+    }
+
+    res.status(400).json({ error: 'Unknown provider' });
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.response?.data?.error || err.message;
+    res.status(500).json({ error: msg });
+  }
+});
+
 module.exports = router;

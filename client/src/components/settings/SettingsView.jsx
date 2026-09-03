@@ -65,6 +65,9 @@ export default function SettingsView() {
   const [aiSaving, setAiSaving] = useState(false);
   const [aiTestResult, setAiTestResult] = useState(null);
   const [aiTesting, setAiTesting] = useState(false);
+  const [aiModels, setAiModels] = useState([]);
+  const [loadingAiModels, setLoadingAiModels] = useState(false);
+  const [aiModelsError, setAiModelsError] = useState(null);
 
   const [siemens, setSiemens] = useState(
     project?.siemens || {
@@ -254,6 +257,25 @@ export default function SettingsView() {
     }
   };
 
+  const fetchAiModels = async (provider, apiKey, baseUrl) => {
+    setLoadingAiModels(true);
+    setAiModelsError(null);
+    try {
+      const params = new URLSearchParams({ provider });
+      if (apiKey) params.set('apiKey', apiKey);
+      if (baseUrl) params.set('baseUrl', baseUrl);
+      const res = await fetch(`/api/ai/models?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      setAiModels(data.models || []);
+    } catch (err) {
+      setAiModelsError(err.message);
+      setAiModels([]);
+    } finally {
+      setLoadingAiModels(false);
+    }
+  };
+
   const handleSaveAiConfig = async () => {
     setAiSaving(true);
     try {
@@ -286,11 +308,6 @@ export default function SettingsView() {
       setAiTesting(false);
     }
   };
-
-  const ANTHROPIC_MODELS = [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fast & cheap)' },
-    { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 (best quality)' },
-  ];
 
   const tabs = [
     { id: 'general',       label: 'General',              desc: 'Project & Appearance',   icon: SlidersHorizontal },
@@ -1553,105 +1570,106 @@ export default function SettingsView() {
                 </div>
               </div>
 
-              {/* Anthropic settings */}
-              {aiConfig.provider === 'anthropic' && (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model</label>
-                    <select
-                      value={aiConfig.model || 'claude-haiku-4-5-20251001'}
-                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+              {/* API Key (Anthropic + Groq) */}
+              {aiConfig.provider !== 'ollama' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {aiConfig.provider === 'anthropic' ? 'Anthropic API Key' : 'Groq API Key'}
+                  </label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="password"
                       className="form-input"
-                      style={{ fontSize: 13 }}
+                      value={aiConfig.apiKey || ''}
+                      onChange={e => { setAiConfig(prev => ({ ...prev, apiKey: e.target.value })); setAiModels([]); }}
+                      placeholder={aiConfig.provider === 'anthropic' ? 'sk-ant-… (blank = use ANTHROPIC_API_KEY env var)' : 'gsk_…'}
+                      style={{ fontSize: 13, flex: 1 }}
+                    />
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => fetchAiModels(aiConfig.provider, aiConfig.apiKey, aiConfig.baseUrl)}
+                      disabled={loadingAiModels}
+                      style={{ fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
-                      {ANTHROPIC_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
+                      {loadingAiModels ? 'Loading…' : 'Load Models'}
+                    </button>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>API Key</label>
-                    <input
-                      type="password"
-                      className="form-input"
-                      value={aiConfig.apiKey || ''}
-                      onChange={e => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                      placeholder="sk-ant-…  (leave blank to use server ANTHROPIC_API_KEY env var)"
-                      style={{ fontSize: 13 }}
-                    />
+                  {aiConfig.provider === 'anthropic' && (
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Get your key at <span style={{ color: 'var(--accent)' }}>console.anthropic.com</span>. If left blank, the server will fall back to the <code>ANTHROPIC_API_KEY</code> environment variable.
+                      Get your key at <span style={{ color: 'var(--accent)' }}>console.anthropic.com</span>.
                     </div>
-                  </div>
-                </>
+                  )}
+                  {aiConfig.provider === 'groq' && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      Free tier at <span style={{ color: 'var(--accent)' }}>console.groq.com</span> — no credit card required.
+                    </div>
+                  )}
+                </div>
               )}
 
-              {/* Groq settings */}
-              {aiConfig.provider === 'groq' && (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model ID</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={aiConfig.model || ''}
-                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
-                      placeholder="e.g. llama-3.1-8b-instant"
-                      style={{ fontSize: 13 }}
-                    />
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Copy the exact model ID from{' '}
-                      <span style={{ color: 'var(--accent)', fontWeight: 500 }}>console.groq.com/docs/models</span>
-                      {' '}— Groq frequently adds and retires models. Common IDs: <code>llama-3.1-8b-instant</code>, <code>gemma2-9b-it</code>.
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Groq API Key</label>
-                    <input
-                      type="password"
-                      className="form-input"
-                      value={aiConfig.apiKey || ''}
-                      onChange={e => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                      placeholder="gsk_…"
-                      style={{ fontSize: 13 }}
-                    />
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Free tier available at <span style={{ color: 'var(--accent)' }}>console.groq.com</span>. No credit card required.
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Ollama settings */}
+              {/* Ollama Base URL */}
               {aiConfig.provider === 'ollama' && (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model Name</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={aiConfig.model || ''}
-                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
-                      placeholder="e.g. llama3.2, mistral, qwen2.5-coder"
-                      style={{ fontSize: 13 }}
-                    />
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Pull a model first: <code>ollama pull llama3.2</code>. See <span style={{ color: 'var(--accent)' }}>ollama.com/library</span> for available models.
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Ollama Base URL</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Ollama Base URL</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <input
                       type="text"
                       className="form-input"
                       value={aiConfig.baseUrl || 'http://localhost:11434'}
-                      onChange={e => setAiConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
+                      onChange={e => { setAiConfig(prev => ({ ...prev, baseUrl: e.target.value })); setAiModels([]); }}
                       placeholder="http://localhost:11434"
-                      style={{ fontSize: 13 }}
+                      style={{ fontSize: 13, flex: 1 }}
                     />
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Default is <code>http://localhost:11434</code>. Change this if Ollama runs on a different host or port.
-                    </div>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => fetchAiModels('ollama', '', aiConfig.baseUrl)}
+                      disabled={loadingAiModels}
+                      style={{ fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      {loadingAiModels ? 'Loading…' : 'Load Models'}
+                    </button>
                   </div>
-                </>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    Pull a model first: <code>ollama pull llama3.2</code>
+                  </div>
+                </div>
+              )}
+
+              {/* Model selector — shown after models are loaded */}
+              {aiModelsError && (
+                <div style={{ fontSize: 12, color: 'var(--danger, #e55353)', padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                  Could not load models: {aiModelsError}
+                </div>
+              )}
+              {aiModels.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model</label>
+                  <select
+                    value={aiConfig.model || ''}
+                    onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                    className="form-input"
+                    style={{ fontSize: 13 }}
+                  >
+                    {!aiConfig.model && <option value="">— select a model —</option>}
+                    {aiModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {aiModels.length === 0 && !loadingAiModels && aiConfig.model && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Model</label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={aiConfig.model}
+                      onChange={e => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                      style={{ fontSize: 13, flex: 1 }}
+                      readOnly
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Click "Load Models" to change</span>
+                  </div>
+                </div>
               )}
 
               {/* Test + Save */}
