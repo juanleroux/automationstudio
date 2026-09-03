@@ -281,7 +281,7 @@ router.post('/chat', async (req, res) => {
 
   const cfg = readAiConfig();
   const provider = cfg.provider || 'anthropic';
-  const PROVIDER_DEFAULT_MODELS = { anthropic: 'claude-haiku-4-5-20251001', groq: 'llama3-70b-8192', ollama: '' };
+  const PROVIDER_DEFAULT_MODELS = { anthropic: 'claude-haiku-4-5-20251001', groq: 'llama-3.3-70b-versatile', ollama: '' };
   const model    = cfg.model    || PROVIDER_DEFAULT_MODELS[provider] || '';
   const apiKey   = cfg.apiKey   || (provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.GROQ_API_KEY) || '';
   const baseUrl  = provider === 'groq'
