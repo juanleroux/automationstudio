@@ -276,13 +276,13 @@ async function callOpenAICompat(apiKey, model, baseUrl, messages, systemWithCont
 
     let resp;
     try {
-      resp = await axios.post(url, payload, { headers, timeout: 60000 });
+      resp = await axios.post(url, payload, { headers, timeout: 300000 });
     } catch (err) {
       if (useTools && isToolCallUnsupportedError(err)) {
         // Model doesn't support tool calling — retry without tools
         useTools = false;
         const plainPayload = { model, messages: openAIMessages, max_tokens: 1024 };
-        resp = await axios.post(url, plainPayload, { headers, timeout: 60000 });
+        resp = await axios.post(url, plainPayload, { headers, timeout: 300000 });
         return (resp.data.choices?.[0]?.message?.content || '') +
           '\n\n*Note: this model does not support actions. Switch to a tool-capable model in Settings → AI Assistant to enable full app control.*';
       }
