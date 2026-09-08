@@ -8,7 +8,6 @@ import AttributeGrid from './AttributeGrid';
 import ProfilePanel, { ProfileForm } from './ProfilePanel';
 import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
-import { runProfileExport } from '../../utils/profileExport';
 import { useProject } from '../../context/ProjectContext';
 import AreasView from '../areas/AreasView';
 import { openCommissioningReport } from '../../utils/commissioningReport';
@@ -214,10 +213,15 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
   };
 
   const handleExportProfile = () => {
-    if (!activeProfile || !selectedTemplate) return;
-    const err = runProfileExport(activeProfile, selectedTemplate);
-    if (err) { toast.error(err); return; }
-    toast.success(`Exported ${selectedTemplate.instances?.length || 0} instances`);
+    if (!activeProfile) return;
+    const blob = new Blob([JSON.stringify(activeProfile, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeProfile.name || 'profile'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported profile "${activeProfile.name}" as JSON`);
   };
 
   const handleImportProfile = (e) => {
@@ -227,12 +231,16 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
-        if (!data.name) { toast.error('Invalid profile file: missing name'); return; }
-        onUpdateTemplate(t => ({
-          ...t,
-          profiles: [...(t.profiles || []), { ...BLANK_PROFILE, ...data, attributes: data.attributes || [] }]
+        // Accept a single profile object OR an array (right-click export format)
+        const incoming = Array.isArray(data) ? data : [data];
+        const added = incoming.map(prof => ({
+          ...BLANK_PROFILE,
+          ...prof,
+          name: prof.name || 'Imported Profile',
+          attributes: prof.attributes || [],
         }));
-        toast.success(`Imported profile "${data.name}"`);
+        onUpdateTemplate(t => ({ ...t, profiles: [...(t.profiles || []), ...added] }));
+        toast.success(`Imported ${added.length} profile${added.length !== 1 ? 's' : ''}`);
       } catch {
         toast.error('Failed to parse profile file — expected JSON');
       }
@@ -312,13 +320,6 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
           <div className="flex items-center gap-1 px-2 flex-shrink-0">
             <button
               className="btn btn-ghost btn-icon"
-              title="Import profile from JSON"
-              onClick={() => importRef.current?.click()}
-            >
-              <Upload size={13} />
-            </button>
-            <button
-              className="btn btn-ghost btn-icon"
               title="Edit profile"
               onClick={handleEditProfile}
               disabled={!activeProfile}
@@ -328,7 +329,14 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             </button>
             <button
               className="btn btn-ghost btn-icon"
-              title="Export profile"
+              title="Import profile from JSON"
+              onClick={() => importRef.current?.click()}
+            >
+              <Upload size={13} />
+            </button>
+            <button
+              className="btn btn-ghost btn-icon"
+              title="Export profile as JSON"
               onClick={handleExportProfile}
               disabled={!activeProfile}
               style={{ opacity: activeProfile ? 1 : 0.35 }}
