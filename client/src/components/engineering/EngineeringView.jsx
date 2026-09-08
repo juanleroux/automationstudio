@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Cpu, Plus, Zap, Printer, Download, Folder, ChevronRight, ChevronDown, Loader, FileCode } from 'lucide-react';
+import { Cpu, Plus, Zap, Printer, Download, Upload, Folder, ChevronRight, ChevronDown, Loader, FileCode, Edit2, Trash2 } from 'lucide-react';
 import { parseProjectL5X } from '../../utils/studio5000Export';
 import NoProjectOpen from '../shared/NoProjectOpen';
 import { VERSION } from '../../version';
@@ -7,6 +7,8 @@ import TemplateTree from './TemplateTree';
 import AttributeGrid from './AttributeGrid';
 import ProfilePanel, { ProfileForm } from './ProfilePanel';
 import Modal from '../shared/Modal';
+import ConfirmDialog from '../shared/ConfirmDialog';
+import { runProfileExport } from '../../utils/profileExport';
 import { useProject } from '../../context/ProjectContext';
 import AreasView from '../areas/AreasView';
 import { openCommissioningReport } from '../../utils/commissioningReport';
@@ -128,9 +130,14 @@ const DEFAULT_WIDTH = 260;
 const BLANK_PROFILE = { name: '', description: '', exportType: 0, formatType: 0, tabularExportDelimiter: ',', structuralExportTemplate: '', customFormat: '' };
 
 function RightPanel({ selected, selectedTemplate, selectedInstance, project, onUpdateTemplateAttrs, onUpdateInstanceAttrs, onUpdateTemplate }) {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState(0);
   const [showAddProfileModal, setShowAddProfileModal] = useState(false);
   const [newProfileDraft, setNewProfileDraft] = useState(BLANK_PROFILE);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editProfileDraft, setEditProfileDraft] = useState(null);
+  const [confirmDeleteProfile, setConfirmDeleteProfile] = useState(false);
+  const importRef = useRef(null);
   const mode = selected?.type === 'instance' ? 'instance' : 'template';
 
   useEffect(() => { setActiveTab(0); }, [selected?.templateId, selected?.instanceId]);
@@ -177,6 +184,63 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
     setNewProfileDraft(BLANK_PROFILE);
   };
 
+  const activeProfileIndex = activeTab - 1;
+  const activeProfile = activeTab > 0 ? profiles[activeProfileIndex] : null;
+
+  const handleEditProfile = () => {
+    if (!activeProfile) return;
+    setEditProfileDraft({ ...activeProfile });
+    setShowEditProfileModal(true);
+  };
+
+  const handleSaveEditProfile = () => {
+    onUpdateTemplate(t => {
+      const profs = [...(t.profiles || [])];
+      profs[activeProfileIndex] = { ...profs[activeProfileIndex], ...editProfileDraft };
+      return { ...t, profiles: profs };
+    });
+    setShowEditProfileModal(false);
+    toast.success('Profile updated');
+  };
+
+  const handleDeleteProfile = () => {
+    onUpdateTemplate(t => {
+      const profs = (t.profiles || []).filter((_, i) => i !== activeProfileIndex);
+      return { ...t, profiles: profs };
+    });
+    setActiveTab(0);
+    setConfirmDeleteProfile(false);
+    toast.success('Profile deleted');
+  };
+
+  const handleExportProfile = () => {
+    if (!activeProfile || !selectedTemplate) return;
+    const err = runProfileExport(activeProfile, selectedTemplate);
+    if (err) { toast.error(err); return; }
+    toast.success(`Exported ${selectedTemplate.instances?.length || 0} instances`);
+  };
+
+  const handleImportProfile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.name) { toast.error('Invalid profile file: missing name'); return; }
+        onUpdateTemplate(t => ({
+          ...t,
+          profiles: [...(t.profiles || []), { ...BLANK_PROFILE, ...data, attributes: data.attributes || [] }]
+        }));
+        toast.success(`Imported profile "${data.name}"`);
+      } catch {
+        toast.error('Failed to parse profile file — expected JSON');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   return (
     <div className="flex flex-col h-full">
       {showAddProfileModal && (
@@ -194,6 +258,32 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
           <ProfileForm profile={newProfileDraft} onChange={setNewProfileDraft} />
         </Modal>
       )}
+      {showEditProfileModal && editProfileDraft && (
+        <Modal
+          title="Edit Profile"
+          onClose={() => setShowEditProfileModal(false)}
+          width={460}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setShowEditProfileModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveEditProfile}>Save</button>
+            </>
+          }
+        >
+          <ProfileForm profile={editProfileDraft} onChange={setEditProfileDraft} />
+        </Modal>
+      )}
+      {confirmDeleteProfile && activeProfile && (
+        <ConfirmDialog
+          title="Delete Profile"
+          message={`Delete profile "${activeProfile.name}"? This cannot be undone.`}
+          danger
+          onConfirm={handleDeleteProfile}
+          onCancel={() => setConfirmDeleteProfile(false)}
+        />
+      )}
+
+      <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportProfile} />
 
       <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-main)' }}>
         <div className="flex-1 flex overflow-x-auto" style={{ border: 'none' }}>
@@ -218,6 +308,44 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             </button>
           )}
         </div>
+        {mode === 'template' && (
+          <div className="flex items-center gap-1 px-2 flex-shrink-0">
+            <button
+              className="btn btn-ghost btn-icon"
+              title="Import profile from JSON"
+              onClick={() => importRef.current?.click()}
+            >
+              <Upload size={13} />
+            </button>
+            <button
+              className="btn btn-ghost btn-icon"
+              title="Edit profile"
+              onClick={handleEditProfile}
+              disabled={!activeProfile}
+              style={{ opacity: activeProfile ? 1 : 0.35 }}
+            >
+              <Edit2 size={13} />
+            </button>
+            <button
+              className="btn btn-ghost btn-icon"
+              title="Export profile"
+              onClick={handleExportProfile}
+              disabled={!activeProfile}
+              style={{ opacity: activeProfile ? 1 : 0.35 }}
+            >
+              <Download size={13} />
+            </button>
+            <button
+              className="btn btn-ghost btn-icon"
+              title="Delete profile"
+              onClick={() => setConfirmDeleteProfile(true)}
+              disabled={!activeProfile}
+              style={{ color: activeProfile ? '#e55353' : undefined, opacity: activeProfile ? 1 : 0.35 }}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden">

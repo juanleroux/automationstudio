@@ -128,7 +128,7 @@ function buildStructuralText(profile, template) {
       .replace(/\{Instance\.Name\}/gi,        inst.name || '')
       .replace(/\{Instance\.Description\}/gi, inst.description || '')
       .replace(/\{Template\.Name\}/gi,        template.name || '')
-  ).join('\n---\n');
+  ).join('\n');
 }
 
 const FORMAT_EXT = { 0: 'csv', 1: 'txt', 2: 'xml', 3: 'txt' };
