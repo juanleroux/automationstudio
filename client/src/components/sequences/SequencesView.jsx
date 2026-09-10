@@ -233,11 +233,11 @@ function TransitionLine({ t, fromStep, toStep, selected, zoom, onPointerDown, on
       <line x1={mx - px*BAR_HW} y1={my - py*BAR_HW} x2={mx + px*BAR_HW} y2={my + py*BAR_HW}
         stroke={barColor} strokeWidth={BAR_THICK}/>
       {t.condition && (
-        <text x={mx + px*(BAR_HW+5)+5} y={my + py*(BAR_HW+5)} fontSize={10} fill={lineColor}
+        <text x={mx + BAR_HW + 8} y={my} fontSize={10} fill={lineColor}
           dominantBaseline="middle">{t.condition.length>26?t.condition.slice(0,24)+'…':t.condition}</text>
       )}
       {t.label && (
-        <text x={mx + px*(BAR_HW+5)+5} y={my + py*(BAR_HW+5)+(t.condition?13:0)} fontSize={10} fill="#6b7280"
+        <text x={mx + BAR_HW + 8} y={my + (t.condition ? 13 : 0)} fontSize={10} fill="#6b7280"
           dominantBaseline="middle" style={{fontStyle:'italic'}}>{t.label}</text>
       )}
       {/* Invisible wider hit area for hover detection */}
