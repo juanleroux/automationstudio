@@ -68,7 +68,7 @@ function nearestPort(step, pt) {
 
 // ─── Path builders ────────────────────────────────────────────────────────────
 
-function buildPath(from, fromPort, to, toPort, lineType) {
+function buildPath(from, fromPort, to, toPort, lineType, jog = 0) {
   const fd   = PORT_DIRS[fromPort] || PORT_DIRS.bottom;
   const td   = PORT_DIRS[toPort]   || PORT_DIRS.top;
   const STUB = 36;
@@ -78,18 +78,16 @@ function buildPath(from, fromPort, to, toPort, lineType) {
   }
 
   if (lineType === 'orthogonal') {
-    const p1x = from.x + fd.dx * STUB;
-    const p1y = from.y + fd.dy * STUB;
     if (fd.dy !== 0) {
-      // exit vertical → jog to target x
-      return `M${from.x},${from.y} L${p1x},${p1y} L${to.x},${p1y} L${to.x},${to.y}`;
+      const jy = from.y + fd.dy * STUB + jog;
+      return `M${from.x},${from.y} L${from.x},${jy} L${to.x},${jy} L${to.x},${to.y}`;
     } else {
-      // exit horizontal → jog to target y
-      return `M${from.x},${from.y} L${p1x},${p1y} L${p1x},${to.y} L${to.x},${to.y}`;
+      const jx = from.x + fd.dx * STUB + jog;
+      return `M${from.x},${from.y} L${jx},${from.y} L${jx},${to.y} L${to.x},${to.y}`;
     }
   }
 
-  // curved (default): cubic bezier, control points pulled in port directions
+  // curved: cubic bezier, control points pulled in port directions
   const dx   = to.x - from.x, dy = to.y - from.y;
   const dist = Math.max(50, Math.sqrt(dx * dx + dy * dy) * 0.4);
   return `M${from.x},${from.y} C${from.x + fd.dx * dist},${from.y + fd.dy * dist} ${to.x + td.dx * dist},${to.y + td.dy * dist} ${to.x},${to.y}`;
@@ -103,14 +101,12 @@ function barAtMidpoint(from, to) {
 
 // Bar placed at the 50% point along the actual orthogonal path segments,
 // perpendicular to the local segment direction — so it sits ON the line.
-function orthogonalBarData(from, fromPort, to) {
+function orthogonalBarData(from, fromPort, to, jog = 0) {
   const fd   = PORT_DIRS[fromPort] || PORT_DIRS.bottom;
   const STUB = 36;
-  const p1x  = from.x + fd.dx * STUB;
-  const p1y  = from.y + fd.dy * STUB;
   const segs = fd.dy !== 0
-    ? [[from, {x:p1x,y:p1y}], [{x:p1x,y:p1y},{x:to.x,y:p1y}], [{x:to.x,y:p1y},to]]
-    : [[from, {x:p1x,y:p1y}], [{x:p1x,y:p1y},{x:p1x,y:to.y}], [{x:p1x,y:to.y},to]];
+    ? (() => { const jy = from.y + fd.dy * STUB + jog; return [[from,{x:from.x,y:jy}],[{x:from.x,y:jy},{x:to.x,y:jy}],[{x:to.x,y:jy},to]]; })()
+    : (() => { const jx = from.x + fd.dx * STUB + jog; return [[from,{x:jx,y:from.y}],[{x:jx,y:from.y},{x:jx,y:to.y}],[{x:jx,y:to.y},to]]; })();
   const lens  = segs.map(([a,b]) => Math.hypot(b.x-a.x, b.y-a.y));
   const total = lens.reduce((s,v)=>s+v, 0);
   if (total < 1) return barAtMidpoint(from, to);
@@ -146,7 +142,11 @@ function StepPorts({ step, isSource, sourcePort, onPortPointerDown }) {
 
 // ─── Transition line ──────────────────────────────────────────────────────────
 
-function TransitionLine({ t, fromStep, toStep, selected, onPointerDown }) {
+function TransitionLine({ t, fromStep, toStep, selected, zoom, onPointerDown, onJogChange }) {
+  const [jogDelta, setJogDelta] = useState(0);
+  const [handleHover, setHandleHover] = useState(false);
+  const jogDragRef = useRef(null);
+
   if (!fromStep || !toStep) return null;
 
   const fromPort = t.fromPort || 'bottom';
@@ -154,6 +154,7 @@ function TransitionLine({ t, fromStep, toStep, selected, onPointerDown }) {
   const lineType = t.lineType || 'orthogonal';
   const dashed   = t.style === 'dashed';
   const isSelf   = t.fromStepId === t.toStepId;
+  const curJog   = (t.jog || 0) + jogDelta;
 
   const lineColor = selected ? '#6366f1' : dashed ? '#dc2626' : '#374151';
   const barColor  = selected ? '#6366f1' : '#111827';
@@ -179,12 +180,51 @@ function TransitionLine({ t, fromStep, toStep, selected, onPointerDown }) {
 
   const from = getPortPos(fromStep, fromPort);
   const to   = getPortPos(toStep,   toPort);
-  const d    = buildPath(from, fromPort, to, toPort, lineType);
-  // Bar sits ON the actual path — use segment-aware helper for orthogonal,
-  // geometric midpoint for straight/curved.
+  const d    = buildPath(from, fromPort, to, toPort, lineType, curJog);
   const { mx, my, px, py } = lineType === 'orthogonal'
-    ? orthogonalBarData(from, fromPort, to)
+    ? orthogonalBarData(from, fromPort, to, curJog)
     : barAtMidpoint(from, to);
+
+  // Jog handle: draggable grip on the middle elbow segment (orthogonal only)
+  const fd = PORT_DIRS[fromPort] || PORT_DIRS.bottom;
+  const STUB = 36;
+  let handleX, handleY, handleCursor;
+  if (lineType === 'orthogonal') {
+    if (fd.dy !== 0) {
+      handleX = (from.x + to.x) / 2;
+      handleY = from.y + fd.dy * STUB + curJog;
+      handleCursor = 'ns-resize';
+    } else {
+      handleX = from.x + fd.dx * STUB + curJog;
+      handleY = (from.y + to.y) / 2;
+      handleCursor = 'ew-resize';
+    }
+  }
+
+  const handleJogDown = (e) => {
+    e.stopPropagation();
+    const axis = fd.dy !== 0 ? 'y' : 'x';
+    jogDragRef.current = { start: axis === 'y' ? e.clientY : e.clientX, axis };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleJogMove = (e) => {
+    if (!jogDragRef.current) return;
+    e.stopPropagation();
+    const { start, axis } = jogDragRef.current;
+    const raw = axis === 'y' ? e.clientY - start : e.clientX - start;
+    setJogDelta(raw / (zoom || 1));
+  };
+
+  const handleJogUp = (e) => {
+    if (!jogDragRef.current) return;
+    e.stopPropagation();
+    onJogChange(curJog);
+    setJogDelta(0);
+    jogDragRef.current = null;
+  };
+
+  const showHandle = lineType === 'orthogonal' && (selected || handleHover);
 
   return (
     <g onPointerDown={onPointerDown} style={{ cursor:'pointer' }}>
@@ -199,6 +239,23 @@ function TransitionLine({ t, fromStep, toStep, selected, onPointerDown }) {
       {t.label && (
         <text x={mx + px*(BAR_HW+5)+5} y={my + py*(BAR_HW+5)+(t.condition?13:0)} fontSize={10} fill="#6b7280"
           dominantBaseline="middle" style={{fontStyle:'italic'}}>{t.label}</text>
+      )}
+      {/* Invisible wider hit area for hover detection */}
+      {lineType === 'orthogonal' && (
+        <path d={d} fill="none" stroke="transparent" strokeWidth={20}
+          onPointerEnter={() => setHandleHover(true)}
+          onPointerLeave={() => { if (!jogDragRef.current) setHandleHover(false); }}
+          style={{ pointerEvents:'all' }}/>
+      )}
+      {showHandle && (
+        <circle cx={handleX} cy={handleY} r={6}
+          fill={selected ? '#6366f1' : '#9ca3af'} stroke="white" strokeWidth={1.5}
+          style={{ cursor: handleCursor, pointerEvents:'all' }}
+          onPointerEnter={() => setHandleHover(true)}
+          onPointerLeave={() => { if (!jogDragRef.current) setHandleHover(false); }}
+          onPointerDown={handleJogDown}
+          onPointerMove={handleJogMove}
+          onPointerUp={handleJogUp}/>
       )}
     </g>
   );
@@ -545,6 +602,7 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
   const resetView = () => { setZoom(1); setPan({x:60,y:40}); };
   const updateStepField  = (f,v) => updateSteps(ss=>ss.map(s=>s.id===selectedStepIds[0]?{...s,[f]:v}:s));
   const updateTransField = (f,v) => updateTransitions(tt=>tt.map(t=>t.id===selectedTransId?{...t,[f]:v}:t));
+  const updateTransJog   = (id,jog) => updateTransitions(tt=>tt.map(t=>t.id===id?{...t,jog}:t));
 
   const previewFrom = connectFrom!==null ? steps.find(s=>s.id===connectFrom) : null;
   const previewFromPt = previewFrom ? getPortPos(previewFrom, connectFromPort) : null;
@@ -665,7 +723,9 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
               {transitions.map(t => {
                 const from=steps.find(s=>s.id===t.fromStepId);
                 const to=steps.find(s=>s.id===t.toStepId);
-                return <TransitionLine key={t.id} t={t} fromStep={from} toStep={to} selected={t.id===selectedTransId} onPointerDown={e=>handleTransPointerDown(e,t.id)}/>;
+                return <TransitionLine key={t.id} t={t} fromStep={from} toStep={to} selected={t.id===selectedTransId}
+                  zoom={zoom} onPointerDown={e=>handleTransPointerDown(e,t.id)}
+                  onJogChange={jog=>updateTransJog(t.id,jog)}/>;
               })}
 
               {/* Preview line from port to cursor */}
