@@ -96,15 +96,36 @@ function buildPath(from, fromPort, to, toPort, lineType) {
 }
 
 function barAtMidpoint(from, to) {
-  // Perpendicular bar at midpoint of the from→to vector
   const dx = to.x - from.x, dy = to.y - from.y;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  return {
-    mx: (from.x + to.x) / 2,
-    my: (from.y + to.y) / 2,
-    px: -dy / len,   // perpendicular unit vector (CCW 90°)
-    py:  dx / len,
-  };
+  return { mx:(from.x+to.x)/2, my:(from.y+to.y)/2, px:-dy/len, py:dx/len };
+}
+
+// Bar placed at the 50% point along the actual orthogonal path segments,
+// perpendicular to the local segment direction — so it sits ON the line.
+function orthogonalBarData(from, fromPort, to) {
+  const fd   = PORT_DIRS[fromPort] || PORT_DIRS.bottom;
+  const STUB = 36;
+  const p1x  = from.x + fd.dx * STUB;
+  const p1y  = from.y + fd.dy * STUB;
+  const segs = fd.dy !== 0
+    ? [[from, {x:p1x,y:p1y}], [{x:p1x,y:p1y},{x:to.x,y:p1y}], [{x:to.x,y:p1y},to]]
+    : [[from, {x:p1x,y:p1y}], [{x:p1x,y:p1y},{x:p1x,y:to.y}], [{x:p1x,y:to.y},to]];
+  const lens  = segs.map(([a,b]) => Math.hypot(b.x-a.x, b.y-a.y));
+  const total = lens.reduce((s,v)=>s+v, 0);
+  if (total < 1) return barAtMidpoint(from, to);
+  let rem = total / 2;
+  for (let i = 0; i < segs.length; i++) {
+    if (rem <= lens[i] + 0.001) {
+      const [a, b] = segs[i];
+      const t   = lens[i] < 0.001 ? 0 : rem / lens[i];
+      const mx  = a.x + (b.x-a.x)*t, my = a.y + (b.y-a.y)*t;
+      const len = lens[i] || 1;
+      return { mx, my, px:-(b.y-a.y)/len, py:(b.x-a.x)/len };
+    }
+    rem -= lens[i];
+  }
+  return barAtMidpoint(from, to);
 }
 
 // ─── Port dots ────────────────────────────────────────────────────────────────
@@ -130,7 +151,7 @@ function TransitionLine({ t, fromStep, toStep, selected, onPointerDown }) {
 
   const fromPort = t.fromPort || 'bottom';
   const toPort   = t.toPort   || 'top';
-  const lineType = t.lineType || 'curved';
+  const lineType = t.lineType || 'orthogonal';
   const dashed   = t.style === 'dashed';
   const isSelf   = t.fromStepId === t.toStepId;
 
@@ -159,11 +180,11 @@ function TransitionLine({ t, fromStep, toStep, selected, onPointerDown }) {
   const from = getPortPos(fromStep, fromPort);
   const to   = getPortPos(toStep,   toPort);
   const d    = buildPath(from, fromPort, to, toPort, lineType);
-  const { mx, my, px, py } = barAtMidpoint(from, to);
-
-  // Text offset: place to the "right" of the path (slightly into positive-x space)
-  const textX = mx + Math.abs(px) * (BAR_HW + 6) + (px >= 0 ? BAR_HW + 6 : -(BAR_HW + 6));
-  const textY = my + py * (BAR_HW + 6);
+  // Bar sits ON the actual path — use segment-aware helper for orthogonal,
+  // geometric midpoint for straight/curved.
+  const { mx, my, px, py } = lineType === 'orthogonal'
+    ? orthogonalBarData(from, fromPort, to)
+    : barAtMidpoint(from, to);
 
   return (
     <g onPointerDown={onPointerDown} style={{ cursor:'pointer' }}>
@@ -354,7 +375,7 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
       id: nextId(sequence.transitions||[]),
       fromStepId, fromPort: fromPort||'bottom',
       toStepId,   toPort:   toPort||'top',
-      condition:'', label:'', style:'solid', lineType:'curved',
+      condition:'', label:'', style:'solid', lineType:'orthogonal',
     };
     updateTransitions(tt => [...tt, t]);
     setSelectedTransId(t.id);
@@ -767,10 +788,10 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
                         <button key={v} onClick={()=>updateTransField('lineType',v)}
                           style={{
                             flex:1, padding:'5px 0', borderRadius:6, cursor:'pointer', fontSize:11,
-                            border:`1px solid ${(selTrans.lineType||'curved')===v?'#6366f1':'var(--border)'}`,
-                            background:(selTrans.lineType||'curved')===v?'rgba(99,102,241,0.1)':'transparent',
-                            color:(selTrans.lineType||'curved')===v?'#6366f1':'var(--text-muted)',
-                            fontWeight:(selTrans.lineType||'curved')===v?600:400,
+                            border:`1px solid ${(selTrans.lineType||'orthogonal')===v?'#6366f1':'var(--border)'}`,
+                            background:(selTrans.lineType||'orthogonal')===v?'rgba(99,102,241,0.1)':'transparent',
+                            color:(selTrans.lineType||'orthogonal')===v?'#6366f1':'var(--text-muted)',
+                            fontWeight:(selTrans.lineType||'orthogonal')===v?600:400,
                           }}>{l}</button>
                       ))}
                     </div>
