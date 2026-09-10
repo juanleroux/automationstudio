@@ -1,8 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Plus, Trash2, Edit2, GitBranch, Search, X,
-  MousePointer, Link2, ZoomIn, ZoomOut, Maximize,
-  ChevronDown, ArrowRight,
+  MousePointer, Link2, ZoomIn, ZoomOut, Maximize, ArrowRight,
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -11,28 +10,34 @@ import NoProjectOpen from '../shared/NoProjectOpen';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEP_W = 164;
-const STEP_H = 54;
-const PANEL_W = 268;
+const STEP_W  = 164;
+const STEP_H  = 54;
+const PANEL_W = 272;
 
-const STEP_TYPES = [
-  { value: 'normal',   label: 'Normal',   fill: '#ede9fe', stroke: '#7c3aed', text: '#4c1d95' },
-  { value: 'initial',  label: 'Initial',  fill: '#dbeafe', stroke: '#2563eb', text: '#1e3a8a' },
-  { value: 'running',  label: 'Running',  fill: '#dcfce7', stroke: '#16a34a', text: '#14532d' },
-  { value: 'stopping', label: 'Stopping', fill: '#fef9c3', stroke: '#d97706', text: '#78350f' },
-  { value: 'fault',    label: 'Fault',    fill: '#fee2e2', stroke: '#dc2626', text: '#7f1d1d' },
+const PRESET_COLORS = [
+  '#7c3aed', '#2563eb', '#0891b2', '#16a34a',
+  '#d97706', '#dc2626', '#db2777', '#374151',
+  '#9333ea', '#0d9488',
 ];
-function stepStyle(type) { return STEP_TYPES.find(t => t.value === type) ?? STEP_TYPES[0]; }
+
+// Backward-compat: old steps with `type` field get a default colour
+const TYPE_TO_COLOR = {
+  normal: '#7c3aed', initial: '#2563eb', running: '#16a34a',
+  stopping: '#d97706', fault: '#dc2626',
+};
+
+function resolveColor(step) {
+  return step.color || TYPE_TO_COLOR[step.type] || '#7c3aed';
+}
 
 function nextId(items) {
   if (!items?.length) return 1;
   return Math.max(...items.map(x => x.id ?? 0)) + 1;
 }
 
-// Auto-place steps that lack x/y — vertical column, 120px apart
 function withPositions(steps) {
   let autoY = 60;
-  return steps.map((s, i) => {
+  return steps.map(s => {
     if (s.x != null && s.y != null) return s;
     const placed = { ...s, x: 80, y: autoY };
     autoY += 120;
@@ -40,95 +45,180 @@ function withPositions(steps) {
   });
 }
 
-// ─── SVG helpers ─────────────────────────────────────────────────────────────
+// ─── SFC transition line with horizontal bar ──────────────────────────────────
+//
+// Forward  (target below source): straight/L-routed path with a short horizontal
+//          bar at ~45% of the way down — matching IEC 61131-3 SFC notation.
+// Backward / self-loop:           bezier arc with a bar marker overlaid.
 
-function stepCenter(step) {
-  return { x: step.x + STEP_W / 2, y: step.y + STEP_H / 2 };
-}
-function stepBottom(step) { return { x: step.x + STEP_W / 2, y: step.y + STEP_H }; }
-function stepTop(step)    { return { x: step.x + STEP_W / 2, y: step.y }; }
-
-function TransitionArrow({ t, fromStep, toStep, selected, previewing, onPointerDown }) {
+function TransitionLine({ t, fromStep, toStep, selected, onPointerDown }) {
   if (!fromStep || !toStep) return null;
-  const isSelf = t.fromStepId === t.toStepId;
-  const dashed  = t.style === 'dashed';
-  const color   = selected ? 'var(--accent, #6366f1)' : dashed ? '#dc2626' : '#6366f1';
-  const dashArr = dashed ? '6,4' : undefined;
 
-  let d;
+  const isSelf    = t.fromStepId === t.toStepId;
+  const lineColor = selected ? '#6366f1' : '#374151';
+  const barColor  = selected ? '#6366f1' : '#111827';
+  const BAR_HW    = 14;   // half-width of the bar (total = 28px)
+  const BAR_THICK = 3;
+  const markId    = selected ? 'arr-sel' : 'arr-def';
+
+  // ── Self-loop ────────────────────────────────────────────────────────────
   if (isSelf) {
-    const cx = fromStep.x + STEP_W;
-    const cy = fromStep.y + STEP_H / 2;
-    d = `M${cx},${cy - 10} C${cx+65},${cy-30} ${cx+65},${cy+30} ${cx},${cy + 10}`;
-  } else {
-    const fx = fromStep.x + STEP_W / 2;
-    const fy = fromStep.y + STEP_H;
-    const tx = toStep.x + STEP_W / 2;
-    const ty = toStep.y;
-    const dy = ty - fy;
-    const cpx = Math.abs(tx - fx) > 20 ? (fx + tx) / 2 : fx;
-    d = `M${fx},${fy} C${fx},${fy + Math.abs(dy)*0.4} ${tx},${ty - Math.abs(dy)*0.4} ${tx},${ty}`;
+    const cx   = fromStep.x + STEP_W;
+    const cy   = fromStep.y + STEP_H / 2;
+    const d    = `M${cx},${cy - 10} C${cx+65},${cy-35} ${cx+65},${cy+35} ${cx},${cy + 10}`;
+    const barX = cx + 66;
+    const barY = cy;
+    return (
+      <g onPointerDown={onPointerDown} style={{ cursor: 'pointer' }}>
+        <path d={d} fill="none" stroke="transparent" strokeWidth={14} />
+        <path d={d} fill="none" stroke={lineColor} strokeWidth={1.5} markerEnd={`url(#${markId})`} />
+        {/* Bar */}
+        <line x1={barX - BAR_HW} y1={barY} x2={barX + BAR_HW} y2={barY}
+          stroke={barColor} strokeWidth={BAR_THICK} />
+        {(t.condition || t.label) && (
+          <text x={barX + BAR_HW + 5} y={barY + 4} fontSize={10} fill={lineColor}>
+            {t.condition || t.label}
+          </text>
+        )}
+      </g>
+    );
   }
 
-  const markerId = selected ? 'arr-sel' : dashed ? 'arr-dash' : 'arr';
+  const fx = fromStep.x + STEP_W / 2;
+  const fy = fromStep.y + STEP_H;
+  const tx = toStep.x + STEP_W / 2;
+  const ty = toStep.y;
+
+  const forward = ty > fy + 8;
+
+  // ── Backward arc ─────────────────────────────────────────────────────────
+  if (!forward) {
+    const railX = Math.min(fromStep.x, toStep.x) - 44;
+    const d = [
+      `M${fx},${fy}`,
+      `L${fx},${fy + 20}`,
+      `L${railX},${fy + 20}`,
+      `L${railX},${ty - 20}`,
+      `L${tx},${ty - 20}`,
+      `L${tx},${ty}`,
+    ].join(' ');
+    const barX = railX;
+    const barY = (fy + 20 + ty - 20) / 2;
+    return (
+      <g onPointerDown={onPointerDown} style={{ cursor: 'pointer' }}>
+        <path d={d} fill="none" stroke="transparent" strokeWidth={14} />
+        <path d={d} fill="none" stroke={lineColor} strokeWidth={1.5} markerEnd={`url(#${markId})`} />
+        <line x1={barX - BAR_HW} y1={barY} x2={barX + BAR_HW} y2={barY}
+          stroke={barColor} strokeWidth={BAR_THICK} />
+        {(t.condition || t.label) && (
+          <text x={barX + BAR_HW + 5} y={barY + 4} fontSize={10} fill={lineColor}>
+            {t.condition || t.label}
+          </text>
+        )}
+      </g>
+    );
+  }
+
+  // ── Forward SFC path ──────────────────────────────────────────────────────
+  // Bar placed at 45% of the vertical drop, on the source column x.
+  const barY = fy + (ty - fy) * 0.45;
+  const barX = fx; // stays on the source column
+
+  // Path: source → bar → (route to target column if needed) → target
+  let d;
+  if (Math.abs(fx - tx) < 4) {
+    // Straight vertical — no horizontal jog needed
+    d = `M${fx},${fy} L${fx},${barY} L${tx},${barY} L${tx},${ty}`;
+  } else {
+    // L-shape: go down to barY on source x, jog horizontal, then down to target
+    d = `M${fx},${fy} L${fx},${barY} L${tx},${barY} L${tx},${ty}`;
+  }
+
+  const textX = barX + BAR_HW + 5;
+  const textY = barY;
 
   return (
     <g onPointerDown={onPointerDown} style={{ cursor: 'pointer' }}>
+      {/* Wide invisible hit area */}
       <path d={d} fill="none" stroke="transparent" strokeWidth={14} />
-      <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.5 : 1.5}
-        strokeDasharray={dashArr} markerEnd={`url(#${markerId})`} />
-      {t.label && (() => {
-        if (isSelf) {
-          return <text x={fromStep.x + STEP_W + 50} y={fromStep.y + STEP_H / 2 + 4} fontSize={10} fill={color}>{t.label}</text>;
-        }
-        const mx = (fromStep.x + toStep.x) / 2 + STEP_W / 2 + 8;
-        const my = (fromStep.y + toStep.y) / 2 + STEP_H / 2;
-        return <text x={mx} y={my} fontSize={10} fill={color}>{t.label}</text>;
-      })()}
-      {t.condition && (() => {
-        const mx = (fromStep.x + toStep.x) / 2 + STEP_W / 2;
-        const my = (fromStep.y + toStep.y) / 2 + STEP_H / 2 - 10;
-        return (
-          <text x={mx} y={my} textAnchor="middle" fontSize={9} fill="#6b7280"
-            style={{ fontStyle: 'italic' }}>
-            {t.condition.length > 22 ? t.condition.slice(0, 20) + '…' : t.condition}
-          </text>
-        );
-      })()}
+      {/* Visible path */}
+      <path d={d} fill="none" stroke={lineColor} strokeWidth={1.5}
+        markerEnd={`url(#${markId})`} />
+      {/* Transition bar (the SFC horizontal bar) */}
+      <line x1={barX - BAR_HW} y1={barY} x2={barX + BAR_HW} y2={barY}
+        stroke={barColor} strokeWidth={BAR_THICK} />
+      {/* Condition text */}
+      {t.condition && (
+        <text x={textX} y={textY - 1} fontSize={10} fill={lineColor} dominantBaseline="auto">
+          {t.condition.length > 24 ? t.condition.slice(0, 22) + '…' : t.condition}
+        </text>
+      )}
+      {/* Label (below condition if both) */}
+      {t.label && (
+        <text x={textX} y={textY + (t.condition ? 12 : 4)} fontSize={10} fill="#6b7280"
+          style={{ fontStyle: 'italic' }}>
+          {t.label}
+        </text>
+      )}
     </g>
   );
 }
 
-function StepNode({ step, selected, isConnectSource, tool, onPointerDown }) {
-  const sty   = stepStyle(step.type);
-  const isConnMode = tool === 'connect';
+// ─── Step node ────────────────────────────────────────────────────────────────
 
+function StepNode({ step, selected, isConnectSource, tool, onPointerDown }) {
+  const color  = resolveColor(step);
+  const fillBg = color + '20'; // ~12% opacity tint
   return (
     <g transform={`translate(${step.x},${step.y})`}
        onPointerDown={onPointerDown}
-       style={{ cursor: isConnMode ? 'crosshair' : 'grab' }}>
+       style={{ cursor: tool === 'connect' ? 'crosshair' : 'grab' }}>
       {(selected || isConnectSource) && (
-        <rect x={-4} y={-4} width={STEP_W + 8} height={STEP_H + 8} rx={9}
-          fill="none"
-          stroke={isConnectSource ? '#f59e0b' : 'var(--accent, #6366f1)'}
-          strokeWidth={2}
+        <rect x={-4} y={-4} width={STEP_W + 8} height={STEP_H + 8} rx={9} fill="none"
+          stroke={isConnectSource ? '#f59e0b' : '#6366f1'} strokeWidth={2}
           strokeDasharray={isConnectSource ? '5 3' : 'none'} />
       )}
-      <rect x={0} y={0} width={STEP_W} height={STEP_H} rx={6}
-        fill={sty.fill} stroke={sty.stroke} strokeWidth={1.5} />
-      {/* Step # badge */}
-      <rect x={0} y={0} width={STEP_W} height={18} rx={6} fill={sty.stroke} />
-      <rect x={0} y={12} width={STEP_W} height={6} fill={sty.stroke} />
+      <rect x={0} y={0} width={STEP_W} height={STEP_H} rx={6} fill={fillBg} stroke={color} strokeWidth={1.5} />
+      {/* Colour badge strip at top */}
+      <rect x={0} y={0} width={STEP_W} height={18} rx={6} fill={color} />
+      <rect x={0} y={12} width={STEP_W} height={6} fill={color} />
       <text x={STEP_W / 2} y={13} textAnchor="middle" dominantBaseline="middle"
         fontSize={10} fontWeight={700} fill="white" style={{ userSelect: 'none' }}>
         Step {step.number}
       </text>
       {/* Name */}
-      <text x={STEP_W / 2} y={36} textAnchor="middle" dominantBaseline="middle"
-        fontSize={12} fill={sty.text} style={{ userSelect: 'none' }}>
+      <text x={STEP_W / 2} y={37} textAnchor="middle" dominantBaseline="middle"
+        fontSize={12} fill={color} style={{ userSelect: 'none' }}>
         {step.name.length > 18 ? step.name.slice(0, 17) + '…' : step.name}
       </text>
     </g>
+  );
+}
+
+// ─── Color picker ─────────────────────────────────────────────────────────────
+
+function ColorPicker({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {PRESET_COLORS.map(c => (
+          <button key={c} onClick={() => onChange(c)}
+            title={c}
+            style={{
+              width: 22, height: 22, borderRadius: 4, background: c, border: 'none', cursor: 'pointer',
+              outline: value === c ? '2px solid var(--text-primary)' : '2px solid transparent',
+              outlineOffset: 2,
+            }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input type="color" value={value || '#7c3aed'} onChange={e => onChange(e.target.value)}
+          style={{ width: 28, height: 28, border: 'none', background: 'none', cursor: 'pointer', padding: 0, borderRadius: 4 }} />
+        <input type="text" className="form-input" value={value || '#7c3aed'}
+          onChange={e => { if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) onChange(e.target.value); }}
+          style={{ fontSize: 12, flex: 1, fontFamily: 'monospace' }} />
+      </div>
+    </div>
   );
 }
 
@@ -136,21 +226,19 @@ function StepNode({ step, selected, isConnectSource, tool, onPointerDown }) {
 
 function SequenceCanvas({ sequence, onUpdateSequence }) {
   const toast = useToast();
-  const [tool, setTool]               = useState('select'); // 'select' | 'connect'
+  const [tool, setTool]                     = useState('select');
   const [selectedStepId, setSelectedStepId] = useState(null);
   const [selectedTransId, setSelectedTransId] = useState(null);
-  const [connectFrom, setConnectFrom] = useState(null);
-  const [previewPt, setPreviewPt]     = useState(null);
-  const [zoom, setZoom]               = useState(1);
-  const [pan, setPan]                 = useState({ x: 40, y: 40 });
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [confirmDelStep, setConfirmDelStep] = useState(null);
+  const [connectFrom, setConnectFrom]       = useState(null);
+  const [previewPt, setPreviewPt]           = useState(null);
+  const [zoom, setZoom]                     = useState(1);
+  const [pan, setPan]                       = useState({ x: 60, y: 40 });
+  const [confirmDelStep, setConfirmDelStep]   = useState(null);
   const [confirmDelTrans, setConfirmDelTrans] = useState(null);
 
-  const svgRef   = useRef(null);
-  const dragRef  = useRef(null);
-  const panRef   = useRef(null);
-  const addBtnRef = useRef(null);
+  const svgRef  = useRef(null);
+  const dragRef = useRef(null);
+  const panRef  = useRef(null);
 
   const steps       = withPositions(sequence.steps || []);
   const transitions = sequence.transitions || [];
@@ -159,34 +247,29 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
   const selectedTrans = transitions.find(t => t.id === selectedTransId) ?? null;
   const panelOpen     = !!(selectedStep || selectedTrans);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // ── Data mutators ─────────────────────────────────────────────────────────
 
-  const updateSteps = (fn) => onUpdateSequence(seq => ({
-    ...seq, steps: typeof fn === 'function' ? fn(seq.steps || []) : fn,
-  }));
-  const updateTransitions = (fn) => onUpdateSequence(seq => ({
-    ...seq, transitions: typeof fn === 'function' ? fn(seq.transitions || []) : fn,
-  }));
+  const updateSteps = fn =>
+    onUpdateSequence(seq => ({ ...seq, steps: typeof fn === 'function' ? fn(seq.steps || []) : fn }));
+  const updateTransitions = fn =>
+    onUpdateSequence(seq => ({ ...seq, transitions: typeof fn === 'function' ? fn(seq.transitions || []) : fn }));
 
   const svgPt = useCallback((clientX, clientY) => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return {
-      x: (clientX - rect.left - pan.x) / zoom,
-      y: (clientY - rect.top  - pan.y) / zoom,
-    };
+    const r = svgRef.current?.getBoundingClientRect();
+    if (!r) return { x: 0, y: 0 };
+    return { x: (clientX - r.left - pan.x) / zoom, y: (clientY - r.top - pan.y) / zoom };
   }, [pan, zoom]);
 
-  // ── Tool handlers ─────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────
 
-  const addStep = (type = 'normal') => {
+  const addStep = () => {
     const existing = steps;
-    const maxY = existing.length ? Math.max(...existing.map(s => s.y)) : -40;
-    const newStep = {
+    const maxY     = existing.length ? Math.max(...existing.map(s => s.y)) : -60;
+    const newStep  = {
       id: nextId(sequence.steps || []),
       number: existing.length ? Math.max(...existing.map(s => s.number)) + 1000 : 0,
       name: 'NEW',
-      type,
+      color: '#7c3aed',
       description: '',
       x: 80,
       y: maxY + 120,
@@ -194,10 +277,9 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
     updateSteps(s => [...s, newStep]);
     setSelectedStepId(newStep.id);
     setSelectedTransId(null);
-    setAddMenuOpen(false);
   };
 
-  const deleteStep = (id) => {
+  const deleteStep = id => {
     updateSteps(s => s.filter(x => x.id !== id));
     updateTransitions(t => t.filter(x => x.fromStepId !== id && x.toStepId !== id));
     if (selectedStepId === id) setSelectedStepId(null);
@@ -205,7 +287,7 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
     toast.success('Step deleted');
   };
 
-  const deleteTransition = (id) => {
+  const deleteTransition = id => {
     updateTransitions(t => t.filter(x => x.id !== id));
     if (selectedTransId === id) setSelectedTransId(null);
     setConfirmDelTrans(null);
@@ -213,14 +295,7 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
   };
 
   const createTransition = (fromId, toId) => {
-    const newT = {
-      id: nextId(sequence.transitions || []),
-      fromStepId: fromId,
-      toStepId: toId,
-      condition: '',
-      label: '',
-      style: 'solid',
-    };
+    const newT = { id: nextId(sequence.transitions || []), fromStepId: fromId, toStepId: toId, condition: '', label: '', style: 'solid' };
     updateTransitions(t => [...t, newT]);
     setSelectedTransId(newT.id);
     setSelectedStepId(null);
@@ -243,17 +318,10 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
       }
       return;
     }
-    // Select + start drag
     setSelectedStepId(stepId);
     setSelectedTransId(null);
     const step = steps.find(s => s.id === stepId);
-    dragRef.current = {
-      stepId,
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: step?.x ?? 0,
-      origY: step?.y ?? 0,
-    };
+    dragRef.current = { stepId, startX: e.clientX, startY: e.clientY, origX: step?.x ?? 0, origY: step?.y ?? 0 };
     e.currentTarget.setPointerCapture(e.pointerId);
   }, [tool, connectFrom, steps]);
 
@@ -265,7 +333,7 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
   }, [tool]);
 
   const handleBgPointerDown = useCallback((e) => {
-    if (e.target !== svgRef.current && !e.target.hasAttribute('data-bg')) return;
+    if (!e.target.hasAttribute('data-bg') && e.target !== svgRef.current) return;
     setSelectedStepId(null);
     setSelectedTransId(null);
     if (connectFrom) { setConnectFrom(null); setPreviewPt(null); return; }
@@ -281,24 +349,17 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
       const ny = Math.max(0, dragRef.current.origY + dy);
       updateSteps(ss => ss.map(s => s.id === dragRef.current.stepId ? { ...s, x: nx, y: ny } : s));
     } else if (panRef.current) {
-      setPan({
-        x: panRef.current.origPan.x + (e.clientX - panRef.current.startX),
-        y: panRef.current.origPan.y + (e.clientY - panRef.current.startY),
-      });
+      setPan({ x: panRef.current.origPan.x + (e.clientX - panRef.current.startX), y: panRef.current.origPan.y + (e.clientY - panRef.current.startY) });
     } else if (connectFrom) {
       setPreviewPt(svgPt(e.clientX, e.clientY));
     }
   }, [zoom, connectFrom, svgPt]);
 
-  const handlePointerUp = useCallback(() => {
-    dragRef.current = null;
-    panRef.current  = null;
-  }, []);
+  const handlePointerUp = useCallback(() => { dragRef.current = null; panRef.current = null; }, []);
 
   const handleWheel = useCallback((e) => {
     e.preventDefault();
-    const delta = e.deltaY < 0 ? 1.1 : 0.91;
-    setZoom(z => Math.max(0.2, Math.min(3, z * delta)));
+    setZoom(z => Math.max(0.2, Math.min(3, z * (e.deltaY < 0 ? 1.1 : 0.91))));
   }, []);
 
   useEffect(() => {
@@ -308,34 +369,22 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
     return () => el.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
-  const resetView = () => { setZoom(1); setPan({ x: 40, y: 40 }); };
+  const resetView = () => { setZoom(1); setPan({ x: 60, y: 40 }); };
 
-  // Close add menu on outside click
-  useEffect(() => {
-    if (!addMenuOpen) return;
-    const close = (e) => { if (!addBtnRef.current?.contains(e.target)) setAddMenuOpen(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [addMenuOpen]);
+  // ── Property updaters ─────────────────────────────────────────────────────
 
-  // ── Property panel live update helpers ────────────────────────────────────
-
-  const updateStepField = (field, value) => {
-    updateSteps(ss => ss.map(s => s.id === selectedStepId ? { ...s, [field]: value } : s));
-  };
-  const updateTransField = (field, value) => {
-    updateTransitions(tt => tt.map(t => t.id === selectedTransId ? { ...t, [field]: value } : t));
-  };
+  const updateStepField  = (f, v) => updateSteps(ss => ss.map(s => s.id === selectedStepId  ? { ...s, [f]: v } : s));
+  const updateTransField = (f, v) => updateTransitions(tt => tt.map(t => t.id === selectedTransId ? { ...t, [f]: v } : t));
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const previewFromStep = connectFrom ? steps.find(s => s.id === connectFrom) : null;
+  const previewFrom = connectFrom ? steps.find(s => s.id === connectFrom) : null;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       {confirmDelStep && (
         <ConfirmDialog title="Delete Step"
-          message={`Delete step "${steps.find(s => s.id === confirmDelStep)?.name}"? All its transitions will also be removed.`}
+          message={`Delete step "${steps.find(s => s.id === confirmDelStep)?.name}"? Its transitions will also be removed.`}
           danger onConfirm={() => deleteStep(confirmDelStep)} onCancel={() => setConfirmDelStep(null)} />
       )}
       {confirmDelTrans && (
@@ -344,92 +393,46 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
       )}
 
       {/* ── Toolbar ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
-        borderBottom: '1px solid var(--border)', background: 'var(--bg-main)', flexShrink: 0,
-      }}>
-        {/* Mode */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg-main)', flexShrink: 0 }}>
+        {/* Mode toggle */}
         <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: 6, padding: 2, gap: 1 }}>
-          {[
-            { id: 'select',  Icon: MousePointer, title: 'Select & Move (S)' },
-            { id: 'connect', Icon: Link2,        title: 'Connect Steps (C)' },
-          ].map(({ id, Icon, title }) => (
-            <button key={id} title={title}
-              onClick={() => { setTool(id); setConnectFrom(null); setPreviewPt(null); }}
+          {[{ id: 'select', Icon: MousePointer, label: 'Select' }, { id: 'connect', Icon: Link2, label: 'Connect' }].map(({ id, Icon, label }) => (
+            <button key={id} onClick={() => { setTool(id); setConnectFrom(null); setPreviewPt(null); }}
               style={{
-                padding: '4px 8px', border: 'none', cursor: 'pointer', borderRadius: 5,
+                padding: '4px 8px', border: 'none', cursor: 'pointer', borderRadius: 5, fontSize: 12,
                 background: tool === id ? 'var(--accent, #6366f1)' : 'transparent',
                 color: tool === id ? 'white' : 'var(--text-muted)',
-                display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+                display: 'flex', alignItems: 'center', gap: 4,
               }}>
-              <Icon size={13} />{id === 'select' ? 'Select' : 'Connect'}
+              <Icon size={13} />{label}
             </button>
           ))}
         </div>
 
-        {/* Add step */}
-        <div ref={addBtnRef} style={{ position: 'relative' }}>
-          <button
-            onClick={() => setAddMenuOpen(o => !o)}
-            className="btn btn-secondary"
-            style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Plus size={13} /> Add Step <ChevronDown size={11} />
-          </button>
-          {addMenuOpen && (
-            <div style={{
-              position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 100,
-              background: 'var(--bg-main)', border: '1px solid var(--border)',
-              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-              overflow: 'hidden', minWidth: 150,
-            }}>
-              {STEP_TYPES.map(t => (
-                <button key={t.value} onClick={() => addStep(t.value)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                    padding: '7px 12px', background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 13, color: 'var(--text-primary)', textAlign: 'left',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                >
-                  <span style={{ width: 12, height: 12, borderRadius: 3, background: t.stroke, flexShrink: 0 }} />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <button className="btn btn-secondary" onClick={addStep}
+          style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Plus size={13} /> Add Step
+        </button>
 
-        <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 2px' }} />
 
-        {/* Delete */}
-        <button
-          className="btn btn-ghost"
-          style={{ fontSize: 12, color: '#e55353', display: 'flex', alignItems: 'center', gap: 4,
-            opacity: (selectedStep || selectedTrans) ? 1 : 0.35 }}
-          disabled={!selectedStep && !selectedTrans}
-          onClick={() => {
-            if (selectedStep)  setConfirmDelStep(selectedStepId);
-            if (selectedTrans) setConfirmDelTrans(selectedTransId);
-          }}>
+        <button className="btn btn-ghost" disabled={!selectedStep && !selectedTrans}
+          style={{ fontSize: 12, color: '#e55353', display: 'flex', alignItems: 'center', gap: 4, opacity: (selectedStep || selectedTrans) ? 1 : 0.35 }}
+          onClick={() => { if (selectedStep) setConfirmDelStep(selectedStepId); if (selectedTrans) setConfirmDelTrans(selectedTransId); }}>
           <Trash2 size={13} /> Delete
         </button>
 
         <div style={{ flex: 1 }} />
 
-        {/* Connect hint */}
         {tool === 'connect' && (
           <span style={{ fontSize: 11, color: connectFrom ? '#f59e0b' : 'var(--text-muted)', marginRight: 8 }}>
-            {connectFrom
-              ? `Click target step to connect from "${steps.find(s => s.id === connectFrom)?.name}"`
-              : 'Click a step to start a connection'}
+            {connectFrom ? `Click target step — connecting from "${steps.find(s => s.id === connectFrom)?.name}"` : 'Click a step to start a connection'}
           </span>
         )}
 
-        {/* Zoom */}
         <button className="btn btn-ghost btn-icon" title="Zoom out" onClick={() => setZoom(z => Math.max(0.2, z - 0.15))}><ZoomOut size={13} /></button>
         <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 38, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-        <button className="btn btn-ghost btn-icon" title="Zoom in" onClick={() => setZoom(z => Math.min(3, z + 0.15))}><ZoomIn size={13} /></button>
+        <button className="btn btn-ghost btn-icon" title="Zoom in"  onClick={() => setZoom(z => Math.min(3, z + 0.15))}><ZoomIn size={13} /></button>
         <button className="btn btn-ghost btn-icon" title="Reset view" onClick={resetView}><Maximize size={13} /></button>
       </div>
 
@@ -438,60 +441,51 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
 
         {/* Canvas */}
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-          <svg
-            ref={svgRef}
-            width="100%" height="100%"
+          <svg ref={svgRef} width="100%" height="100%"
             style={{ display: 'block', background: 'var(--bg-surface)', cursor: tool === 'connect' ? 'crosshair' : 'default' }}
             onPointerDown={handleBgPointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            data-bg
-          >
+            data-bg>
             <defs>
-              <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-                <path d="M0,0 L0,6 L8,3 z" fill="#6366f1" />
+              <marker id="arr-def" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#374151" />
               </marker>
               <marker id="arr-sel" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-                <path d="M0,0 L0,6 L8,3 z" fill="var(--accent, #6366f1)" />
-              </marker>
-              <marker id="arr-dash" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-                <path d="M0,0 L0,6 L8,3 z" fill="#dc2626" />
+                <path d="M0,0 L0,6 L8,3 z" fill="#6366f1" />
               </marker>
               <marker id="arr-prev" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b" />
               </marker>
-              {/* Dot grid */}
               <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"
                 patternTransform={`translate(${pan.x % 20},${pan.y % 20}) scale(${zoom})`}>
                 <circle cx="10" cy="10" r="0.8" fill="var(--border)" opacity="0.6" />
               </pattern>
             </defs>
 
-            {/* Background grid */}
             <rect width="100%" height="100%" fill="url(#dots)" style={{ pointerEvents: 'none' }} />
 
             <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-              {/* Transitions (rendered behind steps) */}
+              {/* Transitions behind steps */}
               {transitions.map(t => {
                 const from = steps.find(s => s.id === t.fromStepId);
                 const to   = steps.find(s => s.id === t.toStepId);
                 return (
-                  <TransitionArrow key={t.id} t={t} fromStep={from} toStep={to}
+                  <TransitionLine key={t.id} t={t} fromStep={from} toStep={to}
                     selected={t.id === selectedTransId}
                     onPointerDown={e => handleTransPointerDown(e, t.id)} />
                 );
               })}
 
-              {/* Preview line while connecting */}
-              {connectFrom && previewPt && previewFromStep && (() => {
-                const fx = previewFromStep.x + STEP_W / 2;
-                const fy = previewFromStep.y + STEP_H;
+              {/* Live preview line while connecting */}
+              {connectFrom && previewPt && previewFrom && (() => {
+                const fx = previewFrom.x + STEP_W / 2;
+                const fy = previewFrom.y + STEP_H;
                 const dy = previewPt.y - fy;
-                const d = `M${fx},${fy} C${fx},${fy + Math.abs(dy)*0.4} ${previewPt.x},${previewPt.y - Math.abs(dy)*0.4} ${previewPt.x},${previewPt.y}`;
+                const d  = `M${fx},${fy} C${fx},${fy + Math.abs(dy) * 0.4} ${previewPt.x},${previewPt.y - Math.abs(dy) * 0.4} ${previewPt.x},${previewPt.y}`;
                 return (
                   <path d={d} fill="none" stroke="#f59e0b" strokeWidth={1.5}
-                    strokeDasharray="6 3" markerEnd="url(#arr-prev)"
-                    style={{ pointerEvents: 'none' }} />
+                    strokeDasharray="6 3" markerEnd="url(#arr-prev)" style={{ pointerEvents: 'none' }} />
                 );
               })()}
 
@@ -505,7 +499,6 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
               ))}
             </g>
 
-            {/* Empty state */}
             {steps.length === 0 && (
               <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
                 fontSize={13} fill="var(--text-muted)" style={{ pointerEvents: 'none' }}>
@@ -517,16 +510,8 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
 
         {/* ── Right: Properties panel ── */}
         {panelOpen && (
-          <div style={{
-            width: PANEL_W, borderLeft: '1px solid var(--border)',
-            background: 'var(--bg-main)', display: 'flex', flexDirection: 'column',
-            flexShrink: 0, overflowY: 'auto',
-          }}>
-            {/* Header */}
-            <div style={{
-              padding: '10px 14px', borderBottom: '1px solid var(--border-subtle)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
-            }}>
+          <div style={{ width: PANEL_W, borderLeft: '1px solid var(--border)', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto' }}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                 {selectedStep ? 'Step Properties' : 'Transition'}
               </span>
@@ -535,62 +520,43 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
               </button>
             </div>
 
-            <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
               {/* ── Step properties ── */}
               {selectedStep && (
                 <>
-                  {/* Type badge row */}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {STEP_TYPES.map(t => {
-                      const active = selectedStep.type === t.value;
-                      return (
-                        <button key={t.value}
-                          onClick={() => updateStepField('type', t.value)}
-                          style={{
-                            padding: '3px 10px', borderRadius: 12, border: `1px solid ${t.stroke}`,
-                            background: active ? t.fill : 'transparent',
-                            color: active ? t.text : 'var(--text-muted)',
-                            fontSize: 11, fontWeight: active ? 700 : 400, cursor: 'pointer',
-                          }}>{t.label}</button>
-                      );
-                    })}
-                  </div>
-
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Step Number</label>
-                    <input type="number" className="form-input"
-                      value={selectedStep.number}
+                    <input type="number" className="form-input" value={selectedStep.number}
                       onChange={e => updateStepField('number', Number(e.target.value))}
                       style={{ fontSize: 13 }} />
                   </div>
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Name</label>
-                    <input type="text" className="form-input"
-                      value={selectedStep.name}
+                    <input type="text" className="form-input" value={selectedStep.name}
                       onChange={e => updateStepField('name', e.target.value)}
                       style={{ fontSize: 13 }} />
                   </div>
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Description</label>
-                    <textarea className="form-input"
-                      value={selectedStep.description}
+                    <textarea className="form-input" value={selectedStep.description}
                       onChange={e => updateStepField('description', e.target.value)}
                       rows={3} style={{ fontSize: 12, resize: 'vertical' }} />
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4, borderTop: '1px solid var(--border-subtle)' }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Incoming: {transitions.filter(t => t.toStepId === selectedStepId).length} transition(s)
-                    </span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Outgoing: {transitions.filter(t => t.fromStepId === selectedStepId).length} transition(s)
-                    </span>
+                  {/* Appearance */}
+                  <div style={{ paddingTop: 4, borderTop: '1px solid var(--border-subtle)' }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>Appearance</label>
+                    <ColorPicker value={resolveColor(selectedStep)} onChange={v => updateStepField('color', v)} />
                   </div>
 
-                  <button
-                    className="btn" style={{ fontSize: 12, color: '#e55353', background: 'rgba(229,83,83,0.08)', border: '1px solid rgba(229,83,83,0.3)' }}
-                    onClick={() => setConfirmDelStep(selectedStepId)}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 4, borderTop: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Incoming: {transitions.filter(t => t.toStepId === selectedStepId).length} transition(s)</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Outgoing: {transitions.filter(t => t.fromStepId === selectedStepId).length} transition(s)</span>
+                  </div>
+
+                  <button className="btn" onClick={() => setConfirmDelStep(selectedStepId)}
+                    style={{ fontSize: 12, color: '#e55353', background: 'rgba(229,83,83,0.08)', border: '1px solid rgba(229,83,83,0.3)' }}>
                     <Trash2 size={12} style={{ marginRight: 4 }} /> Delete Step
                   </button>
                 </>
@@ -604,47 +570,38 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
                     <select className="form-input" value={selectedTrans.fromStepId ?? ''}
                       onChange={e => updateTransField('fromStepId', Number(e.target.value))}
                       style={{ fontSize: 12 }}>
-                      {[...steps].sort((a,b) => a.number - b.number).map(s =>
+                      {[...steps].sort((a, b) => a.number - b.number).map(s =>
                         <option key={s.id} value={s.id}>{s.number}: {s.name}</option>
                       )}
                     </select>
                   </div>
-
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
                     <ArrowRight size={16} />
                   </div>
-
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>To</label>
                     <select className="form-input" value={selectedTrans.toStepId ?? ''}
                       onChange={e => updateTransField('toStepId', Number(e.target.value))}
                       style={{ fontSize: 12 }}>
-                      {[...steps].sort((a,b) => a.number - b.number).map(s =>
+                      {[...steps].sort((a, b) => a.number - b.number).map(s =>
                         <option key={s.id} value={s.id}>{s.number}: {s.name}</option>
                       )}
                     </select>
                   </div>
-
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Condition</label>
-                    <input type="text" className="form-input"
-                      value={selectedTrans.condition}
+                    <input type="text" className="form-input" value={selectedTrans.condition}
                       onChange={e => updateTransField('condition', e.target.value)}
-                      placeholder="e.g. Stop Command or Complete?"
-                      style={{ fontSize: 12 }} />
+                      placeholder="e.g. Stop Command" style={{ fontSize: 12 }} />
                   </div>
-
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Label</label>
-                    <input type="text" className="form-input"
-                      value={selectedTrans.label}
+                    <input type="text" className="form-input" value={selectedTrans.label}
                       onChange={e => updateTransField('label', e.target.value)}
-                      placeholder="Yes / No / custom"
-                      style={{ fontSize: 12 }} />
+                      placeholder="Yes / No / custom" style={{ fontSize: 12 }} />
                   </div>
-
                   <div>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Style</label>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Style</label>
                     <div style={{ display: 'flex', gap: 8 }}>
                       {[{ v: 'solid', l: 'Normal' }, { v: 'dashed', l: 'Off-Normal' }].map(({ v, l }) => (
                         <button key={v} onClick={() => updateTransField('style', v)}
@@ -658,10 +615,8 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
                       ))}
                     </div>
                   </div>
-
-                  <button
-                    className="btn" style={{ fontSize: 12, color: '#e55353', background: 'rgba(229,83,83,0.08)', border: '1px solid rgba(229,83,83,0.3)', marginTop: 4 }}
-                    onClick={() => setConfirmDelTrans(selectedTransId)}>
+                  <button className="btn" onClick={() => setConfirmDelTrans(selectedTransId)}
+                    style={{ fontSize: 12, color: '#e55353', background: 'rgba(229,83,83,0.08)', border: '1px solid rgba(229,83,83,0.3)', marginTop: 4 }}>
                     <Trash2 size={12} style={{ marginRight: 4 }} /> Delete Transition
                   </button>
                 </>
@@ -680,32 +635,27 @@ export default function SequencesView() {
   const { project, updateProject } = useProject();
   const toast = useToast();
 
-  const [selectedId, setSelectedId]   = useState(null);
-  const [filter, setFilter]           = useState('');
-  const [renameId, setRenameId]       = useState(null);
-  const [renameDraft, setRenameDraft] = useState('');
+  const [selectedId, setSelectedId]     = useState(null);
+  const [filter, setFilter]             = useState('');
+  const [renameId, setRenameId]         = useState(null);
+  const [renameDraft, setRenameDraft]   = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [showNewModal, setShowNewModal]   = useState(false);
-  const [newName, setNewName] = useState('');
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [newName, setNewName]           = useState('');
 
   if (!project) return <NoProjectOpen />;
 
   const sequences = project.sequences || [];
-  const filtered  = filter.trim()
-    ? sequences.filter(s => s.name.toLowerCase().includes(filter.toLowerCase()))
-    : sequences;
+  const filtered  = filter.trim() ? sequences.filter(s => s.name.toLowerCase().includes(filter.toLowerCase())) : sequences;
   const selected  = sequences.find(s => s.id === selectedId) ?? null;
 
-  const updateSequences = (updater) => {
-    updateProject(p => ({ ...p, sequences: typeof updater === 'function' ? updater(p.sequences || []) : updater }));
-  };
+  const updateSequences = upd =>
+    updateProject(p => ({ ...p, sequences: typeof upd === 'function' ? upd(p.sequences || []) : upd }));
 
-  const updateSelectedSequence = (updater) => {
+  const updateSelectedSequence = upd =>
     updateSequences(seqs => seqs.map(s => s.id === selectedId
-      ? (typeof updater === 'function' ? updater(s) : { ...s, ...updater })
-      : s
+      ? (typeof upd === 'function' ? upd(s) : { ...s, ...upd }) : s
     ));
-  };
 
   const addSequence = () => {
     if (!newName.trim()) return;
@@ -718,42 +668,42 @@ export default function SequencesView() {
     toast.success(`Sequence "${seq.name}" created`);
   };
 
-  const deleteSequence = (id) => {
+  const deleteSequence = id => {
     updateSequences(s => s.filter(x => x.id !== id));
     if (selectedId === id) setSelectedId(null);
     setConfirmDelete(null);
     toast.success('Sequence deleted');
   };
 
-  const renameSequence = (id) => {
+  const renameSequence = id => {
     if (!renameDraft.trim()) { setRenameId(null); return; }
     updateSequences(s => s.map(x => x.id === id ? { ...x, name: renameDraft.trim() } : x));
     setRenameId(null);
   };
 
-  const newModal = showNewModal && (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-         onClick={() => setShowNewModal(false)}>
-      <div style={{ background: 'var(--bg-main)', borderRadius: 10, padding: 24, width: 380, border: '1px solid var(--border)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}
-           onClick={e => e.stopPropagation()}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>New Sequence</h3>
-        <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Name *</label>
-        <input type="text" className="form-input" value={newName} autoFocus
-          onChange={e => setNewName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') addSequence(); if (e.key === 'Escape') setShowNewModal(false); }}
-          placeholder="e.g. Main Process Sequence"
-          style={{ width: '100%', marginBottom: 20 }} />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => setShowNewModal(false)}>Cancel</button>
-          <button className="btn btn-primary" onClick={addSequence} disabled={!newName.trim()}>Create</button>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {newModal}
+      {/* New sequence modal */}
+      {showNewModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+             onClick={() => setShowNewModal(false)}>
+          <div style={{ background: 'var(--bg-main)', borderRadius: 10, padding: 24, width: 380, border: '1px solid var(--border)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}
+               onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>New Sequence</h3>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Name *</label>
+            <input type="text" className="form-input" value={newName} autoFocus
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addSequence(); if (e.key === 'Escape') setShowNewModal(false); }}
+              placeholder="e.g. Main Process Sequence"
+              style={{ width: '100%', marginBottom: 20 }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-secondary" onClick={() => setShowNewModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={addSequence} disabled={!newName.trim()}>Create</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmDelete && (
         <ConfirmDialog title="Delete Sequence"
           message={`Delete "${sequences.find(s => s.id === confirmDelete)?.name}"? This cannot be undone.`}
@@ -762,18 +712,19 @@ export default function SequencesView() {
 
       {/* ── Left: Sequence list ── */}
       <div style={{ width: 220, borderRight: '1px solid var(--border)', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        {/* Search */}
         <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }}>
           <div style={{ position: 'relative' }}>
             <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-            <input type="text" value={filter} onChange={e => setFilter(e.target.value)}
-              placeholder="Filter…"
+            <input type="text" value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter…"
               style={{ paddingLeft: 26, width: '100%', fontSize: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px 5px 26px' }} />
-            {filter && <button onClick={() => setFilter('')} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}><X size={12} /></button>}
+            {filter && (
+              <button onClick={() => setFilter('')} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* List */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {filtered.length === 0 && (
             <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
@@ -785,11 +736,7 @@ export default function SequencesView() {
             const isRenaming = renameId === seq.id;
             return (
               <div key={seq.id} onClick={() => setSelectedId(seq.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', cursor: 'pointer',
-                  background: isSelected ? 'var(--accent-subtle, rgba(99,102,241,0.1))' : 'transparent',
-                  borderLeft: `3px solid ${isSelected ? 'var(--accent, #6366f1)' : 'transparent'}`,
-                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', cursor: 'pointer', background: isSelected ? 'var(--accent-subtle, rgba(99,102,241,0.1))' : 'transparent', borderLeft: `3px solid ${isSelected ? 'var(--accent, #6366f1)' : 'transparent'}` }}
                 className="tree-node">
                 <GitBranch size={14} style={{ flexShrink: 0, color: isSelected ? 'var(--accent)' : 'var(--text-muted)' }} />
                 {isRenaming ? (
@@ -821,7 +768,6 @@ export default function SequencesView() {
           })}
         </div>
 
-        {/* Add button */}
         <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
           <button className="btn btn-secondary"
             style={{ width: '100%', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
@@ -833,11 +779,7 @@ export default function SequencesView() {
 
       {/* ── Right: Canvas ── */}
       {selected ? (
-        <SequenceCanvas
-          key={selected.id}
-          sequence={selected}
-          onUpdateSequence={updateSelectedSequence}
-        />
+        <SequenceCanvas key={selected.id} sequence={selected} onUpdateSequence={updateSelectedSequence} />
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--text-muted)' }}>
           <GitBranch size={48} style={{ opacity: 0.12 }} />
