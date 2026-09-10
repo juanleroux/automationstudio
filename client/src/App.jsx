@@ -10,6 +10,7 @@ import CommTestView from './components/commtest/CommTestView';
 import SettingsView from './components/settings/SettingsView';
 import TopologyView from './components/topology/TopologyView';
 import NotesView from './components/notes/NotesView';
+import SequencesView from './components/sequences/SequencesView';
 import AiChat from './components/shared/AiChat';
 
 function AppInner() {
@@ -22,6 +23,7 @@ function AppInner() {
         {activeView === 'dashboard'   && <DashboardView />}
         {activeView === 'topology'    && <TopologyView />}
         {activeView === 'engineering' && <EngineeringView />}
+        {activeView === 'sequences'   && <SequencesView />}
         {activeView === 'notes'       && <NotesView />}
         {activeView === 'calculators' && <CalculatorsView />}
         {activeView === 'commtest'    && <CommTestView />}
