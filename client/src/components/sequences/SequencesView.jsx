@@ -79,9 +79,19 @@ function buildPath(from, fromPort, to, toPort, lineType, jog = 0) {
 
   if (lineType === 'orthogonal') {
     if (fd.dy !== 0) {
+      // Vertical exit (top/bottom port): stub ↕ → horizontal → ↕ to target
+      // Last segment is always vertical — arrow arrives up/down ✓
       const jy = from.y + fd.dy * STUB + jog;
       return `M${from.x},${from.y} L${from.x},${jy} L${to.x},${jy} L${to.x},${to.y}`;
+    } else if (td.dy !== 0) {
+      // Horizontal exit → vertical entry (left/right → top/bottom):
+      // stub → horizontal to target x → ↕ to target
+      // Last segment is vertical — arrow arrives up/down ✓
+      const jx = from.x + fd.dx * STUB + jog;
+      return `M${from.x},${from.y} L${jx},${from.y} L${to.x},${from.y} L${to.x},${to.y}`;
     } else {
+      // Both horizontal (left/right → left/right):
+      // stub → ↕ jog → horizontal to target
       const jx = from.x + fd.dx * STUB + jog;
       return `M${from.x},${from.y} L${jx},${from.y} L${jx},${to.y} L${to.x},${to.y}`;
     }
@@ -99,29 +109,37 @@ function barAtMidpoint(from, to) {
   return { mx:(from.x+to.x)/2, my:(from.y+to.y)/2, px:-dy/len, py:dx/len };
 }
 
-// Bar placed at the 50% point along the actual orthogonal path segments,
-// perpendicular to the local segment direction — so it sits ON the line.
-function orthogonalBarData(from, fromPort, to, jog = 0) {
+// Bar always placed on a VERTICAL segment so it renders as a horizontal line.
+// Mirrors the routing logic in buildPath to pick the right vertical segment.
+function orthogonalBarData(from, fromPort, to, toPort, jog = 0) {
   const fd   = PORT_DIRS[fromPort] || PORT_DIRS.bottom;
+  const td   = PORT_DIRS[toPort]   || PORT_DIRS.top;
   const STUB = 36;
-  const segs = fd.dy !== 0
-    ? (() => { const jy = from.y + fd.dy * STUB + jog; return [[from,{x:from.x,y:jy}],[{x:from.x,y:jy},{x:to.x,y:jy}],[{x:to.x,y:jy},to]]; })()
-    : (() => { const jx = from.x + fd.dx * STUB + jog; return [[from,{x:jx,y:from.y}],[{x:jx,y:from.y},{x:jx,y:to.y}],[{x:jx,y:to.y},to]]; })();
-  const lens  = segs.map(([a,b]) => Math.hypot(b.x-a.x, b.y-a.y));
-  const total = lens.reduce((s,v)=>s+v, 0);
-  if (total < 1) return barAtMidpoint(from, to);
-  let rem = total / 2;
-  for (let i = 0; i < segs.length; i++) {
-    if (rem <= lens[i] + 0.001) {
-      const [a, b] = segs[i];
-      const t   = lens[i] < 0.001 ? 0 : rem / lens[i];
-      const mx  = a.x + (b.x-a.x)*t, my = a.y + (b.y-a.y)*t;
-      const len = lens[i] || 1;
-      return { mx, my, px:-(b.y-a.y)/len, py:(b.x-a.x)/len };
+
+  if (fd.dy !== 0) {
+    // Vertical exit: path is [vert stub → horiz → vert to target]
+    // Prefer segment 3 (vert to target); fall back to stub if seg3 is tiny
+    const jy = from.y + fd.dy * STUB + jog;
+    if (Math.abs(to.y - jy) > 1) {
+      return { mx: to.x, my: (jy + to.y) / 2, px: 1, py: 0 };
     }
-    rem -= lens[i];
+    return { mx: from.x, my: (from.y + jy) / 2, px: 1, py: 0 };
+  } else if (td.dy !== 0) {
+    // Horiz exit → vert entry: path is [horiz stub → horiz → vert to target]
+    // Segment 3 is the vertical leg
+    if (Math.abs(to.y - from.y) > 1) {
+      return { mx: to.x, my: (from.y + to.y) / 2, px: 1, py: 0 };
+    }
+    return barAtMidpoint(from, to);
+  } else {
+    // Both horizontal: path is [horiz stub → vert jog → horiz to target]
+    // Segment 2 is the vertical leg
+    const jx = from.x + fd.dx * STUB + jog;
+    if (Math.abs(to.y - from.y) > 1) {
+      return { mx: jx, my: (from.y + to.y) / 2, px: 1, py: 0 };
+    }
+    return barAtMidpoint(from, to);
   }
-  return barAtMidpoint(from, to);
 }
 
 // ─── Port dots ────────────────────────────────────────────────────────────────
@@ -182,19 +200,27 @@ function TransitionLine({ t, fromStep, toStep, selected, zoom, onPointerDown, on
   const to   = getPortPos(toStep,   toPort);
   const d    = buildPath(from, fromPort, to, toPort, lineType, curJog);
   const { mx, my, px, py } = lineType === 'orthogonal'
-    ? orthogonalBarData(from, fromPort, to, curJog)
+    ? orthogonalBarData(from, fromPort, to, toPort, curJog)
     : barAtMidpoint(from, to);
 
-  // Jog handle: draggable grip on the middle elbow segment (orthogonal only)
+  // Jog handle: draggable grip on the reshapable segment (orthogonal only)
   const fd = PORT_DIRS[fromPort] || PORT_DIRS.bottom;
+  const td = PORT_DIRS[toPort]   || PORT_DIRS.top;
   const STUB = 36;
   let handleX, handleY, handleCursor;
   if (lineType === 'orthogonal') {
     if (fd.dy !== 0) {
+      // Vertical exit: handle on horizontal crossbar, drag up/down
       handleX = (from.x + to.x) / 2;
       handleY = from.y + fd.dy * STUB + curJog;
       handleCursor = 'ns-resize';
+    } else if (td.dy !== 0) {
+      // Horiz exit → vert entry: handle on first corner, drag left/right
+      handleX = from.x + fd.dx * STUB + curJog;
+      handleY = from.y;
+      handleCursor = 'ew-resize';
     } else {
+      // Both horizontal: handle on vertical jog column, drag left/right
       handleX = from.x + fd.dx * STUB + curJog;
       handleY = (from.y + to.y) / 2;
       handleCursor = 'ew-resize';
