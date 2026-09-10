@@ -6,6 +6,7 @@ const VIEW_LABELS = {
   dashboard:   'Dashboard',
   topology:    'Topology',
   engineering: 'Assets',
+  sequences:   'Sequences',
   notes:       'Notes',
   proposal:    'Proposal',
   calculators: 'Calculators',
@@ -13,7 +14,7 @@ const VIEW_LABELS = {
   settings:    'Settings',
 };
 
-export default function TopBar({ activeView, onToggleAiChat }) {
+export default function TopBar({ activeView, subtitle, onToggleAiChat }) {
   const { project, filename, isDirty } = useProject();
 
   return (
@@ -35,6 +36,14 @@ export default function TopBar({ activeView, onToggleAiChat }) {
             <span className="text-sm text-text-muted">
               {project.name || filename?.replace('.atsproj.json', '')}
             </span>
+            {subtitle && (
+              <>
+                <span className="text-text-muted">/</span>
+                <span className="text-sm text-text-muted" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {subtitle}
+                </span>
+              </>
+            )}
             {isDirty && (
               <span
                 className="text-xs px-1.5 py-0.5 rounded"

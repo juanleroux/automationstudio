@@ -170,14 +170,14 @@ function TransitionLine({ t, fromStep, toStep, selected, zoom, onPointerDown, on
   const fromPort = t.fromPort || 'bottom';
   const toPort   = t.toPort   || 'top';
   const lineType = t.lineType || 'orthogonal';
-  const dashed   = t.style === 'dashed';
   const isSelf   = t.fromStepId === t.toStepId;
   const curJog   = (t.jog || 0) + jogDelta;
 
-  const lineColor = selected ? '#6366f1' : dashed ? '#dc2626' : '#374151';
+  const DASH_MAP  = { dashed:'8 4', 'dash-dot':'8 3 2 3', dotted:'2 3' };
+  const dashArr   = DASH_MAP[t.style] ?? undefined;
+  const lineColor = selected ? '#6366f1' : '#374151';
   const barColor  = selected ? '#6366f1' : '#111827';
-  const dashArr   = dashed ? '6 4' : undefined;
-  const markId    = selected ? 'arr-sel' : dashed ? 'arr-dash' : 'arr-def';
+  const markId    = selected ? 'arr-sel' : 'arr-def';
   const BAR_HW    = 14;
   const BAR_THICK = 3;
 
@@ -867,22 +867,6 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
 
                   <PortSelect label="To Port" value={selTrans.toPort||'top'} onChange={v=>updateTransField('toPort',v)}/>
 
-                  <div style={{ borderTop:'1px solid var(--border-subtle)', paddingTop:10 }}>
-                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:6}}>Routing</label>
-                    <div style={{ display:'flex', gap:4 }}>
-                      {[{v:'curved',l:'Curved'},{v:'straight',l:'Straight'},{v:'orthogonal',l:'Orthogonal'}].map(({v,l})=>(
-                        <button key={v} onClick={()=>updateTransField('lineType',v)}
-                          style={{
-                            flex:1, padding:'5px 0', borderRadius:6, cursor:'pointer', fontSize:11,
-                            border:`1px solid ${(selTrans.lineType||'orthogonal')===v?'#6366f1':'var(--border)'}`,
-                            background:(selTrans.lineType||'orthogonal')===v?'rgba(99,102,241,0.1)':'transparent',
-                            color:(selTrans.lineType||'orthogonal')===v?'#6366f1':'var(--text-muted)',
-                            fontWeight:(selTrans.lineType||'orthogonal')===v?600:400,
-                          }}>{l}</button>
-                      ))}
-                    </div>
-                  </div>
-
                   <div>
                     <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>Condition</label>
                     <input type="text" className="form-input" value={selTrans.condition} onChange={e=>updateTransField('condition',e.target.value)} placeholder="e.g. Stop Command" style={{fontSize:12}}/>
@@ -892,19 +876,14 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
                     <input type="text" className="form-input" value={selTrans.label} onChange={e=>updateTransField('label',e.target.value)} placeholder="Yes / No / custom" style={{fontSize:12}}/>
                   </div>
                   <div>
-                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:6}}>Stroke</label>
-                    <div style={{display:'flex',gap:8}}>
-                      {[{v:'solid',l:'Normal'},{v:'dashed',l:'Off-Normal'}].map(({v,l})=>(
-                        <button key={v} onClick={()=>updateTransField('style',v)}
-                          style={{
-                            flex:1, padding:'5px 0', borderRadius:6, cursor:'pointer', fontSize:12,
-                            border:`1px solid ${selTrans.style===v?(v==='dashed'?'#dc2626':'#6366f1'):'var(--border)'}`,
-                            background:selTrans.style===v?(v==='dashed'?'rgba(220,38,38,0.08)':'rgba(99,102,241,0.08)'):'transparent',
-                            color:selTrans.style===v?(v==='dashed'?'#dc2626':'#6366f1'):'var(--text-muted)',
-                            fontWeight:selTrans.style===v?600:400,
-                          }}>{l}</button>
-                      ))}
-                    </div>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>Line Style</label>
+                    <select className="form-input" value={selTrans.style||'solid'} style={{fontSize:12}}
+                      onChange={e=>updateTransField('style',e.target.value)}>
+                      <option value="solid">Solid</option>
+                      <option value="dashed">Dashed</option>
+                      <option value="dash-dot">Dash Dot</option>
+                      <option value="dotted">Dotted</option>
+                    </select>
                   </div>
                   <button className="btn" onClick={()=>setConfirmDelTrans(selectedTransId)}
                     style={{fontSize:12,color:'#e55353',background:'rgba(229,83,83,0.08)',border:'1px solid rgba(229,83,83,0.3)',marginTop:4}}>
@@ -922,7 +901,7 @@ function SequenceCanvas({ sequence, onUpdateSequence }) {
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 
-export default function SequencesView() {
+export default function SequencesView({ onSetSubtitle }) {
   const { project, updateProject } = useProject();
   const toast = useToast();
   const [selectedId, setSelectedId]       = useState(null);
@@ -933,11 +912,18 @@ export default function SequencesView() {
   const [showNewModal, setShowNewModal]   = useState(false);
   const [newName, setNewName]             = useState('');
 
+  const sequences = project?.sequences || [];
+  const selected  = sequences.find(s => s.id === selectedId) ?? null;
+
+  // Keep top-bar title in sync with the selected sequence
+  useEffect(() => {
+    onSetSubtitle?.(selected?.name || '');
+    return () => onSetSubtitle?.('');
+  }, [selected?.name]);
+
   if (!project) return <NoProjectOpen/>;
 
-  const sequences = project.sequences || [];
   const filtered  = filter.trim() ? sequences.filter(s=>s.name.toLowerCase().includes(filter.toLowerCase())) : sequences;
-  const selected  = sequences.find(s=>s.id===selectedId)??null;
 
   const updateSequences = upd => updateProject(p=>({...p,sequences:typeof upd==='function'?upd(p.sequences||[]):upd}));
   const updateSelectedSequence = upd => updateSequences(seqs=>seqs.map(s=>s.id===selectedId?(typeof upd==='function'?upd(s):{...s,...upd}):s));

@@ -15,21 +15,24 @@ import AiChat from './components/shared/AiChat';
 
 function AppInner() {
   const [activeView, setActiveView] = useState('dashboard');
-  const [aiOpen, setAiOpen] = useState(false);
+  const [subtitle, setSubtitle]     = useState('');
+  const [aiOpen, setAiOpen]         = useState(false);
+
+  const handleChangeView = (view) => { setSubtitle(''); setActiveView(view); };
 
   return (
     <>
-      <Layout activeView={activeView} onChangeView={setActiveView} onToggleAiChat={() => setAiOpen(v => !v)}>
+      <Layout activeView={activeView} onChangeView={handleChangeView} onToggleAiChat={() => setAiOpen(v => !v)} subtitle={subtitle}>
         {activeView === 'dashboard'   && <DashboardView />}
         {activeView === 'topology'    && <TopologyView />}
         {activeView === 'engineering' && <EngineeringView />}
-        {activeView === 'sequences'   && <SequencesView />}
+        {activeView === 'sequences'   && <SequencesView onSetSubtitle={setSubtitle} />}
         {activeView === 'notes'       && <NotesView />}
         {activeView === 'calculators' && <CalculatorsView />}
         {activeView === 'commtest'    && <CommTestView />}
         {activeView === 'settings'    && <SettingsView />}
       </Layout>
-      <AiChat activeView={activeView} onChangeView={setActiveView} open={aiOpen} onSetOpen={setAiOpen} />
+      <AiChat activeView={activeView} onChangeView={handleChangeView} open={aiOpen} onSetOpen={setAiOpen} />
     </>
   );
 }
