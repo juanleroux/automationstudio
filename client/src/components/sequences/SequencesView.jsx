@@ -78,22 +78,33 @@ function buildPath(from, fromPort, to, toPort, lineType, jog = 0) {
   }
 
   if (lineType === 'orthogonal') {
-    if (fd.dy !== 0) {
-      // Vertical exit (top/bottom port): stub ↕ → horizontal → ↕ to target
-      // Last segment is always vertical — arrow arrives up/down ✓
+    if (fd.dy !== 0 && td.dy !== 0) {
+      // Vertical exit → vertical entry (top/bottom → top/bottom):
+      // stub ↕ → horiz → ↕ to target — last seg vertical ✓
       const jy = from.y + fd.dy * STUB + jog;
       return `M${from.x},${from.y} L${from.x},${jy} L${to.x},${jy} L${to.x},${to.y}`;
+    } else if (fd.dy !== 0) {
+      // Vertical exit → horizontal entry (top/bottom → left/right):
+      // stub ↕ → horiz to pre-approach → ↕ → horiz into port ✓
+      const jy = from.y + fd.dy * STUB + jog;
+      const preX = td.dx < 0 ? to.x - STUB : to.x + STUB;
+      return `M${from.x},${from.y} L${from.x},${jy} L${preX},${jy} L${preX},${to.y} L${to.x},${to.y}`;
     } else if (td.dy !== 0) {
       // Horizontal exit → vertical entry (left/right → top/bottom):
-      // stub → horizontal to target x → ↕ to target
-      // Last segment is vertical — arrow arrives up/down ✓
+      // stub → horiz to target x → ↕ to target — last seg vertical ✓
       const jx = from.x + fd.dx * STUB + jog;
       return `M${from.x},${from.y} L${jx},${from.y} L${to.x},${from.y} L${to.x},${to.y}`;
     } else {
       // Both horizontal (left/right → left/right):
-      // stub → ↕ jog → horizontal to target
+      // stub → ↕ jog → horiz into port — ensure correct arrival direction
       const jx = from.x + fd.dx * STUB + jog;
-      return `M${from.x},${from.y} L${jx},${from.y} L${jx},${to.y} L${to.x},${to.y}`;
+      const preX = td.dx < 0 ? Math.min(jx, to.x - STUB) : Math.max(jx, to.x + STUB);
+      if (Math.abs(preX - jx) < 0.5) {
+        return `M${from.x},${from.y} L${jx},${from.y} L${jx},${to.y} L${to.x},${to.y}`;
+      }
+      // jx is on the wrong side — route around via a midpoint row
+      const midY = (from.y + to.y) / 2;
+      return `M${from.x},${from.y} L${jx},${from.y} L${jx},${midY} L${preX},${midY} L${preX},${to.y} L${to.x},${to.y}`;
     }
   }
 
@@ -116,14 +127,22 @@ function orthogonalBarData(from, fromPort, to, toPort, jog = 0) {
   const td   = PORT_DIRS[toPort]   || PORT_DIRS.top;
   const STUB = 36;
 
-  if (fd.dy !== 0) {
-    // Vertical exit: path is [vert stub → horiz → vert to target]
-    // Prefer segment 3 (vert to target); fall back to stub if seg3 is tiny
+  if (fd.dy !== 0 && td.dy !== 0) {
+    // Vertical exit → vertical entry: path is [vert stub → horiz → vert to target]
+    // Bar on vertical segment 3, centered at true midpoint
     const jy = from.y + fd.dy * STUB + jog;
     if (Math.abs(to.y - jy) > 1) {
-      return { mx: to.x, my: (jy + to.y) / 2, px: 1, py: 0 };
+      return { mx: to.x, my: (from.y + to.y) / 2, px: 1, py: 0 };
     }
     return { mx: from.x, my: (from.y + jy) / 2, px: 1, py: 0 };
+  } else if (fd.dy !== 0) {
+    // Vertical exit → horizontal entry: path has pre-approach vertical segment
+    const jy = from.y + fd.dy * STUB + jog;
+    const preX = td.dx < 0 ? to.x - STUB : to.x + STUB;
+    if (Math.abs(to.y - jy) > 1) {
+      return { mx: preX, my: (jy + to.y) / 2, px: 1, py: 0 };
+    }
+    return barAtMidpoint(from, to);
   } else if (td.dy !== 0) {
     // Horiz exit → vert entry: path is [horiz stub → horiz → vert to target]
     // Segment 3 is the vertical leg
@@ -210,8 +229,9 @@ function TransitionLine({ t, fromStep, toStep, selected, zoom, onPointerDown, on
   let handleX, handleY, handleCursor;
   if (lineType === 'orthogonal') {
     if (fd.dy !== 0) {
-      // Vertical exit: handle on horizontal crossbar, drag up/down
-      handleX = (from.x + to.x) / 2;
+      // Vertical exit: handle on horizontal jog segment, drag up/down
+      const preX = td.dx !== 0 ? (td.dx < 0 ? to.x - STUB : to.x + STUB) : to.x;
+      handleX = (from.x + preX) / 2;
       handleY = from.y + fd.dy * STUB + curJog;
       handleCursor = 'ns-resize';
     } else if (td.dy !== 0) {
