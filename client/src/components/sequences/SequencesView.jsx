@@ -85,10 +85,8 @@ function buildPath(from, fromPort, to, toPort, lineType, jog = 0) {
       return `M${from.x},${from.y} L${from.x},${jy} L${to.x},${jy} L${to.x},${to.y}`;
     } else if (fd.dy !== 0) {
       // Vertical exit → horizontal entry (top/bottom → left/right):
-      // stub ↕ → horiz to pre-approach → ↕ → horiz into port ✓
-      const jy = from.y + fd.dy * STUB + jog;
-      const preX = td.dx < 0 ? to.x - STUB : to.x + STUB;
-      return `M${from.x},${from.y} L${from.x},${jy} L${preX},${jy} L${preX},${to.y} L${to.x},${to.y}`;
+      // Simple L-shape: go straight to target y, then horizontal into port
+      return `M${from.x},${from.y} L${from.x},${to.y} L${to.x},${to.y}`;
     } else if (td.dy !== 0) {
       // Horizontal exit → vertical entry (left/right → top/bottom):
       // stub → horiz to target x → ↕ to target — last seg vertical ✓
@@ -136,13 +134,8 @@ function orthogonalBarData(from, fromPort, to, toPort, jog = 0) {
     }
     return { mx: from.x, my: (from.y + jy) / 2, px: 1, py: 0 };
   } else if (fd.dy !== 0) {
-    // Vertical exit → horizontal entry: path has pre-approach vertical segment
-    const jy = from.y + fd.dy * STUB + jog;
-    const preX = td.dx < 0 ? to.x - STUB : to.x + STUB;
-    if (Math.abs(to.y - jy) > 1) {
-      return { mx: preX, my: (jy + to.y) / 2, px: 1, py: 0 };
-    }
-    return barAtMidpoint(from, to);
+    // Vertical exit → horizontal entry: L-shape, bar on the vertical leg at from.x
+    return { mx: from.x, my: (from.y + to.y) / 2, px: 1, py: 0 };
   } else if (td.dy !== 0) {
     // Horiz exit → vert entry: path is [horiz stub → horiz → vert to target]
     // Segment 3 is the vertical leg
@@ -228,10 +221,9 @@ function TransitionLine({ t, fromStep, toStep, selected, zoom, onPointerDown, on
   const STUB = 36;
   let handleX, handleY, handleCursor;
   if (lineType === 'orthogonal') {
-    if (fd.dy !== 0) {
-      // Vertical exit: handle on horizontal jog segment, drag up/down
-      const preX = td.dx !== 0 ? (td.dx < 0 ? to.x - STUB : to.x + STUB) : to.x;
-      handleX = (from.x + preX) / 2;
+    if (fd.dy !== 0 && td.dy !== 0) {
+      // Both vertical: handle on the horizontal crossbar, drag up/down
+      handleX = (from.x + to.x) / 2;
       handleY = from.y + fd.dy * STUB + curJog;
       handleCursor = 'ns-resize';
     } else if (td.dy !== 0) {
