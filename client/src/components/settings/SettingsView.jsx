@@ -61,7 +61,7 @@ export default function SettingsView() {
   const ceProjectXDBFileRef = useRef(null);
   const [cePendingTemplateId, setCePendingTemplateId] = useState(null);
   // AI Assistant settings — loaded from server config
-  const [aiConfig, setAiConfig] = useState({ provider: 'anthropic', model: '', apiKey: '', baseUrl: 'http://ollama:11434' });
+  const [aiConfig, setAiConfig] = useState({ enabled: true, provider: 'anthropic', model: '', apiKey: '', baseUrl: 'http://ollama:11434' });
   const [aiSaving, setAiSaving] = useState(false);
   const [aiTestResult, setAiTestResult] = useState(null);
   const [aiTesting, setAiTesting] = useState(false);
@@ -99,7 +99,7 @@ export default function SettingsView() {
   useEffect(() => {
     loadConfig().then(cfg => {
       setConfig(cfg);
-      if (cfg?.ai) setAiConfig(prev => ({ ...prev, ...cfg.ai }));
+      if (cfg?.ai) setAiConfig(prev => ({ ...prev, ...cfg.ai, enabled: cfg.ai.enabled !== false }));
     }).catch(() => {
       setConfig({
         proposal: {
@@ -282,6 +282,7 @@ export default function SettingsView() {
       const merged = { ...(config || {}), ai: aiConfig };
       await saveConfig(merged);
       setConfig(merged);
+      window.dispatchEvent(new CustomEvent('ai-settings-saved', { detail: { enabled: aiConfig.enabled !== false } }));
       toast.success('AI settings saved');
     } catch (err) {
       toast.error('Failed to save AI settings: ' + (err.response?.data?.error || err.message));
@@ -1543,6 +1544,22 @@ export default function SettingsView() {
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   Select your AI provider and model. Free options (Ollama, Groq) are available. Settings are saved to the server config and apply immediately.
                 </div>
+              </div>
+
+              {/* Enable / Disable toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-main)' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Enable AI Assistant</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>When disabled, the AI button and chat bubble are hidden throughout the app.</div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={aiConfig.enabled !== false}
+                    onChange={e => setAiConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{aiConfig.enabled !== false ? 'Enabled' : 'Disabled'}</span>
+                </label>
               </div>
 
               {/* Provider */}

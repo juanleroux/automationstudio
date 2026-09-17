@@ -136,6 +136,26 @@ function findUdtInstancesInTree(tags, nameSet, templateName) {
   return results;
 }
 
+// Resolve a full Ignition folder path back to a local areaId.
+// Strips the configured base prefix, then walks project.areas by name to find the matching id.
+// Returns 0 (unassigned) if the path cannot be resolved.
+function resolveIgnitionPathToAreaId(fullIgnPath, base, areas) {
+  let subPath = (fullIgnPath === '(unassigned)' ? '' : fullIgnPath) || '';
+  if (base && subPath === base) subPath = '';
+  else if (base && subPath.startsWith(base + '/')) subPath = subPath.slice(base.length + 1);
+  if (!subPath) return 0;
+  const parts = subPath.split('/');
+  let parentId = null;
+  let areaId = 0;
+  for (const name of parts) {
+    const area = (areas || []).find(a => a.name === name && a.parentId === parentId);
+    if (!area) return 0;
+    areaId = area.id;
+    parentId = area.id;
+  }
+  return areaId;
+}
+
 // Like findUdtInstancesInTree but also returns the Ignition folder path of each match.
 // Used to record where a tag actually lives so uploads go to the right place.
 function findUdtInstancesWithPath(tags, nameSet, templateName, basePath = '') {
@@ -847,6 +867,22 @@ export default function TemplateTree({ selected, onSelect }) {
             });
           }
         }
+
+        // Area / folder diff: compare where Ignition has the tag vs the local area assignment
+        const ignPath  = instanceIgnPath.get(`${template.id}:${instance.id}`) ?? '';
+        const localPath = [base, buildAreaPath(instance.areaId, areas)].filter(Boolean).join('/');
+        const ignDisp   = ignPath  || '(unassigned)';
+        const localDisp = localPath || '(unassigned)';
+        if (ignDisp !== localDisp) {
+          diffs.push({
+            key: `${template.id}:${instance.id}:__area__`,
+            templateId: template.id, instanceId: instance.id,
+            attrId: null, diffType: 'area',
+            instanceName: instance.name, attributeName: 'Area / Folder',
+            localValue: localDisp, ignitionValue: ignDisp,
+            checked: true,
+          });
+        }
       }
 
       setSyncDialog({ direction, searching: false, diffs, notFound, instanceList, instanceIgnPath });
@@ -865,21 +901,32 @@ export default function TemplateTree({ selected, onSelect }) {
     if (!checked.length) { setSyncDialog(null); return; }
     setSyncDialog(null);
 
+    const attrChecked = checked.filter(d => !d.diffType);
+    const areaChecked = checked.filter(d => d.diffType === 'area');
+
     if (direction === 'from') {
-      // Write Ignition values into local instance attributes
+      // Write Ignition values into local instance attributes + update area assignments
+      const eng = project?.engineering;
+      const areas = project.areas || [];
+      const base = eng?.folderPath || '';
       updateProject(p => ({
         ...p,
         templates: p.templates.map(t => {
-          const tChecked = checked.filter(d => d.templateId === t.id);
-          if (!tChecked.length) return t;
+          const tAttr = attrChecked.filter(d => d.templateId === t.id);
+          const tArea = areaChecked.filter(d => d.templateId === t.id);
+          if (!tAttr.length && !tArea.length) return t;
           return {
             ...t,
             instances: (t.instances || []).map(i => {
-              const iChecked = tChecked.filter(d => d.instanceId === i.id);
-              if (!iChecked.length) return i;
+              const iAttr = tAttr.filter(d => d.instanceId === i.id);
+              const iArea = tArea.find(d => d.instanceId === i.id);
+              if (!iAttr.length && !iArea) return i;
               const attrMap = new Map((i.attributes || []).map(a => [a.id, { ...a }]));
-              for (const d of iChecked) attrMap.set(d.attrId, { id: d.attrId, value: d.ignitionValue });
-              return { ...i, attributes: [...attrMap.values()], lastModification: new Date().toISOString() };
+              for (const d of iAttr) attrMap.set(d.attrId, { id: d.attrId, value: d.ignitionValue });
+              const areaUpdate = iArea
+                ? { areaId: resolveIgnitionPathToAreaId(iArea.ignitionValue, base, p.areas || []) }
+                : {};
+              return { ...i, ...areaUpdate, attributes: [...attrMap.values()], lastModification: new Date().toISOString() };
             }),
           };
         }),
@@ -894,15 +941,19 @@ export default function TemplateTree({ selected, onSelect }) {
       const toUpload = instanceList.filter(
         item => affectedKeys.has(`${item.template.id}:${item.instance.id}`)
       );
+      // For checked area diffs, use the LOCAL area path so the tag moves to the right folder.
+      const areaPathOverrides = new Map();
+      for (const d of areaChecked) {
+        const item = toUpload.find(i => i.template.id === d.templateId && i.instance.id === d.instanceId);
+        if (item) areaPathOverrides.set(`${d.templateId}:${d.instanceId}`,
+          [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/'));
+      }
       const groups = new Map();
       for (const item of toUpload) {
-        // Use the Ignition folder path where the tag was actually found during the diff scan.
-        // Fall back to the locally-computed area path only if the tag was not found (shouldn't happen).
         const key = `${item.template.id}:${item.instance.id}`;
-        const knownPath = instanceIgnPath?.get(key);
-        const fullPath = knownPath !== undefined
-          ? knownPath
-          : [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/');
+        const fullPath = areaPathOverrides.get(key)          // area move: use local path
+          ?? instanceIgnPath?.get(key)                        // attribute sync: use Ignition path
+          ?? [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/');
         if (!groups.has(fullPath)) groups.set(fullPath, []);
         groups.get(fullPath).push(item);
       }

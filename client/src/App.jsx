@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProjectProvider } from './context/ProjectContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/shared/Toast';
@@ -12,17 +12,26 @@ import TopologyView from './components/topology/TopologyView';
 import NotesView from './components/notes/NotesView';
 import SequencesView from './components/sequences/SequencesView';
 import AiChat from './components/shared/AiChat';
+import { loadConfig } from './api/client';
 
 function AppInner() {
   const [activeView, setActiveView] = useState('dashboard');
   const [subtitle, setSubtitle]     = useState('');
   const [aiOpen, setAiOpen]         = useState(false);
+  const [aiEnabled, setAiEnabled]   = useState(true);
+
+  useEffect(() => {
+    loadConfig().then(c => setAiEnabled(c?.ai?.enabled !== false)).catch(() => {});
+    const handler = e => setAiEnabled(e.detail?.enabled !== false);
+    window.addEventListener('ai-settings-saved', handler);
+    return () => window.removeEventListener('ai-settings-saved', handler);
+  }, []);
 
   const handleChangeView = (view) => { setSubtitle(''); setActiveView(view); };
 
   return (
     <>
-      <Layout activeView={activeView} onChangeView={handleChangeView} onToggleAiChat={() => setAiOpen(v => !v)} subtitle={subtitle}>
+      <Layout activeView={activeView} onChangeView={handleChangeView} onToggleAiChat={aiEnabled ? () => setAiOpen(v => !v) : null} subtitle={subtitle} showAi={aiEnabled}>
         {activeView === 'dashboard'   && <DashboardView />}
         {activeView === 'topology'    && <TopologyView />}
         {activeView === 'engineering' && <EngineeringView />}
@@ -32,7 +41,7 @@ function AppInner() {
         {activeView === 'commtest'    && <CommTestView />}
         {activeView === 'settings'    && <SettingsView />}
       </Layout>
-      <AiChat activeView={activeView} onChangeView={handleChangeView} open={aiOpen} onSetOpen={setAiOpen} />
+      {aiEnabled && <AiChat activeView={activeView} onChangeView={handleChangeView} open={aiOpen} onSetOpen={setAiOpen} />}
     </>
   );
 }
