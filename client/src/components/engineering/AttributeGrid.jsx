@@ -51,11 +51,9 @@ function EditCell({ value, onChange, disabled, type = 'text', style }) {
   );
 }
 
-export default function AttributeGrid({ attributes, templateAttributes, mode, onChange }) {
+export default function AttributeGrid({ attributes, templateAttributes, mode, onChange, hideDefaults = true, instanceArea }) {
   // mode: 'template' | 'instance'
   const isTemplate = mode === 'template';
-
-  const [hideDefaults, setHideDefaults] = useState(true);
 
   const updateAttr = useCallback((id, field, value) => {
     onChange(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
@@ -101,13 +99,22 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   });
 
   // In instance mode, optionally hide rows whose value is blank or unchanged from the template default
-  const displayRows = (!isTemplate && hideDefaults)
+  const visibleAttrRows = (!isTemplate && hideDefaults)
     ? sortedRows.filter(attr => {
         const val = String(attr.value ?? '');
         const def = String(attr._defaultValue ?? '');
         return val !== '' && val !== def;
       })
     : sortedRows;
+
+  // Virtual "Area" row: shows the instance's assigned area (from areaId resolved in the parent).
+  // Only visible when instanceArea is provided; hidden by "Hide Defaults" when no area is assigned.
+  const areaRow = !isTemplate && instanceArea !== undefined
+    ? { id: '__area__', name: 'Area', description: 'Assigned area', _isAreaRow: true, value: instanceArea || '' }
+    : null;
+  const areaVisible = areaRow && (!hideDefaults || !!areaRow.value);
+
+  const displayRows = areaVisible ? [areaRow, ...visibleAttrRows] : visibleAttrRows;
 
   function SortIcon({ col }) {
     if (sortCol !== col) return null;
@@ -116,19 +123,6 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
 
   return (
     <div className="flex flex-col h-full">
-      {!isTemplate && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
-            <input
-              type="checkbox"
-              checked={hideDefaults}
-              onChange={e => setHideDefaults(e.target.checked)}
-              style={{ cursor: 'pointer' }}
-            />
-            Hide Defaults
-          </label>
-        </div>
-      )}
       <div className="flex-1 overflow-auto">
         <table className="data-table" style={{ tableLayout: 'auto', width: 'auto', minWidth: '100%' }}>
           <thead>
@@ -159,7 +153,15 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                 </td>
               </tr>
             )}
-            {displayRows.map((attr) => (
+            {displayRows.map((attr) => attr._isAreaRow ? (
+              <tr key="__area__" style={{ opacity: 0.75, fontStyle: 'italic' }}>
+                <td><span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Area</span></td>
+                <td><span style={{ color: 'var(--text-disabled)', fontSize: 12 }}>assigned area</span></td>
+                <td><span style={{ color: 'var(--text-disabled)', fontSize: 12 }}>—</span></td>
+                <td><span style={{ color: 'var(--text-muted)' }}>{attr.value || <span style={{ color: 'var(--text-disabled)' }}>—</span>}</span></td>
+                <td />
+              </tr>
+            ) : (
               <tr key={attr.id}>
                 <td>
                   <EditCell

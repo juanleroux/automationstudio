@@ -13,6 +13,7 @@ import AreasView from '../areas/AreasView';
 import { openCommissioningReport } from '../../utils/commissioningReport';
 import { getFoldersFromIgnition } from '../../api/client';
 import { useToast } from '../shared/Toast';
+import { buildAreaPath } from '../../utils/ignition';
 
 function collectAllPaths(nodes, result = []) {
   for (const n of nodes) {
@@ -138,6 +139,7 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
   const [confirmDeleteProfile, setConfirmDeleteProfile] = useState(false);
   const importRef = useRef(null);
   const mode = selected?.type === 'instance' ? 'instance' : 'template';
+  const [hideDefaults, setHideDefaults] = useState(true);
 
   useEffect(() => { setActiveTab(0); }, [selected?.templateId, selected?.instanceId]);
 
@@ -316,6 +318,19 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             </button>
           )}
         </div>
+        {mode === 'instance' && activeTab === 0 && (
+          <div className="flex items-center gap-1 px-3 flex-shrink-0">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={hideDefaults}
+                onChange={e => setHideDefaults(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              Hide Defaults
+            </label>
+          </div>
+        )}
         {mode === 'template' && (
           <div className="flex items-center gap-1 px-2 flex-shrink-0">
             <button
@@ -363,6 +378,8 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
             templateAttributes={mode === 'instance' ? selectedTemplate?.attributes : undefined}
             mode={mode}
             onChange={mode === 'instance' ? onUpdateInstanceAttrs : onUpdateTemplateAttrs}
+            hideDefaults={hideDefaults}
+            instanceArea={mode === 'instance' ? buildAreaPath(selectedInstance?.areaId, project?.areas || []) : undefined}
           />
         ) : (
           <ProfilePanel
