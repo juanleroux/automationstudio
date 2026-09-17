@@ -136,6 +136,31 @@ function findUdtInstancesInTree(tags, nameSet, templateName) {
   return results;
 }
 
+// Like findUdtInstancesInTree but also returns the Ignition folder path of each match.
+// Used to record where a tag actually lives so uploads go to the right place.
+function findUdtInstancesWithPath(tags, nameSet, templateName, basePath = '') {
+  const results = [];
+  function walk(tagList, currentPath) {
+    for (const tag of (tagList || [])) {
+      if (
+        tag.tagType === 'UdtInstance' &&
+        nameSet.has(tag.name) &&
+        (tag.typeId === templateName || (tag.typeId || '').endsWith('/' + templateName))
+      ) {
+        results.push({ tag, folderPath: currentPath });
+      }
+      if (tag.tags?.length) {
+        const childPath = tag.tagType === 'Folder'
+          ? (currentPath ? `${currentPath}/${tag.name}` : tag.name)
+          : currentPath;
+        walk(tag.tags, childPath);
+      }
+    }
+  }
+  walk(Array.isArray(tags) ? tags : (tags?.tags || []), basePath);
+  return results;
+}
+
 export default function TemplateTree({ selected, onSelect }) {
   const { project, updateProject } = useProject();
   const toast = useToast();
@@ -751,6 +776,7 @@ export default function TemplateTree({ selected, onSelect }) {
 
       const ignByKey = new Map(); // "templateId:instanceName" → ignition UdtInstance
       const foundKeys = new Set(); // "templateId:instanceId"
+      const instanceIgnPath = new Map(); // "templateId:instanceId" → ignition folder path where tag was found
 
       // Step 1: fetch each folder group
       for (const [folderPath, items] of groups.entries()) {
@@ -761,10 +787,12 @@ export default function TemplateTree({ selected, onSelect }) {
           });
           const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
           for (const item of items) {
-            const found = findUdtInstancesInTree(rawTags, new Set([item.instance.name]), item.template.name);
-            for (const ign of found) {
-              ignByKey.set(`${item.template.id}:${ign.name}`, ign);
-              foundKeys.add(`${item.template.id}:${item.instance.id}`);
+            const found = findUdtInstancesWithPath(rawTags, new Set([item.instance.name]), item.template.name, folderPath);
+            for (const { tag, folderPath: tagPath } of found) {
+              ignByKey.set(`${item.template.id}:${tag.name}`, tag);
+              const key = `${item.template.id}:${item.instance.id}`;
+              foundKeys.add(key);
+              instanceIgnPath.set(key, tagPath);
             }
           }
         } catch { /* will retry with root search */ }
@@ -782,10 +810,12 @@ export default function TemplateTree({ selected, onSelect }) {
           });
           const rawRoot = Array.isArray(rootResult.data) ? rootResult.data : (rootResult.data?.tags || []);
           for (const item of stillMissing) {
-            const found = findUdtInstancesInTree(rawRoot, new Set([item.instance.name]), item.template.name);
-            for (const ign of found) {
-              ignByKey.set(`${item.template.id}:${ign.name}`, ign);
-              foundKeys.add(`${item.template.id}:${item.instance.id}`);
+            const found = findUdtInstancesWithPath(rawRoot, new Set([item.instance.name]), item.template.name, '');
+            for (const { tag, folderPath: tagPath } of found) {
+              ignByKey.set(`${item.template.id}:${tag.name}`, tag);
+              const key = `${item.template.id}:${item.instance.id}`;
+              foundKeys.add(key);
+              instanceIgnPath.set(key, tagPath);
             }
           }
         } catch { /* root search also failed */ }
@@ -819,7 +849,7 @@ export default function TemplateTree({ selected, onSelect }) {
         }
       }
 
-      setSyncDialog({ direction, searching: false, diffs, notFound, instanceList });
+      setSyncDialog({ direction, searching: false, diffs, notFound, instanceList, instanceIgnPath });
     } catch (err) {
       setSyncDialog(null);
       toast.error('Failed to fetch from Ignition: ' + (err.response?.data?.error || err.message));
@@ -866,8 +896,13 @@ export default function TemplateTree({ selected, onSelect }) {
       );
       const groups = new Map();
       for (const item of toUpload) {
-        const areaPath = buildAreaPath(item.instance.areaId, areas);
-        const fullPath = [base, areaPath].filter(Boolean).join('/');
+        // Use the Ignition folder path where the tag was actually found during the diff scan.
+        // Fall back to the locally-computed area path only if the tag was not found (shouldn't happen).
+        const key = `${item.template.id}:${item.instance.id}`;
+        const knownPath = instanceIgnPath?.get(key);
+        const fullPath = knownPath !== undefined
+          ? knownPath
+          : [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/');
         if (!groups.has(fullPath)) groups.set(fullPath, []);
         groups.get(fullPath).push(item);
       }
