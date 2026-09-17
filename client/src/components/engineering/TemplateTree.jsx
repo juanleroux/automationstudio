@@ -156,6 +156,32 @@ function resolveIgnitionPathToAreaId(fullIgnPath, base, areas) {
   return areaId;
 }
 
+// Like resolveIgnitionPathToAreaId but auto-creates missing area nodes.
+// Returns { areaId, areas } where areas may include newly created entries.
+function resolveOrCreateAreaPath(fullIgnPath, base, areas) {
+  let subPath = (fullIgnPath === '(unassigned)' ? '' : fullIgnPath) || '';
+  if (base && subPath === base) subPath = '';
+  else if (base && subPath.startsWith(base + '/')) subPath = subPath.slice(base.length + 1);
+  if (!subPath) return { areaId: 0, areas };
+  const parts = subPath.split('/');
+  let currentAreas = [...(areas || [])];
+  let parentId = null;
+  let areaId = 0;
+  for (const name of parts) {
+    const existing = currentAreas.find(a => a.name === name && a.parentId === parentId);
+    if (existing) {
+      areaId = existing.id;
+      parentId = existing.id;
+    } else {
+      const newId = currentAreas.length > 0 ? Math.max(...currentAreas.map(a => a.id)) + 1 : 1;
+      currentAreas = [...currentAreas, { id: newId, name, parentId }];
+      areaId = newId;
+      parentId = newId;
+    }
+  }
+  return { areaId, areas: currentAreas };
+}
+
 // Like findUdtInstancesInTree but also returns the Ignition folder path of each match.
 // Used to record where a tag actually lives so uploads go to the right place.
 function findUdtInstancesWithPath(tags, nameSet, templateName, basePath = '') {
@@ -907,30 +933,39 @@ export default function TemplateTree({ selected, onSelect }) {
     if (direction === 'from') {
       // Write Ignition values into local instance attributes + update area assignments
       const eng = project?.engineering;
-      const areas = project.areas || [];
       const base = eng?.folderPath || '';
-      updateProject(p => ({
-        ...p,
-        templates: p.templates.map(t => {
-          const tAttr = attrChecked.filter(d => d.templateId === t.id);
-          const tArea = areaChecked.filter(d => d.templateId === t.id);
-          if (!tAttr.length && !tArea.length) return t;
-          return {
-            ...t,
-            instances: (t.instances || []).map(i => {
-              const iAttr = tAttr.filter(d => d.instanceId === i.id);
-              const iArea = tArea.find(d => d.instanceId === i.id);
-              if (!iAttr.length && !iArea) return i;
-              const attrMap = new Map((i.attributes || []).map(a => [a.id, { ...a }]));
-              for (const d of iAttr) attrMap.set(d.attrId, { id: d.attrId, value: d.ignitionValue });
-              const areaUpdate = iArea
-                ? { areaId: resolveIgnitionPathToAreaId(iArea.ignitionValue, base, p.areas || []) }
-                : {};
-              return { ...i, ...areaUpdate, attributes: [...attrMap.values()], lastModification: new Date().toISOString() };
-            }),
-          };
-        }),
-      }));
+      updateProject(p => {
+        // Pre-resolve all area diffs, auto-creating areas that don't exist yet
+        let updatedAreas = p.areas || [];
+        const areaResolutions = new Map();
+        for (const d of areaChecked) {
+          const { areaId, areas: newAreas } = resolveOrCreateAreaPath(d.ignitionValue, base, updatedAreas);
+          updatedAreas = newAreas;
+          areaResolutions.set(`${d.templateId}:${d.instanceId}`, areaId);
+        }
+        return {
+          ...p,
+          areas: updatedAreas,
+          templates: p.templates.map(t => {
+            const tAttr = attrChecked.filter(d => d.templateId === t.id);
+            const tArea = areaChecked.filter(d => d.templateId === t.id);
+            if (!tAttr.length && !tArea.length) return t;
+            return {
+              ...t,
+              instances: (t.instances || []).map(i => {
+                const iAttr = tAttr.filter(d => d.instanceId === i.id);
+                const iArea = tArea.find(d => d.instanceId === i.id);
+                if (!iAttr.length && !iArea) return i;
+                const attrMap = new Map((i.attributes || []).map(a => [a.id, { ...a }]));
+                for (const d of iAttr) attrMap.set(d.attrId, { id: d.attrId, value: d.ignitionValue });
+                const resolvedAreaId = iArea ? areaResolutions.get(`${iArea.templateId}:${iArea.instanceId}`) : undefined;
+                const areaUpdate = resolvedAreaId !== undefined ? { areaId: resolvedAreaId } : {};
+                return { ...i, ...areaUpdate, attributes: [...attrMap.values()], lastModification: new Date().toISOString() };
+              }),
+            };
+          }),
+        };
+      });
       toast.success(`Applied ${checked.length} change(s) from Ignition`);
     } else {
       // Upload affected instances to Ignition
