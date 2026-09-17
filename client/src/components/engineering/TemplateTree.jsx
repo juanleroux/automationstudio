@@ -859,11 +859,11 @@ export default function TemplateTree({ selected, onSelect }) {
   // Apply the confirmed sync (only checked diffs)
   const applySyncDialog = async () => {
     if (!syncDialog) return;
-    const { direction, diffs, instanceList } = syncDialog;
+    const { direction, diffs, instanceList, instanceIgnPath } = syncDialog;
     const checked = diffs.filter(d => d.checked);
-    setSyncDialog(null);
 
-    if (!checked.length) return;
+    if (!checked.length) { setSyncDialog(null); return; }
+    setSyncDialog(null);
 
     if (direction === 'from') {
       // Write Ignition values into local instance attributes
