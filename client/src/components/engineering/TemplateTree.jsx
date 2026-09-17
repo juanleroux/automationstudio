@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ChevronRight, ChevronDown, Folder, FolderOpen, Tag,
   Circle, Search, Filter, Plus, Trash2, Copy, Edit2,
-  Upload, Download, Flag, MoreVertical, ArrowUpDown, FileCode
+  Upload, Download, Flag, MoreVertical, ArrowUpDown, FileCode, RefreshCw
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
@@ -702,6 +702,90 @@ export default function TemplateTree({ selected, onSelect }) {
     } catch (err) {
       const detail = err.response?.data?.error || err.message;
       toast.error('Upload failed: ' + detail);
+    }
+  };
+
+  const syncInstancesToIgnition = (instanceList) => exportInstancesToIgnition(instanceList);
+
+  const syncInstancesFromIgnition = async (instanceList) => {
+    setContextMenu(null);
+    const eng = project?.engineering;
+    if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
+
+    const areas = project.areas || [];
+    const base  = eng.folderPath || '';
+
+    // Group by resolved folder path (same grouping as upload)
+    const groups = new Map();
+    for (const item of instanceList) {
+      const areaPath = buildAreaPath(item.instance.areaId, areas);
+      const fullPath = [base, areaPath].filter(Boolean).join('/');
+      if (!groups.has(fullPath)) groups.set(fullPath, []);
+      groups.get(fullPath).push(item);
+    }
+
+    try {
+      const updates = [];
+
+      for (const [folderPath, items] of groups.entries()) {
+        const result = await exportFromIgnition({
+          gatewayUrl: eng.ignitionGateway,
+          apiKey:     eng.apiKey,
+          provider:   eng.provider || 'default',
+          folderPath,
+        });
+        const rawTags    = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
+        const udtInsts   = rawTags.filter(t => t.tagType === 'UdtInstance');
+
+        for (const { template, instance } of items) {
+          const ignInst = udtInsts.find(t =>
+            t.name === instance.name &&
+            (t.typeId === template.name || (t.typeId || '').endsWith('/' + template.name))
+          );
+          if (!ignInst) continue;
+
+          // Rebuild instance attributes: sync parameter values from Ignition
+          const attrMap = new Map((instance.attributes || []).map(a => [a.id, { ...a }]));
+          for (const ta of (template.attributes || [])) {
+            if (!ta.parameter) continue;
+            const ignParam = ignInst.parameters?.[ta.name];
+            if (ignParam == null) continue;
+            const existing = attrMap.get(ta.id);
+            const updated  = { ...(existing || { id: ta.id }), value: String(ignParam.value ?? '') };
+            attrMap.set(ta.id, updated);
+          }
+
+          updates.push({
+            templateId: template.id,
+            instanceId: instance.id,
+            attributes: [...attrMap.values()],
+          });
+        }
+      }
+
+      if (!updates.length) {
+        toast.error('No matching instances found in Ignition');
+        return;
+      }
+
+      updateProject(p => ({
+        ...p,
+        templates: p.templates.map(t => {
+          const tUpdates = updates.filter(u => u.templateId === t.id);
+          if (!tUpdates.length) return t;
+          return {
+            ...t,
+            instances: (t.instances || []).map(i => {
+              const u = tUpdates.find(x => x.instanceId === i.id);
+              return u ? { ...i, attributes: u.attributes, lastModification: new Date().toISOString() } : i;
+            }),
+          };
+        }),
+      }));
+
+      toast.success(`Synced ${updates.length} instance(s) from Ignition`);
+    } catch (err) {
+      toast.error('Sync from Ignition failed: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -1488,6 +1572,24 @@ export default function TemplateTree({ selected, onSelect }) {
                         })()}
                       </div>
                     </div>
+                    {project?.engineering?.enableIgnitionMenuItems && (
+                      <div className="context-menu-submenu">
+                        <div className="context-menu-item">
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <RefreshCw size={14} /> Sync{multi ? ` (${ctxInsts.length})` : ''}
+                          </span>
+                          <ChevronRight size={12} style={{ opacity: 0.6 }} />
+                        </div>
+                        <div className="context-menu-submenu-panel">
+                          <div className="context-menu-item" onClick={() => syncInstancesToIgnition(ctxInsts)}>
+                            <Upload size={14} /> Sync To &rarr; Ignition
+                          </div>
+                          <div className="context-menu-item" onClick={() => syncInstancesFromIgnition(ctxInsts)}>
+                            <Download size={14} /> Sync From &larr; Ignition
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {multiSelected.size > 0 && (
                       <>
                         <div className="context-menu-separator" />
