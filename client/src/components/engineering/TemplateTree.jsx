@@ -115,6 +115,27 @@ function nextId(arr) {
   return Math.max(...arr.map(x => x.id)) + 1;
 }
 
+// Recursively search an Ignition tag tree for UdtInstances matching the given
+// name set and template name.  Falls back to checking typeId suffix so that
+// path-qualified typeIds (e.g. "Folder/Motor") still match "Motor".
+function findUdtInstancesInTree(tags, nameSet, templateName) {
+  const results = [];
+  function walk(tagList) {
+    for (const tag of (tagList || [])) {
+      if (
+        tag.tagType === 'UdtInstance' &&
+        nameSet.has(tag.name) &&
+        (tag.typeId === templateName || (tag.typeId || '').endsWith('/' + templateName))
+      ) {
+        results.push(tag);
+      }
+      if (tag.tags?.length) walk(tag.tags);
+    }
+  }
+  walk(Array.isArray(tags) ? tags : (tags?.tags || []));
+  return results;
+}
+
 export default function TemplateTree({ selected, onSelect }) {
   const { project, updateProject } = useProject();
   const toast = useToast();
@@ -149,6 +170,7 @@ export default function TemplateTree({ selected, onSelect }) {
   const [ceGroups, setCeGroups] = useState([]); // [{ fbTypeName, fbVersion, parameters, instances: [name] }]
   const [ceSelected, setCeSelected] = useState(new Set());
   const [multiSelected, setMultiSelected] = useState(new Set()); // "templateId:instanceId"
+  const [syncDialog, setSyncDialog] = useState(null); // { direction, searching, diffs, notFound, instanceList }
 
   const renameInputRef = useRef(null);
 
@@ -705,87 +727,163 @@ export default function TemplateTree({ selected, onSelect }) {
     }
   };
 
-  const syncInstancesToIgnition = (instanceList) => exportInstancesToIgnition(instanceList);
-
-  const syncInstancesFromIgnition = async (instanceList) => {
+  // Open the sync diff dialog: fetches current Ignition values, computes diff,
+  // then lets the user review and confirm which changes to apply.
+  const openSyncDialog = async (direction, instanceList) => {
     setContextMenu(null);
     const eng = project?.engineering;
     if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
 
+    setSyncDialog({ direction, searching: true, diffs: [], notFound: [], instanceList });
+
     const areas = project.areas || [];
     const base  = eng.folderPath || '';
 
-    // Group by resolved folder path (same grouping as upload)
-    const groups = new Map();
-    for (const item of instanceList) {
-      const areaPath = buildAreaPath(item.instance.areaId, areas);
-      const fullPath = [base, areaPath].filter(Boolean).join('/');
-      if (!groups.has(fullPath)) groups.set(fullPath, []);
-      groups.get(fullPath).push(item);
-    }
-
     try {
-      const updates = [];
+      // Group by area-resolved folder path for the initial fetch
+      const groups = new Map();
+      for (const item of instanceList) {
+        const areaPath = buildAreaPath(item.instance.areaId, areas);
+        const fullPath = [base, areaPath].filter(Boolean).join('/');
+        if (!groups.has(fullPath)) groups.set(fullPath, []);
+        groups.get(fullPath).push(item);
+      }
 
+      const ignByKey = new Map(); // "templateId:instanceName" → ignition UdtInstance
+      const foundKeys = new Set(); // "templateId:instanceId"
+
+      // Step 1: fetch each folder group
       for (const [folderPath, items] of groups.entries()) {
-        const result = await exportFromIgnition({
-          gatewayUrl: eng.ignitionGateway,
-          apiKey:     eng.apiKey,
-          provider:   eng.provider || 'default',
-          folderPath,
-        });
-        const rawTags    = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
-        const udtInsts   = rawTags.filter(t => t.tagType === 'UdtInstance');
-
-        for (const { template, instance } of items) {
-          const ignInst = udtInsts.find(t =>
-            t.name === instance.name &&
-            (t.typeId === template.name || (t.typeId || '').endsWith('/' + template.name))
-          );
-          if (!ignInst) continue;
-
-          // Rebuild instance attributes: sync parameter values from Ignition
-          const attrMap = new Map((instance.attributes || []).map(a => [a.id, { ...a }]));
-          for (const ta of (template.attributes || [])) {
-            if (!ta.parameter) continue;
-            const ignParam = ignInst.parameters?.[ta.name];
-            if (ignParam == null) continue;
-            const existing = attrMap.get(ta.id);
-            const updated  = { ...(existing || { id: ta.id }), value: String(ignParam.value ?? '') };
-            attrMap.set(ta.id, updated);
-          }
-
-          updates.push({
-            templateId: template.id,
-            instanceId: instance.id,
-            attributes: [...attrMap.values()],
+        try {
+          const result = await exportFromIgnition({
+            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+            provider: eng.provider || 'default', folderPath,
           });
+          const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
+          for (const item of items) {
+            const found = findUdtInstancesInTree(rawTags, new Set([item.instance.name]), item.template.name);
+            for (const ign of found) {
+              ignByKey.set(`${item.template.id}:${ign.name}`, ign);
+              foundKeys.add(`${item.template.id}:${item.instance.id}`);
+            }
+          }
+        } catch { /* will retry with root search */ }
+      }
+
+      // Step 2: for anything still not found, try a root-level search
+      const stillMissing = instanceList.filter(
+        item => !foundKeys.has(`${item.template.id}:${item.instance.id}`)
+      );
+      if (stillMissing.length) {
+        try {
+          const rootResult = await exportFromIgnition({
+            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+            provider: eng.provider || 'default', folderPath: '',
+          });
+          const rawRoot = Array.isArray(rootResult.data) ? rootResult.data : (rootResult.data?.tags || []);
+          for (const item of stillMissing) {
+            const found = findUdtInstancesInTree(rawRoot, new Set([item.instance.name]), item.template.name);
+            for (const ign of found) {
+              ignByKey.set(`${item.template.id}:${ign.name}`, ign);
+              foundKeys.add(`${item.template.id}:${item.instance.id}`);
+            }
+          }
+        } catch { /* root search also failed */ }
+      }
+
+      // Step 3: compute per-attribute diffs
+      const diffs = [];
+      const notFound = [];
+      for (const { template, instance } of instanceList) {
+        if (!foundKeys.has(`${template.id}:${instance.id}`)) {
+          notFound.push(instance.name);
+          continue;
+        }
+        const ignInst = ignByKey.get(`${template.id}:${instance.name}`);
+        if (!ignInst) continue;
+        for (const ta of (template.attributes || [])) {
+          if (!ta.parameter) continue;
+          const instAttr = (instance.attributes || []).find(a => a.id === ta.id);
+          const localVal = instAttr != null ? String(instAttr.value ?? '') : String(ta.value ?? '');
+          const ignParam = ignInst.parameters?.[ta.name];
+          const ignVal   = ignParam != null ? String(ignParam.value ?? '') : String(ta.value ?? '');
+          if (localVal !== ignVal) {
+            diffs.push({
+              key: `${template.id}:${instance.id}:${ta.id}`,
+              templateId: template.id, instanceId: instance.id, attrId: ta.id,
+              instanceName: instance.name, attributeName: ta.name,
+              localValue: localVal, ignitionValue: ignVal,
+              checked: true,
+            });
+          }
         }
       }
 
-      if (!updates.length) {
-        toast.error('No matching instances found in Ignition');
-        return;
-      }
+      setSyncDialog({ direction, searching: false, diffs, notFound, instanceList });
+    } catch (err) {
+      setSyncDialog(null);
+      toast.error('Failed to fetch from Ignition: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
+  // Apply the confirmed sync (only checked diffs)
+  const applySyncDialog = async () => {
+    if (!syncDialog) return;
+    const { direction, diffs, instanceList } = syncDialog;
+    const checked = diffs.filter(d => d.checked);
+    setSyncDialog(null);
+
+    if (!checked.length) return;
+
+    if (direction === 'from') {
+      // Write Ignition values into local instance attributes
       updateProject(p => ({
         ...p,
         templates: p.templates.map(t => {
-          const tUpdates = updates.filter(u => u.templateId === t.id);
-          if (!tUpdates.length) return t;
+          const tChecked = checked.filter(d => d.templateId === t.id);
+          if (!tChecked.length) return t;
           return {
             ...t,
             instances: (t.instances || []).map(i => {
-              const u = tUpdates.find(x => x.instanceId === i.id);
-              return u ? { ...i, attributes: u.attributes, lastModification: new Date().toISOString() } : i;
+              const iChecked = tChecked.filter(d => d.instanceId === i.id);
+              if (!iChecked.length) return i;
+              const attrMap = new Map((i.attributes || []).map(a => [a.id, { ...a }]));
+              for (const d of iChecked) attrMap.set(d.attrId, { id: d.attrId, value: d.ignitionValue });
+              return { ...i, attributes: [...attrMap.values()], lastModification: new Date().toISOString() };
             }),
           };
         }),
       }));
-
-      toast.success(`Synced ${updates.length} instance(s) from Ignition`);
-    } catch (err) {
-      toast.error('Sync from Ignition failed: ' + (err.response?.data?.error || err.message));
+      toast.success(`Applied ${checked.length} change(s) from Ignition`);
+    } else {
+      // Upload affected instances to Ignition
+      const eng = project?.engineering;
+      const areas = project.areas || [];
+      const base = eng.folderPath || '';
+      const affectedKeys = new Set(checked.map(d => `${d.templateId}:${d.instanceId}`));
+      const toUpload = instanceList.filter(
+        item => affectedKeys.has(`${item.template.id}:${item.instance.id}`)
+      );
+      const groups = new Map();
+      for (const item of toUpload) {
+        const areaPath = buildAreaPath(item.instance.areaId, areas);
+        const fullPath = [base, areaPath].filter(Boolean).join('/');
+        if (!groups.has(fullPath)) groups.set(fullPath, []);
+        groups.get(fullPath).push(item);
+      }
+      try {
+        await Promise.all([...groups.entries()].map(([folderPath, items]) =>
+          uploadToIgnition({
+            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+            provider: eng.provider || 'default',
+            collisionPolicy: eng.collisionPolicy || 'Overwrite',
+            folderPath, payload: buildInstancesPayload(items),
+          })
+        ));
+        toast.success(`Synced ${toUpload.length} instance(s) to Ignition`);
+      } catch (err) {
+        toast.error('Sync to Ignition failed: ' + (err.response?.data?.error || err.message));
+      }
     }
   };
 
@@ -1581,10 +1679,10 @@ export default function TemplateTree({ selected, onSelect }) {
                           <ChevronRight size={12} style={{ opacity: 0.6 }} />
                         </div>
                         <div className="context-menu-submenu-panel">
-                          <div className="context-menu-item" onClick={() => syncInstancesToIgnition(ctxInsts)}>
+                          <div className="context-menu-item" onClick={() => openSyncDialog('to', ctxInsts)}>
                             <Upload size={14} /> Sync To &rarr; Ignition
                           </div>
-                          <div className="context-menu-item" onClick={() => syncInstancesFromIgnition(ctxInsts)}>
+                          <div className="context-menu-item" onClick={() => openSyncDialog('from', ctxInsts)}>
                             <Download size={14} /> Sync From &larr; Ignition
                           </div>
                         </div>
@@ -1612,6 +1710,116 @@ export default function TemplateTree({ selected, onSelect }) {
           )}
         </div>
       )}
+
+      {/* Ignition Sync Diff Dialog */}
+      {syncDialog && (
+        <Modal
+          title={syncDialog.direction === 'to' ? 'Sync To → Ignition' : 'Sync From ← Ignition'}
+          onClose={() => setSyncDialog(null)}
+          width={720}
+          footer={
+            syncDialog.searching ? null : (
+              <>
+                {syncDialog.diffs.length > 0 && (
+                  <>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: 12, marginRight: 'auto' }}
+                      onClick={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: true })) }))}
+                    >Select All</button>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: 12 }}
+                      onClick={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: false })) }))}
+                    >Deselect All</button>
+                  </>
+                )}
+                <button className="btn btn-ghost" onClick={() => setSyncDialog(null)}>Cancel</button>
+                {syncDialog.diffs.length > 0 && (
+                  <button
+                    className="btn btn-primary"
+                    disabled={!syncDialog.diffs.some(d => d.checked)}
+                    onClick={applySyncDialog}
+                  >
+                    Confirm ({syncDialog.diffs.filter(d => d.checked).length})
+                  </button>
+                )}
+              </>
+            )
+          }
+        >
+          {syncDialog.searching ? (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+              <RefreshCw size={20} style={{ marginBottom: 8, animation: 'spin 1s linear infinite' }} />
+              <div>Searching Ignition for matching tags…</div>
+            </div>
+          ) : (
+            <>
+              {syncDialog.notFound.length > 0 && (
+                <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, fontSize: 12,
+                  background: 'var(--bg-warning, #fef3c7)', color: 'var(--text-warning, #92400e)',
+                  border: '1px solid var(--border-warning, #fcd34d)' }}>
+                  Not found in Ignition: {syncDialog.notFound.join(', ')}
+                </div>
+              )}
+              {syncDialog.diffs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                  All values are already in sync — no differences found.
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                    {syncDialog.direction === 'to'
+                      ? 'The following local values differ from Ignition. Tick the changes to push:'
+                      : 'The following Ignition values differ from local. Tick the changes to pull:'}
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                          <th style={{ width: 28, padding: '6px 4px' }}></th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>Instance</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>Attribute</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                            {syncDialog.direction === 'to' ? 'Current (Ignition)' : 'Current (Local)'}
+                          </th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                            {syncDialog.direction === 'to' ? 'New (Local)' : 'New (Ignition)'}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {syncDialog.diffs.map((d, i) => (
+                          <tr key={d.key}
+                            style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'var(--bg-main)' }}
+                            onClick={() => setSyncDialog(sd => ({
+                              ...sd, diffs: sd.diffs.map(x => x.key === d.key ? { ...x, checked: !x.checked } : x)
+                            }))}
+                          >
+                            <td style={{ padding: '6px 4px', textAlign: 'center' }}>
+                              <input type="checkbox" checked={d.checked} onChange={() => {}}
+                                style={{ cursor: 'pointer' }} />
+                            </td>
+                            <td style={{ padding: '6px 8px', color: 'var(--text-primary)', fontWeight: 500 }}>{d.instanceName}</td>
+                            <td style={{ padding: '6px 8px', color: 'var(--text-primary)' }}>{d.attributeName}</td>
+                            <td style={{ padding: '6px 8px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                              {syncDialog.direction === 'to' ? d.ignitionValue : d.localValue}
+                            </td>
+                            <td style={{ padding: '6px 8px', color: '#16a34a', fontFamily: 'monospace', fontWeight: 500 }}>
+                              {syncDialog.direction === 'to' ? d.localValue : d.ignitionValue}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </Modal>
+      )}
+      <style>{`@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }`}</style>
 
       {/* Confirm Delete */}
       {confirmDelete && (
