@@ -28,6 +28,14 @@ function flattenVisible(nodes, expanded, depth = 0) {
   return rows;
 }
 
+function getTotalCount(areaId, areaInst, areasArr) {
+  let count = (areaInst[areaId] || []).length;
+  for (const child of areasArr.filter(a => a.parentId === areaId)) {
+    count += getTotalCount(child.id, areaInst, areasArr);
+  }
+  return count;
+}
+
 function collectDescendants(areas, areaId) {
   const ids = [];
   const children = areas.filter(a => a.parentId === areaId);
@@ -439,7 +447,7 @@ export default function AreasView() {
                       )}
                     </td>
                     <td>
-                      <span className="badge">{instances.length}</span>
+                      <span className="badge">{getTotalCount(area.id, areaInstances, areas)}</span>
                     </td>
                     <td>
                       <div className="flex items-center gap-1">

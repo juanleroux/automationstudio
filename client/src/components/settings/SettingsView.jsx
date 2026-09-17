@@ -1556,7 +1556,11 @@ export default function SettingsView() {
                   <input
                     type="checkbox"
                     checked={aiConfig.enabled !== false}
-                    onChange={e => setAiConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+                    onChange={e => {
+                      const enabled = e.target.checked;
+                      setAiConfig(prev => ({ ...prev, enabled }));
+                      window.dispatchEvent(new CustomEvent('ai-settings-saved', { detail: { enabled } }));
+                    }}
                   />
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{aiConfig.enabled !== false ? 'Enabled' : 'Disabled'}</span>
                 </label>
