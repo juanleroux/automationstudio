@@ -55,6 +55,8 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   // mode: 'template' | 'instance'
   const isTemplate = mode === 'template';
 
+  const [hideDefaults, setHideDefaults] = useState(true);
+
   const updateAttr = useCallback((id, field, value) => {
     onChange(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
   }, [onChange]);
@@ -78,7 +80,8 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
         return {
           ...ta,
           value: ia ? ia.value : ta.value,
-          _instanceAttr: ia
+          _instanceAttr: ia,
+          _defaultValue: ta.value,  // preserve original template default for comparison
         };
       });
 
@@ -97,6 +100,15 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
     return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
   });
 
+  // In instance mode, optionally hide rows whose value is blank or unchanged from the template default
+  const displayRows = (!isTemplate && hideDefaults)
+    ? sortedRows.filter(attr => {
+        const val = String(attr.value ?? '');
+        const def = String(attr._defaultValue ?? '');
+        return val !== '' && val !== def;
+      })
+    : sortedRows;
+
   function SortIcon({ col }) {
     if (sortCol !== col) return null;
     return sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />;
@@ -104,6 +116,19 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
 
   return (
     <div className="flex flex-col h-full">
+      {!isTemplate && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={hideDefaults}
+              onChange={e => setHideDefaults(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            Hide Defaults
+          </label>
+        </div>
+      )}
       <div className="flex-1 overflow-auto">
         <table className="data-table" style={{ tableLayout: 'auto', width: 'auto', minWidth: '100%' }}>
           <thead>
@@ -123,14 +148,18 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
             </tr>
           </thead>
           <tbody>
-            {sortedRows.length === 0 && (
+            {displayRows.length === 0 && (
               <tr>
                 <td colSpan={isTemplate ? 6 : 5} className="text-center py-8 text-text-muted text-xs">
-                  {isTemplate ? 'No attributes. Click "+ Add" to create one.' : 'No attributes defined on this template.'}
+                  {isTemplate
+                    ? 'No attributes. Click "+ Add" to create one.'
+                    : (hideDefaults && sortedRows.length > 0
+                        ? 'All attributes are at their default values.'
+                        : 'No attributes defined on this template.')}
                 </td>
               </tr>
             )}
-            {sortedRows.map((attr) => (
+            {displayRows.map((attr) => (
               <tr key={attr.id}>
                 <td>
                   <EditCell
