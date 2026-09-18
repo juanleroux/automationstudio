@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, Edit2, Map, Tag, ChevronDown, ChevronRight, Check, X, Upload, Download, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Edit2, Map as MapIcon, Tag, ChevronDown, ChevronRight, Check, X, Upload, Download, RefreshCw } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition, exportFromIgnition } from '../../api/client';
@@ -644,7 +644,7 @@ export default function AreasView() {
                         />
                       ) : (
                         <div className="flex items-center gap-2" style={{ paddingLeft: indent }}>
-                          <Map
+                          <MapIcon
                             size={14}
                             style={{
                               color: area.isSystem ? 'var(--text-disabled)' : 'var(--accent)',
