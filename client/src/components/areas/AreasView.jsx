@@ -104,7 +104,6 @@ export default function AreasView() {
         groups.get(fullPath).push(item);
       }
 
-      const ignByKey = new Map();
       const foundKeys = new Set();
       const instanceIgnPath = new Map();
 
@@ -117,8 +116,7 @@ export default function AreasView() {
           const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
           for (const item of items) {
             const found = findUdtInstancesWithPath(rawTags, new Set([item.instance.name]), item.template.name, folderPath);
-            for (const { tag, folderPath: tagPath } of found) {
-              ignByKey.set(`${item.template.id}:${tag.name}`, tag);
+            for (const { folderPath: tagPath } of found) {
               const key = `${item.template.id}:${item.instance.id}`;
               foundKeys.add(key);
               instanceIgnPath.set(key, tagPath);
@@ -137,8 +135,7 @@ export default function AreasView() {
           const rawRoot = Array.isArray(rootResult.data) ? rootResult.data : (rootResult.data?.tags || []);
           for (const item of stillMissing) {
             const found = findUdtInstancesWithPath(rawRoot, new Set([item.instance.name]), item.template.name, '');
-            for (const { tag, folderPath: tagPath } of found) {
-              ignByKey.set(`${item.template.id}:${tag.name}`, tag);
+            for (const { folderPath: tagPath } of found) {
               const key = `${item.template.id}:${item.instance.id}`;
               foundKeys.add(key);
               instanceIgnPath.set(key, tagPath);
@@ -147,27 +144,11 @@ export default function AreasView() {
         } catch { /* root search failed */ }
       }
 
+      // Model View sync: folder/area placement only — no attribute diffs
       const diffs = [];
       const notFound = [];
       for (const { template, instance } of instanceList) {
         if (!foundKeys.has(`${template.id}:${instance.id}`)) { notFound.push(instance.name); continue; }
-        const ignInst = ignByKey.get(`${template.id}:${instance.name}`);
-        if (!ignInst) continue;
-        for (const ta of (template.attributes || [])) {
-          if (!ta.parameter) continue;
-          const instAttr = (instance.attributes || []).find(a => a.id === ta.id);
-          const localVal = instAttr != null ? String(instAttr.value ?? '') : String(ta.value ?? '');
-          const ignParam = ignInst.parameters?.[ta.name];
-          const ignVal = ignParam != null ? String(ignParam.value ?? '') : String(ta.value ?? '');
-          if (localVal !== ignVal) {
-            diffs.push({
-              key: `${template.id}:${instance.id}:${ta.id}`,
-              templateId: template.id, instanceId: instance.id, attrId: ta.id,
-              instanceName: instance.name, attributeName: ta.name,
-              localValue: localVal, ignitionValue: ignVal, checked: true,
-            });
-          }
-        }
         const ignPath = instanceIgnPath.get(`${template.id}:${instance.id}`) ?? '';
         const localPath = [base, buildAreaPath(instance.areaId, areas)].filter(Boolean).join('/');
         const ignDisp = ignPath || '(unassigned)';
@@ -197,16 +178,16 @@ export default function AreasView() {
     if (!checked.length) { setSyncDialog(null); return; }
     setSyncDialog(null);
 
-    const attrChecked = checked.filter(d => !d.diffType);
-    const areaChecked = checked.filter(d => d.diffType === 'area');
+    // Model View sync is folder/area only — all checked diffs are area diffs
     const eng = project?.engineering;
     const base = eng?.folderPath || '';
 
     if (direction === 'from') {
+      // Move local instances to match their Ignition folder
       updateProject(p => {
         let updatedAreas = p.areas || [];
         const areaResolutions = new Map();
-        for (const d of areaChecked) {
+        for (const d of checked) {
           const { areaId, areas: newAreas } = resolveOrCreateAreaPath(d.ignitionValue, base, updatedAreas);
           updatedAreas = newAreas;
           areaResolutions.set(`${d.templateId}:${d.instanceId}`, areaId);
@@ -214,43 +195,26 @@ export default function AreasView() {
         return {
           ...p,
           areas: updatedAreas,
-          templates: p.templates.map(t => {
-            const tAttr = attrChecked.filter(d => d.templateId === t.id);
-            const tArea = areaChecked.filter(d => d.templateId === t.id);
-            if (!tAttr.length && !tArea.length) return t;
-            return {
-              ...t,
-              instances: (t.instances || []).map(i => {
-                const iAttr = tAttr.filter(d => d.instanceId === i.id);
-                const iArea = tArea.find(d => d.instanceId === i.id);
-                if (!iAttr.length && !iArea) return i;
-                const attrMap = new Map((i.attributes || []).map(a => [a.id, { ...a }]));
-                for (const d of iAttr) attrMap.set(d.attrId, { id: d.attrId, value: d.ignitionValue });
-                const resolvedAreaId = iArea ? areaResolutions.get(`${iArea.templateId}:${iArea.instanceId}`) : undefined;
-                const areaUpdate = resolvedAreaId !== undefined ? { areaId: resolvedAreaId } : {};
-                return { ...i, ...areaUpdate, attributes: [...attrMap.values()], lastModification: new Date().toISOString() };
-              }),
-            };
-          }),
+          templates: p.templates.map(t => ({
+            ...t,
+            instances: (t.instances || []).map(i => {
+              const resolvedAreaId = areaResolutions.get(`${t.id}:${i.id}`);
+              if (resolvedAreaId === undefined) return i;
+              return { ...i, areaId: resolvedAreaId, lastModification: new Date().toISOString() };
+            }),
+          })),
         };
       });
-      toast.success(`Applied ${checked.length} change(s) from Ignition`);
+      toast.success(`Updated ${checked.length} instance folder assignment(s)`);
     } else {
+      // Move Ignition tags to match local area folders by re-uploading to the new path
       const areas = project.areas || [];
-      const affectedKeys = new Set(checked.map(d => `${d.templateId}:${d.instanceId}`));
-      const toUpload = instanceList.filter(item => affectedKeys.has(`${item.template.id}:${item.instance.id}`));
-      const areaPathOverrides = new Map();
-      for (const d of areaChecked) {
-        const item = toUpload.find(i => i.template.id === d.templateId && i.instance.id === d.instanceId);
-        if (item) areaPathOverrides.set(`${d.templateId}:${d.instanceId}`,
-          [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/'));
-      }
+      const toUpload = instanceList.filter(item =>
+        checked.some(d => d.templateId === item.template.id && d.instanceId === item.instance.id)
+      );
       const groups = new Map();
       for (const item of toUpload) {
-        const key = `${item.template.id}:${item.instance.id}`;
-        const fullPath = areaPathOverrides.get(key)
-          ?? instanceIgnPath?.get(key)
-          ?? [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/');
+        const fullPath = [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/');
         if (!groups.has(fullPath)) groups.set(fullPath, []);
         groups.get(fullPath).push(item);
       }
@@ -263,7 +227,7 @@ export default function AreasView() {
             folderPath, payload: buildInstancesPayload(items),
           })
         ));
-        toast.success(`Synced ${toUpload.length} instance(s) to Ignition`);
+        toast.success(`Moved ${toUpload.length} instance(s) to new Ignition folder`);
       } catch (err) {
         toast.error('Sync to Ignition failed: ' + (err.response?.data?.error || err.message));
       }
