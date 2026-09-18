@@ -188,3 +188,80 @@ export function convertUdtsToTemplates(udtResults, startId) {
     convertUdt(udtType, siblingInstances, startId + i, folderPath)
   );
 }
+
+/**
+ * Walk an Ignition tag tree and return { tag, folderPath } for every UDT instance
+ * whose name is in nameSet and whose typeId matches templateName.
+ */
+export function findUdtInstancesWithPath(tags, nameSet, templateName, basePath = '') {
+  const results = [];
+  function walk(tagList, currentPath) {
+    for (const tag of (tagList || [])) {
+      if (
+        tag.tagType === 'UdtInstance' &&
+        nameSet.has(tag.name) &&
+        (tag.typeId === templateName || (tag.typeId || '').endsWith('/' + templateName))
+      ) {
+        results.push({ tag, folderPath: currentPath });
+      }
+      if (tag.tags?.length) {
+        const childPath = tag.tagType === 'Folder'
+          ? (currentPath ? `${currentPath}/${tag.name}` : tag.name)
+          : currentPath;
+        walk(tag.tags, childPath);
+      }
+    }
+  }
+  walk(Array.isArray(tags) ? tags : (tags?.tags || []), basePath);
+  return results;
+}
+
+/**
+ * Resolve a full Ignition folder path back to a local areaId.
+ * Strips the configured base prefix, then walks project.areas by name.
+ * Returns 0 (unassigned) if the path cannot be resolved.
+ */
+export function resolveIgnitionPathToAreaId(fullIgnPath, base, areas) {
+  let subPath = (fullIgnPath === '(unassigned)' ? '' : fullIgnPath) || '';
+  if (base && subPath === base) subPath = '';
+  else if (base && subPath.startsWith(base + '/')) subPath = subPath.slice(base.length + 1);
+  if (!subPath) return 0;
+  const parts = subPath.split('/');
+  let parentId = null;
+  let areaId = 0;
+  for (const name of parts) {
+    const area = (areas || []).find(a => a.name === name && a.parentId === parentId);
+    if (!area) return 0;
+    areaId = area.id;
+    parentId = area.id;
+  }
+  return areaId;
+}
+
+/**
+ * Like resolveIgnitionPathToAreaId but auto-creates missing area nodes.
+ * Returns { areaId, areas } where areas may include newly created entries.
+ */
+export function resolveOrCreateAreaPath(fullIgnPath, base, areas) {
+  let subPath = (fullIgnPath === '(unassigned)' ? '' : fullIgnPath) || '';
+  if (base && subPath === base) subPath = '';
+  else if (base && subPath.startsWith(base + '/')) subPath = subPath.slice(base.length + 1);
+  if (!subPath) return { areaId: 0, areas };
+  const parts = subPath.split('/');
+  let currentAreas = [...(areas || [])];
+  let parentId = null;
+  let areaId = 0;
+  for (const name of parts) {
+    const existing = currentAreas.find(a => a.name === name && a.parentId === parentId);
+    if (existing) {
+      areaId = existing.id;
+      parentId = existing.id;
+    } else {
+      const newId = currentAreas.length > 0 ? Math.max(...currentAreas.map(a => a.id)) + 1 : 1;
+      currentAreas = [...currentAreas, { id: newId, name, parentId }];
+      areaId = newId;
+      parentId = newId;
+    }
+  }
+  return { areaId, areas: currentAreas };
+}

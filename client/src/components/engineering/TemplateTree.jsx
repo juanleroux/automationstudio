@@ -8,12 +8,13 @@ import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
 import { exportFromIgnition, createTiaInstances } from '../../api/client';
-import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates } from '../../utils/ignition';
+import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates, findUdtInstancesWithPath, resolveOrCreateAreaPath } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
 import { downloadStudio5000Routine, parseProjectL5X, mapL5XDataType } from '../../utils/studio5000Export';
 import { parseXDB, mapCEDataType, downloadXBD } from '../../utils/controlExpertExport';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
+import SyncDiffDialog from '../shared/SyncDiffDialog';
 
 function S5kGroupRow({ group, s5kSelected, setS5kSelected }) {
   const [expanded, setExpanded] = useState(true);
@@ -133,77 +134,6 @@ function findUdtInstancesInTree(tags, nameSet, templateName) {
     }
   }
   walk(Array.isArray(tags) ? tags : (tags?.tags || []));
-  return results;
-}
-
-// Resolve a full Ignition folder path back to a local areaId.
-// Strips the configured base prefix, then walks project.areas by name to find the matching id.
-// Returns 0 (unassigned) if the path cannot be resolved.
-function resolveIgnitionPathToAreaId(fullIgnPath, base, areas) {
-  let subPath = (fullIgnPath === '(unassigned)' ? '' : fullIgnPath) || '';
-  if (base && subPath === base) subPath = '';
-  else if (base && subPath.startsWith(base + '/')) subPath = subPath.slice(base.length + 1);
-  if (!subPath) return 0;
-  const parts = subPath.split('/');
-  let parentId = null;
-  let areaId = 0;
-  for (const name of parts) {
-    const area = (areas || []).find(a => a.name === name && a.parentId === parentId);
-    if (!area) return 0;
-    areaId = area.id;
-    parentId = area.id;
-  }
-  return areaId;
-}
-
-// Like resolveIgnitionPathToAreaId but auto-creates missing area nodes.
-// Returns { areaId, areas } where areas may include newly created entries.
-function resolveOrCreateAreaPath(fullIgnPath, base, areas) {
-  let subPath = (fullIgnPath === '(unassigned)' ? '' : fullIgnPath) || '';
-  if (base && subPath === base) subPath = '';
-  else if (base && subPath.startsWith(base + '/')) subPath = subPath.slice(base.length + 1);
-  if (!subPath) return { areaId: 0, areas };
-  const parts = subPath.split('/');
-  let currentAreas = [...(areas || [])];
-  let parentId = null;
-  let areaId = 0;
-  for (const name of parts) {
-    const existing = currentAreas.find(a => a.name === name && a.parentId === parentId);
-    if (existing) {
-      areaId = existing.id;
-      parentId = existing.id;
-    } else {
-      const newId = currentAreas.length > 0 ? Math.max(...currentAreas.map(a => a.id)) + 1 : 1;
-      currentAreas = [...currentAreas, { id: newId, name, parentId }];
-      areaId = newId;
-      parentId = newId;
-    }
-  }
-  return { areaId, areas: currentAreas };
-}
-
-// Like findUdtInstancesInTree but also returns the Ignition folder path of each match.
-// Used to record where a tag actually lives so uploads go to the right place.
-function findUdtInstancesWithPath(tags, nameSet, templateName, basePath = '') {
-  const results = [];
-  function walk(tagList, currentPath) {
-    for (const tag of (tagList || [])) {
-      if (
-        tag.tagType === 'UdtInstance' &&
-        nameSet.has(tag.name) &&
-        (tag.typeId === templateName || (tag.typeId || '').endsWith('/' + templateName))
-      ) {
-        results.push({ tag, folderPath: currentPath });
-      }
-      if (tag.tags?.length) {
-        const childPath = tag.tagType === 'Folder'
-          ? (currentPath ? `${currentPath}/${tag.name}` : tag.name)
-          : currentPath;
-        walk(tag.tags, childPath);
-      }
-    }
-  }
-  walk(Array.isArray(tags) ? tags : (tags?.tags || []), basePath);
   return results;
 }
 
@@ -1833,113 +1763,14 @@ export default function TemplateTree({ selected, onSelect }) {
       )}
 
       {/* Ignition Sync Diff Dialog */}
-      {syncDialog && (
-        <Modal
-          title={syncDialog.direction === 'to' ? 'Sync To → Ignition' : 'Sync From ← Ignition'}
-          onClose={() => setSyncDialog(null)}
-          width={720}
-          footer={
-            syncDialog.searching ? null : (
-              <>
-                {syncDialog.diffs.length > 0 && (
-                  <>
-                    <button
-                      className="btn btn-ghost"
-                      style={{ fontSize: 12, marginRight: 'auto' }}
-                      onClick={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: true })) }))}
-                    >Select All</button>
-                    <button
-                      className="btn btn-ghost"
-                      style={{ fontSize: 12 }}
-                      onClick={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: false })) }))}
-                    >Deselect All</button>
-                  </>
-                )}
-                <button className="btn btn-ghost" onClick={() => setSyncDialog(null)}>Cancel</button>
-                {syncDialog.diffs.length > 0 && (
-                  <button
-                    className="btn btn-primary"
-                    disabled={!syncDialog.diffs.some(d => d.checked)}
-                    onClick={applySyncDialog}
-                  >
-                    Confirm ({syncDialog.diffs.filter(d => d.checked).length})
-                  </button>
-                )}
-              </>
-            )
-          }
-        >
-          {syncDialog.searching ? (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              <RefreshCw size={20} style={{ marginBottom: 8, animation: 'spin 1s linear infinite' }} />
-              <div>Searching Ignition for matching tags…</div>
-            </div>
-          ) : (
-            <>
-              {syncDialog.notFound.length > 0 && (
-                <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, fontSize: 12,
-                  background: 'var(--bg-warning, #fef3c7)', color: 'var(--text-warning, #92400e)',
-                  border: '1px solid var(--border-warning, #fcd34d)' }}>
-                  Not found in Ignition: {syncDialog.notFound.join(', ')}
-                </div>
-              )}
-              {syncDialog.diffs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-                  All values are already in sync — no differences found.
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-                    {syncDialog.direction === 'to'
-                      ? 'The following local values differ from Ignition. Tick the changes to push:'
-                      : 'The following Ignition values differ from local. Tick the changes to pull:'}
-                  </div>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                          <th style={{ width: 28, padding: '6px 4px' }}></th>
-                          <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>Instance</th>
-                          <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>Attribute</th>
-                          <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                            {syncDialog.direction === 'to' ? 'Current (Ignition)' : 'Current (Local)'}
-                          </th>
-                          <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                            {syncDialog.direction === 'to' ? 'New (Local)' : 'New (Ignition)'}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {syncDialog.diffs.map((d, i) => (
-                          <tr key={d.key}
-                            style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'var(--bg-main)' }}
-                            onClick={() => setSyncDialog(sd => ({
-                              ...sd, diffs: sd.diffs.map(x => x.key === d.key ? { ...x, checked: !x.checked } : x)
-                            }))}
-                          >
-                            <td style={{ padding: '6px 4px', textAlign: 'center' }}>
-                              <input type="checkbox" checked={d.checked} onChange={() => {}}
-                                style={{ cursor: 'pointer' }} />
-                            </td>
-                            <td style={{ padding: '6px 8px', color: 'var(--text-primary)', fontWeight: 500 }}>{d.instanceName}</td>
-                            <td style={{ padding: '6px 8px', color: 'var(--text-primary)' }}>{d.attributeName}</td>
-                            <td style={{ padding: '6px 8px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                              {syncDialog.direction === 'to' ? d.ignitionValue : d.localValue}
-                            </td>
-                            <td style={{ padding: '6px 8px', color: '#16a34a', fontFamily: 'monospace', fontWeight: 500 }}>
-                              {syncDialog.direction === 'to' ? d.localValue : d.ignitionValue}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-        </Modal>
-      )}
+      <SyncDiffDialog
+        syncDialog={syncDialog}
+        onClose={() => setSyncDialog(null)}
+        onToggle={key => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => d.key === key ? { ...d, checked: !d.checked } : d) }))}
+        onSelectAll={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: true })) }))}
+        onDeselectAll={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: false })) }))}
+        onConfirm={applySyncDialog}
+      />
       <style>{`@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }`}</style>
 
       {/* Confirm Delete */}

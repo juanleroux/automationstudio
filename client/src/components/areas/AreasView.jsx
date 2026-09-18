@@ -1,9 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, Edit2, Map, Tag, ChevronDown, ChevronRight, Check, X, Upload, Download } from 'lucide-react';
+import { Plus, Trash2, Edit2, Map, Tag, ChevronDown, ChevronRight, Check, X, Upload, Download, RefreshCw } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
+import { uploadToIgnition, exportFromIgnition } from '../../api/client';
+import { buildAreaPath, buildInstancesPayload, findUdtInstancesWithPath, resolveOrCreateAreaPath } from '../../utils/ignition';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
+import SyncDiffDialog from '../shared/SyncDiffDialog';
 import NoProjectOpen from '../shared/NoProjectOpen';
 
 function nextId(arr) {
@@ -63,11 +66,209 @@ export default function AreasView() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   const [dragging, setDragging] = useState(null);
+  const [syncDialog, setSyncDialog] = useState(null);
 
   // Multi-select state
   const [selected, setSelected] = useState(new Set());
   const lastClickedKey = useRef(null);
   const importAreasRef = useRef(null);
+
+  // Build a flat list of all instances across all templates
+  const buildAllInstanceList = () => {
+    const result = [];
+    for (const t of (project?.templates || [])) {
+      for (const i of (t.instances || [])) {
+        result.push({ template: t, instance: i });
+      }
+    }
+    return result;
+  };
+
+  const openSyncDialog = async (direction) => {
+    const eng = project?.engineering;
+    if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
+    const instanceList = buildAllInstanceList();
+    if (!instanceList.length) { toast.error('No instances to sync'); return; }
+
+    setSyncDialog({ direction, searching: true, diffs: [], notFound: [], instanceList });
+
+    const areas = project.areas || [];
+    const base = eng.folderPath || '';
+
+    try {
+      const groups = new Map();
+      for (const item of instanceList) {
+        const areaPath = buildAreaPath(item.instance.areaId, areas);
+        const fullPath = [base, areaPath].filter(Boolean).join('/');
+        if (!groups.has(fullPath)) groups.set(fullPath, []);
+        groups.get(fullPath).push(item);
+      }
+
+      const ignByKey = new Map();
+      const foundKeys = new Set();
+      const instanceIgnPath = new Map();
+
+      for (const [folderPath, items] of groups.entries()) {
+        try {
+          const result = await exportFromIgnition({
+            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+            provider: eng.provider || 'default', folderPath,
+          });
+          const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
+          for (const item of items) {
+            const found = findUdtInstancesWithPath(rawTags, new Set([item.instance.name]), item.template.name, folderPath);
+            for (const { tag, folderPath: tagPath } of found) {
+              ignByKey.set(`${item.template.id}:${tag.name}`, tag);
+              const key = `${item.template.id}:${item.instance.id}`;
+              foundKeys.add(key);
+              instanceIgnPath.set(key, tagPath);
+            }
+          }
+        } catch { /* retry with root */ }
+      }
+
+      const stillMissing = instanceList.filter(item => !foundKeys.has(`${item.template.id}:${item.instance.id}`));
+      if (stillMissing.length) {
+        try {
+          const rootResult = await exportFromIgnition({
+            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+            provider: eng.provider || 'default', folderPath: '',
+          });
+          const rawRoot = Array.isArray(rootResult.data) ? rootResult.data : (rootResult.data?.tags || []);
+          for (const item of stillMissing) {
+            const found = findUdtInstancesWithPath(rawRoot, new Set([item.instance.name]), item.template.name, '');
+            for (const { tag, folderPath: tagPath } of found) {
+              ignByKey.set(`${item.template.id}:${tag.name}`, tag);
+              const key = `${item.template.id}:${item.instance.id}`;
+              foundKeys.add(key);
+              instanceIgnPath.set(key, tagPath);
+            }
+          }
+        } catch { /* root search failed */ }
+      }
+
+      const diffs = [];
+      const notFound = [];
+      for (const { template, instance } of instanceList) {
+        if (!foundKeys.has(`${template.id}:${instance.id}`)) { notFound.push(instance.name); continue; }
+        const ignInst = ignByKey.get(`${template.id}:${instance.name}`);
+        if (!ignInst) continue;
+        for (const ta of (template.attributes || [])) {
+          if (!ta.parameter) continue;
+          const instAttr = (instance.attributes || []).find(a => a.id === ta.id);
+          const localVal = instAttr != null ? String(instAttr.value ?? '') : String(ta.value ?? '');
+          const ignParam = ignInst.parameters?.[ta.name];
+          const ignVal = ignParam != null ? String(ignParam.value ?? '') : String(ta.value ?? '');
+          if (localVal !== ignVal) {
+            diffs.push({
+              key: `${template.id}:${instance.id}:${ta.id}`,
+              templateId: template.id, instanceId: instance.id, attrId: ta.id,
+              instanceName: instance.name, attributeName: ta.name,
+              localValue: localVal, ignitionValue: ignVal, checked: true,
+            });
+          }
+        }
+        const ignPath = instanceIgnPath.get(`${template.id}:${instance.id}`) ?? '';
+        const localPath = [base, buildAreaPath(instance.areaId, areas)].filter(Boolean).join('/');
+        const ignDisp = ignPath || '(unassigned)';
+        const localDisp = localPath || '(unassigned)';
+        if (ignDisp !== localDisp) {
+          diffs.push({
+            key: `${template.id}:${instance.id}:__area__`,
+            templateId: template.id, instanceId: instance.id,
+            attrId: null, diffType: 'area',
+            instanceName: instance.name, attributeName: 'Area / Folder',
+            localValue: localDisp, ignitionValue: ignDisp, checked: true,
+          });
+        }
+      }
+
+      setSyncDialog({ direction, searching: false, diffs, notFound, instanceList, instanceIgnPath });
+    } catch (err) {
+      setSyncDialog(null);
+      toast.error('Failed to fetch from Ignition: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const applySyncDialog = async () => {
+    if (!syncDialog) return;
+    const { direction, diffs, instanceList, instanceIgnPath } = syncDialog;
+    const checked = diffs.filter(d => d.checked);
+    if (!checked.length) { setSyncDialog(null); return; }
+    setSyncDialog(null);
+
+    const attrChecked = checked.filter(d => !d.diffType);
+    const areaChecked = checked.filter(d => d.diffType === 'area');
+    const eng = project?.engineering;
+    const base = eng?.folderPath || '';
+
+    if (direction === 'from') {
+      updateProject(p => {
+        let updatedAreas = p.areas || [];
+        const areaResolutions = new Map();
+        for (const d of areaChecked) {
+          const { areaId, areas: newAreas } = resolveOrCreateAreaPath(d.ignitionValue, base, updatedAreas);
+          updatedAreas = newAreas;
+          areaResolutions.set(`${d.templateId}:${d.instanceId}`, areaId);
+        }
+        return {
+          ...p,
+          areas: updatedAreas,
+          templates: p.templates.map(t => {
+            const tAttr = attrChecked.filter(d => d.templateId === t.id);
+            const tArea = areaChecked.filter(d => d.templateId === t.id);
+            if (!tAttr.length && !tArea.length) return t;
+            return {
+              ...t,
+              instances: (t.instances || []).map(i => {
+                const iAttr = tAttr.filter(d => d.instanceId === i.id);
+                const iArea = tArea.find(d => d.instanceId === i.id);
+                if (!iAttr.length && !iArea) return i;
+                const attrMap = new Map((i.attributes || []).map(a => [a.id, { ...a }]));
+                for (const d of iAttr) attrMap.set(d.attrId, { id: d.attrId, value: d.ignitionValue });
+                const resolvedAreaId = iArea ? areaResolutions.get(`${iArea.templateId}:${iArea.instanceId}`) : undefined;
+                const areaUpdate = resolvedAreaId !== undefined ? { areaId: resolvedAreaId } : {};
+                return { ...i, ...areaUpdate, attributes: [...attrMap.values()], lastModification: new Date().toISOString() };
+              }),
+            };
+          }),
+        };
+      });
+      toast.success(`Applied ${checked.length} change(s) from Ignition`);
+    } else {
+      const areas = project.areas || [];
+      const affectedKeys = new Set(checked.map(d => `${d.templateId}:${d.instanceId}`));
+      const toUpload = instanceList.filter(item => affectedKeys.has(`${item.template.id}:${item.instance.id}`));
+      const areaPathOverrides = new Map();
+      for (const d of areaChecked) {
+        const item = toUpload.find(i => i.template.id === d.templateId && i.instance.id === d.instanceId);
+        if (item) areaPathOverrides.set(`${d.templateId}:${d.instanceId}`,
+          [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/'));
+      }
+      const groups = new Map();
+      for (const item of toUpload) {
+        const key = `${item.template.id}:${item.instance.id}`;
+        const fullPath = areaPathOverrides.get(key)
+          ?? instanceIgnPath?.get(key)
+          ?? [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/');
+        if (!groups.has(fullPath)) groups.set(fullPath, []);
+        groups.get(fullPath).push(item);
+      }
+      try {
+        await Promise.all([...groups.entries()].map(([folderPath, items]) =>
+          uploadToIgnition({
+            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+            provider: eng.provider || 'default',
+            collisionPolicy: eng.collisionPolicy || 'Overwrite',
+            folderPath, payload: buildInstancesPayload(items),
+          })
+        ));
+        toast.success(`Synced ${toUpload.length} instance(s) to Ignition`);
+      } catch (err) {
+        toast.error('Sync to Ignition failed: ' + (err.response?.data?.error || err.message));
+      }
+    }
+  };
 
   const exportAreas = () => {
     const data = JSON.stringify(project.areas || [], null, 2);
@@ -322,6 +523,27 @@ export default function AreasView() {
           </p>
         </div>
         <div className="flex items-center gap-1">
+          {project?.engineering?.enableIgnitionMenuItems && (
+            <>
+              <button
+                className="btn btn-ghost btn-icon"
+                onClick={() => openSyncDialog('to')}
+                title="Sync All → Ignition"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <Upload size={15} />
+              </button>
+              <button
+                className="btn btn-ghost btn-icon"
+                onClick={() => openSyncDialog('from')}
+                title="Sync All ← Ignition"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <RefreshCw size={15} />
+              </button>
+              <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 2px' }} />
+            </>
+          )}
           <button
             className="btn btn-ghost btn-icon"
             onClick={() => importAreasRef.current?.click()}
@@ -618,6 +840,17 @@ export default function AreasView() {
           onCancel={() => setConfirmDelete(null)}
         />
       )}
+
+      {/* Ignition Sync Diff Dialog */}
+      <SyncDiffDialog
+        syncDialog={syncDialog}
+        onClose={() => setSyncDialog(null)}
+        onToggle={key => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => d.key === key ? { ...d, checked: !d.checked } : d) }))}
+        onSelectAll={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: true })) }))}
+        onDeselectAll={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: false })) }))}
+        onConfirm={applySyncDialog}
+      />
+      <style>{`@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }`}</style>
     </div>
   );
 }
