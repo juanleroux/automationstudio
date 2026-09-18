@@ -753,7 +753,19 @@ export default function AreasView() {
       <FolderSyncDialog
         syncDialog={syncDialog}
         onClose={() => setSyncDialog(null)}
-        onToggle={key => setSyncDialog(sd => ({ ...sd, items: sd.items.map(i => i.key === key ? { ...i, checked: !i.checked } : i) }))}
+        onToggle={key => setSyncDialog(sd => {
+          const target = sd.items.find(i => i.key === key);
+          if (!target) return sd;
+          const next = !target.checked;
+          return {
+            ...sd,
+            items: sd.items.map(i =>
+              i.key === key || (!next && (i.path === target.path || i.path.startsWith(target.path + '/')))
+                ? { ...i, checked: next }
+                : i
+            ),
+          };
+        })}
         onSelectAll={() => setSyncDialog(sd => ({ ...sd, items: sd.items.map(i => ({ ...i, checked: true })) }))}
         onDeselectAll={() => setSyncDialog(sd => ({ ...sd, items: sd.items.map(i => ({ ...i, checked: false })) }))}
         onConfirm={applySyncDialog}
