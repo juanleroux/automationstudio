@@ -86,7 +86,8 @@ export default function AreasView() {
   // Extract a flat folder tree from Ignition tag data (relative paths from the fetch root)
   const extractFolderTree = (tags, parentRelPath = '') => {
     const items = [];
-    for (const tag of (tags || [])) {
+    const sorted = [...(tags || [])].sort((a, b) => a.name.localeCompare(b.name));
+    for (const tag of sorted) {
       if (tag.tagType === 'Folder') {
         const relPath = parentRelPath ? `${parentRelPath}/${tag.name}` : tag.name;
         items.push({ key: relPath, path: relPath, name: tag.name, depth: relPath.split('/').length - 1, checked: true });

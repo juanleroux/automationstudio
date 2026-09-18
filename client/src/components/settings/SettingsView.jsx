@@ -22,7 +22,8 @@ export default function SettingsView() {
       provider: 'default',
       folderPath: '',
       collisionPolicy: 'Overwrite',
-      enableIgnitionMenuItems: true
+      enableIgnitionMenuItems: true,
+      aiEnabled: false,
     }
   );
   const [projectDetails, setProjectDetails] = useState({
@@ -61,7 +62,7 @@ export default function SettingsView() {
   const ceProjectXDBFileRef = useRef(null);
   const [cePendingTemplateId, setCePendingTemplateId] = useState(null);
   // AI Assistant settings — loaded from server config
-  const [aiConfig, setAiConfig] = useState({ enabled: true, provider: 'anthropic', model: '', apiKey: '', baseUrl: 'http://ollama:11434' });
+  const [aiConfig, setAiConfig] = useState({ provider: 'anthropic', model: '', apiKey: '', baseUrl: 'http://ollama:11434' });
   const [aiSaving, setAiSaving] = useState(false);
   const [aiTestResult, setAiTestResult] = useState(null);
   const [aiTesting, setAiTesting] = useState(false);
@@ -99,7 +100,7 @@ export default function SettingsView() {
   useEffect(() => {
     loadConfig().then(cfg => {
       setConfig(cfg);
-      if (cfg?.ai) setAiConfig(prev => ({ ...prev, ...cfg.ai, enabled: cfg.ai.enabled !== false }));
+      if (cfg?.ai) { const { enabled: _e, ...rest } = cfg.ai; setAiConfig(prev => ({ ...prev, ...rest })); }
     }).catch(() => {
       setConfig({
         proposal: {
@@ -282,7 +283,6 @@ export default function SettingsView() {
       const merged = { ...(config || {}), ai: aiConfig };
       await saveConfig(merged);
       setConfig(merged);
-      window.dispatchEvent(new CustomEvent('ai-settings-saved', { detail: { enabled: aiConfig.enabled !== false } }));
       toast.success('AI settings saved');
     } catch (err) {
       toast.error('Failed to save AI settings: ' + (err.response?.data?.error || err.message));
@@ -1555,14 +1555,14 @@ export default function SettingsView() {
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
                   <input
                     type="checkbox"
-                    checked={aiConfig.enabled !== false}
+                    checked={engineering.aiEnabled === true}
                     onChange={e => {
                       const enabled = e.target.checked;
-                      setAiConfig(prev => ({ ...prev, enabled }));
+                      setEngineering(prev => ({ ...prev, aiEnabled: enabled }));
                       window.dispatchEvent(new CustomEvent('ai-settings-saved', { detail: { enabled } }));
                     }}
                   />
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{aiConfig.enabled !== false ? 'Enabled' : 'Disabled'}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{engineering.aiEnabled === true ? 'Enabled' : 'Disabled'}</span>
                 </label>
               </div>
 
