@@ -3,7 +3,7 @@ import { Plus, Trash2, Edit2, Map as MapIcon, Tag, ChevronDown, ChevronRight, Ch
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition, exportFromIgnition } from '../../api/client';
-import { buildAreaPath, buildInstancesPayload, findUdtInstancesWithPath, resolveOrCreateAreaPath } from '../../utils/ignition';
+import { resolveOrCreateAreaPath } from '../../utils/ignition';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
 import FolderSyncDialog from '../shared/FolderSyncDialog';
@@ -113,61 +113,22 @@ export default function AreasView() {
           provider: eng.provider || 'default', folderPath: base,
         });
         const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
-
-        // Build instance location map so we can show instance counts per folder
-        const instanceList = [];
-        for (const t of (project?.templates || [])) {
-          for (const i of (t.instances || [])) instanceList.push({ template: t, instance: i });
-        }
-        const instanceIgnPath = new Map();
-        const byTemplate = new Map();
-        for (const item of instanceList) {
-          if (!byTemplate.has(item.template.id)) byTemplate.set(item.template.id, { template: item.template, instances: [] });
-          byTemplate.get(item.template.id).instances.push(item.instance);
-        }
-        for (const { template, instances } of byTemplate.values()) {
-          const nameSet = new Set(instances.map(i => i.name));
-          const found = findUdtInstancesWithPath(rawTags, nameSet, template.name, base);
-          for (const { tag, folderPath } of found) {
-            const inst = instances.find(i => i.name === tag.name);
-            if (inst) instanceIgnPath.set(`${template.id}:${inst.id}`, folderPath);
-          }
-        }
-
-        // Count instances per folder path
-        const folderCounts = new Map();
-        for (const [, fullPath] of instanceIgnPath.entries()) {
-          const rel = base && fullPath.startsWith(base + '/') ? fullPath.slice(base.length + 1) : fullPath;
-          folderCounts.set(rel, (folderCounts.get(rel) || 0) + 1);
-        }
-
-        const folderItems = extractFolderTree(rawTags).map(item => ({
-          ...item,
-          instanceCount: folderCounts.get(item.path) || 0,
-        }));
-
-        setSyncDialog({ direction, searching: false, items: folderItems, instanceIgnPath, instanceList });
+        const folderItems = extractFolderTree(rawTags);
+        setSyncDialog({ direction, searching: false, items: folderItems });
       } catch (err) {
         setSyncDialog(null);
         toast.error('Failed to fetch from Ignition: ' + (err.response?.data?.error || err.message));
       }
     } else {
       // 'to': show local area tree immediately — no fetch needed
-      const instanceList = [];
-      for (const t of (project?.templates || [])) {
-        for (const i of (t.instances || [])) instanceList.push({ template: t, instance: i });
-      }
-      const areaItems = buildAreaFlatList(areas).map(item => ({
-        ...item,
-        instanceCount: instanceList.filter(({ instance }) => instance.areaId === item.areaId).length,
-      }));
-      setSyncDialog({ direction, searching: false, items: areaItems, instanceList });
+      const areaItems = buildAreaFlatList(areas);
+      setSyncDialog({ direction, searching: false, items: areaItems });
     }
   };
 
   const applySyncDialog = async () => {
     if (!syncDialog) return;
-    const { direction, items, instanceList, instanceIgnPath } = syncDialog;
+    const { direction, items } = syncDialog;
     const checked = (items || []).filter(i => i.checked);
     if (!checked.length) { setSyncDialog(null); return; }
     setSyncDialog(null);
@@ -176,64 +137,41 @@ export default function AreasView() {
     const base = eng?.folderPath || '';
 
     if (direction === 'from') {
-      // For each checked Ignition folder: create/find local area, reassign matching instances
+      // Create local areas from checked Ignition folders — folder structure only, no instance changes
       updateProject(p => {
         let updatedAreas = [...(p.areas || [])];
-
-        // Build folder → areaId mapping, creating areas as needed
-        const folderToAreaId = new Map();
         for (const item of checked) {
-          const { areaId, areas: newAreas } = resolveOrCreateAreaPath(item.path, '', updatedAreas);
+          const { areas: newAreas } = resolveOrCreateAreaPath(item.path, '', updatedAreas);
           updatedAreas = newAreas;
-          const fullPath = [base, item.path].filter(Boolean).join('/');
-          folderToAreaId.set(fullPath, areaId);
         }
-
-        // Build instance → new areaId mapping from instanceIgnPath
-        const instanceAreaMap = new Map();
-        for (const [key, fullPath] of (instanceIgnPath || new Map()).entries()) {
-          if (folderToAreaId.has(fullPath)) {
-            instanceAreaMap.set(key, folderToAreaId.get(fullPath));
-          }
-        }
-
-        return {
-          ...p,
-          areas: updatedAreas,
-          templates: p.templates.map(t => ({
-            ...t,
-            instances: (t.instances || []).map(i => {
-              const newAreaId = instanceAreaMap.get(`${t.id}:${i.id}`);
-              if (newAreaId === undefined) return i;
-              return { ...i, areaId: newAreaId, lastModification: new Date().toISOString() };
-            }),
-          })),
-        };
+        return { ...p, areas: updatedAreas };
       });
       toast.success(`Imported ${checked.length} folder(s) as local areas`);
     } else {
-      // For each checked area: upload its instances to the matching Ignition folder
-      const areas = project.areas || [];
-      const groups = new Map();
-      for (const item of checked) {
-        const folderPath = [base, item.path].filter(Boolean).join('/');
-        const areaInstances = (instanceList || []).filter(({ instance }) => instance.areaId === item.areaId);
-        if (!areaInstances.length) continue;
-        if (!groups.has(folderPath)) groups.set(folderPath, []);
-        groups.get(folderPath).push(...areaInstances);
-      }
-      if (!groups.size) { toast.error('No instances found in selected areas'); return; }
+      // Upload folder structure for checked areas to Ignition — no instance data
+      const buildNestedFolders = (flatItems) => {
+        const root = [];
+        for (const item of flatItems) {
+          const parts = item.path.split('/');
+          let list = root;
+          for (const part of parts) {
+            let node = list.find(n => n.name === part);
+            if (!node) { node = { name: part, tagType: 'Folder', tags: [] }; list.push(node); }
+            list = node.tags;
+          }
+        }
+        return root;
+      };
+
       try {
-        await Promise.all([...groups.entries()].map(([folderPath, items]) =>
-          uploadToIgnition({
-            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
-            provider: eng.provider || 'default',
-            collisionPolicy: eng.collisionPolicy || 'Overwrite',
-            folderPath, payload: buildInstancesPayload(items),
-          })
-        ));
-        const total = [...groups.values()].reduce((s, v) => s + v.length, 0);
-        toast.success(`Uploaded ${total} instance(s) across ${groups.size} folder(s) to Ignition`);
+        const folderTags = buildNestedFolders(checked);
+        await uploadToIgnition({
+          gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+          provider: eng.provider || 'default',
+          collisionPolicy: eng.collisionPolicy || 'Overwrite',
+          folderPath: base, payload: { tags: folderTags },
+        });
+        toast.success(`Synced ${checked.length} folder(s) to Ignition`);
       } catch (err) {
         toast.error('Sync to Ignition failed: ' + (err.response?.data?.error || err.message));
       }
