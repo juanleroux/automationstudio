@@ -6,7 +6,7 @@ import { uploadToIgnition, exportFromIgnition } from '../../api/client';
 import { buildAreaPath, buildInstancesPayload, findUdtInstancesWithPath, resolveOrCreateAreaPath } from '../../utils/ignition';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
-import SyncDiffDialog from '../shared/SyncDiffDialog';
+import FolderSyncDialog from '../shared/FolderSyncDialog';
 import NoProjectOpen from '../shared/NoProjectOpen';
 
 function nextId(arr) {
@@ -73,13 +73,27 @@ export default function AreasView() {
   const lastClickedKey = useRef(null);
   const importAreasRef = useRef(null);
 
-  // Build a flat list of all instances across all templates
-  const buildAllInstanceList = () => {
-    const result = [];
-    for (const t of (project?.templates || [])) {
-      for (const i of (t.instances || [])) {
-        result.push({ template: t, instance: i });
+  // Extract a flat folder tree from Ignition tag data (relative paths from the fetch root)
+  const extractFolderTree = (tags, parentRelPath = '') => {
+    const items = [];
+    for (const tag of (tags || [])) {
+      if (tag.tagType === 'Folder') {
+        const relPath = parentRelPath ? `${parentRelPath}/${tag.name}` : tag.name;
+        items.push({ key: relPath, path: relPath, name: tag.name, depth: relPath.split('/').length - 1, checked: true });
+        if (tag.tags?.length) items.push(...extractFolderTree(tag.tags, relPath));
       }
+    }
+    return items;
+  };
+
+  // Build a flat area list from project areas with depth and relative path
+  const buildAreaFlatList = (areasList, parentId = null, parentPath = '') => {
+    const result = [];
+    const children = (areasList || []).filter(a => (a.parentId ?? null) === parentId);
+    for (const a of children) {
+      const path = parentPath ? `${parentPath}/${a.name}` : a.name;
+      result.push({ key: `area_${a.id}`, areaId: a.id, path, name: a.name, depth: path.split('/').length - 1, checked: true });
+      result.push(...buildAreaFlatList(areasList, a.id, path));
     }
     return result;
   };
@@ -87,137 +101,128 @@ export default function AreasView() {
   const openSyncDialog = async (direction) => {
     const eng = project?.engineering;
     if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
-    const instanceList = buildAllInstanceList();
-    if (!instanceList.length) { toast.error('No instances to sync'); return; }
-
-    setSyncDialog({ direction, searching: true, diffs: [], notFound: [], instanceList });
 
     const areas = project.areas || [];
     const base = eng.folderPath || '';
 
-    try {
-      const groups = new Map();
-      for (const item of instanceList) {
-        const areaPath = buildAreaPath(item.instance.areaId, areas);
-        const fullPath = [base, areaPath].filter(Boolean).join('/');
-        if (!groups.has(fullPath)) groups.set(fullPath, []);
-        groups.get(fullPath).push(item);
-      }
+    if (direction === 'from') {
+      setSyncDialog({ direction, searching: true, items: [] });
+      try {
+        const result = await exportFromIgnition({
+          gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+          provider: eng.provider || 'default', folderPath: base,
+        });
+        const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
 
-      const foundKeys = new Set();
-      const instanceIgnPath = new Map();
-
-      for (const [folderPath, items] of groups.entries()) {
-        try {
-          const result = await exportFromIgnition({
-            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
-            provider: eng.provider || 'default', folderPath,
-          });
-          const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
-          for (const item of items) {
-            const found = findUdtInstancesWithPath(rawTags, new Set([item.instance.name]), item.template.name, folderPath);
-            for (const { folderPath: tagPath } of found) {
-              const key = `${item.template.id}:${item.instance.id}`;
-              foundKeys.add(key);
-              instanceIgnPath.set(key, tagPath);
-            }
-          }
-        } catch { /* retry with root */ }
-      }
-
-      const stillMissing = instanceList.filter(item => !foundKeys.has(`${item.template.id}:${item.instance.id}`));
-      if (stillMissing.length) {
-        try {
-          const rootResult = await exportFromIgnition({
-            gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
-            provider: eng.provider || 'default', folderPath: '',
-          });
-          const rawRoot = Array.isArray(rootResult.data) ? rootResult.data : (rootResult.data?.tags || []);
-          for (const item of stillMissing) {
-            const found = findUdtInstancesWithPath(rawRoot, new Set([item.instance.name]), item.template.name, '');
-            for (const { folderPath: tagPath } of found) {
-              const key = `${item.template.id}:${item.instance.id}`;
-              foundKeys.add(key);
-              instanceIgnPath.set(key, tagPath);
-            }
-          }
-        } catch { /* root search failed */ }
-      }
-
-      // Model View sync: folder/area placement only — no attribute diffs
-      const diffs = [];
-      const notFound = [];
-      for (const { template, instance } of instanceList) {
-        if (!foundKeys.has(`${template.id}:${instance.id}`)) { notFound.push(instance.name); continue; }
-        const ignPath = instanceIgnPath.get(`${template.id}:${instance.id}`) ?? '';
-        const localPath = [base, buildAreaPath(instance.areaId, areas)].filter(Boolean).join('/');
-        const ignDisp = ignPath || '(unassigned)';
-        const localDisp = localPath || '(unassigned)';
-        if (ignDisp !== localDisp) {
-          diffs.push({
-            key: `${template.id}:${instance.id}:__area__`,
-            templateId: template.id, instanceId: instance.id,
-            attrId: null, diffType: 'area',
-            instanceName: instance.name, attributeName: 'Area / Folder',
-            localValue: localDisp, ignitionValue: ignDisp, checked: true,
-          });
+        // Build instance location map so we can show instance counts per folder
+        const instanceList = [];
+        for (const t of (project?.templates || [])) {
+          for (const i of (t.instances || [])) instanceList.push({ template: t, instance: i });
         }
-      }
+        const instanceIgnPath = new Map();
+        const byTemplate = new Map();
+        for (const item of instanceList) {
+          if (!byTemplate.has(item.template.id)) byTemplate.set(item.template.id, { template: item.template, instances: [] });
+          byTemplate.get(item.template.id).instances.push(item.instance);
+        }
+        for (const { template, instances } of byTemplate.values()) {
+          const nameSet = new Set(instances.map(i => i.name));
+          const found = findUdtInstancesWithPath(rawTags, nameSet, template.name, base);
+          for (const { tag, folderPath } of found) {
+            const inst = instances.find(i => i.name === tag.name);
+            if (inst) instanceIgnPath.set(`${template.id}:${inst.id}`, folderPath);
+          }
+        }
 
-      setSyncDialog({ direction, searching: false, diffs, notFound, instanceList, instanceIgnPath });
-    } catch (err) {
-      setSyncDialog(null);
-      toast.error('Failed to fetch from Ignition: ' + (err.response?.data?.error || err.message));
+        // Count instances per folder path
+        const folderCounts = new Map();
+        for (const [, fullPath] of instanceIgnPath.entries()) {
+          const rel = base && fullPath.startsWith(base + '/') ? fullPath.slice(base.length + 1) : fullPath;
+          folderCounts.set(rel, (folderCounts.get(rel) || 0) + 1);
+        }
+
+        const folderItems = extractFolderTree(rawTags).map(item => ({
+          ...item,
+          instanceCount: folderCounts.get(item.path) || 0,
+        }));
+
+        setSyncDialog({ direction, searching: false, items: folderItems, instanceIgnPath, instanceList });
+      } catch (err) {
+        setSyncDialog(null);
+        toast.error('Failed to fetch from Ignition: ' + (err.response?.data?.error || err.message));
+      }
+    } else {
+      // 'to': show local area tree immediately — no fetch needed
+      const instanceList = [];
+      for (const t of (project?.templates || [])) {
+        for (const i of (t.instances || [])) instanceList.push({ template: t, instance: i });
+      }
+      const areaItems = buildAreaFlatList(areas).map(item => ({
+        ...item,
+        instanceCount: instanceList.filter(({ instance }) => instance.areaId === item.areaId).length,
+      }));
+      setSyncDialog({ direction, searching: false, items: areaItems, instanceList });
     }
   };
 
   const applySyncDialog = async () => {
     if (!syncDialog) return;
-    const { direction, diffs, instanceList, instanceIgnPath } = syncDialog;
-    const checked = diffs.filter(d => d.checked);
+    const { direction, items, instanceList, instanceIgnPath } = syncDialog;
+    const checked = (items || []).filter(i => i.checked);
     if (!checked.length) { setSyncDialog(null); return; }
     setSyncDialog(null);
 
-    // Model View sync is folder/area only — all checked diffs are area diffs
     const eng = project?.engineering;
     const base = eng?.folderPath || '';
 
     if (direction === 'from') {
-      // Move local instances to match their Ignition folder
+      // For each checked Ignition folder: create/find local area, reassign matching instances
       updateProject(p => {
-        let updatedAreas = p.areas || [];
-        const areaResolutions = new Map();
-        for (const d of checked) {
-          const { areaId, areas: newAreas } = resolveOrCreateAreaPath(d.ignitionValue, base, updatedAreas);
+        let updatedAreas = [...(p.areas || [])];
+
+        // Build folder → areaId mapping, creating areas as needed
+        const folderToAreaId = new Map();
+        for (const item of checked) {
+          const { areaId, areas: newAreas } = resolveOrCreateAreaPath(item.path, '', updatedAreas);
           updatedAreas = newAreas;
-          areaResolutions.set(`${d.templateId}:${d.instanceId}`, areaId);
+          const fullPath = [base, item.path].filter(Boolean).join('/');
+          folderToAreaId.set(fullPath, areaId);
         }
+
+        // Build instance → new areaId mapping from instanceIgnPath
+        const instanceAreaMap = new Map();
+        for (const [key, fullPath] of (instanceIgnPath || new Map()).entries()) {
+          if (folderToAreaId.has(fullPath)) {
+            instanceAreaMap.set(key, folderToAreaId.get(fullPath));
+          }
+        }
+
         return {
           ...p,
           areas: updatedAreas,
           templates: p.templates.map(t => ({
             ...t,
             instances: (t.instances || []).map(i => {
-              const resolvedAreaId = areaResolutions.get(`${t.id}:${i.id}`);
-              if (resolvedAreaId === undefined) return i;
-              return { ...i, areaId: resolvedAreaId, lastModification: new Date().toISOString() };
+              const newAreaId = instanceAreaMap.get(`${t.id}:${i.id}`);
+              if (newAreaId === undefined) return i;
+              return { ...i, areaId: newAreaId, lastModification: new Date().toISOString() };
             }),
           })),
         };
       });
-      toast.success(`Updated ${checked.length} instance folder assignment(s)`);
+      toast.success(`Imported ${checked.length} folder(s) as local areas`);
     } else {
-      // Move Ignition tags to match local area folders by re-uploading to the new path
+      // For each checked area: upload its instances to the matching Ignition folder
       const areas = project.areas || [];
-      const toUpload = instanceList.filter(item =>
-        checked.some(d => d.templateId === item.template.id && d.instanceId === item.instance.id)
-      );
       const groups = new Map();
-      for (const item of toUpload) {
-        const fullPath = [base, buildAreaPath(item.instance.areaId, areas)].filter(Boolean).join('/');
-        if (!groups.has(fullPath)) groups.set(fullPath, []);
-        groups.get(fullPath).push(item);
+      for (const item of checked) {
+        const folderPath = [base, item.path].filter(Boolean).join('/');
+        const areaInstances = (instanceList || []).filter(({ instance }) => instance.areaId === item.areaId);
+        if (!areaInstances.length) continue;
+        if (!groups.has(folderPath)) groups.set(folderPath, []);
+        groups.get(folderPath).push(...areaInstances);
       }
+      if (!groups.size) { toast.error('No instances found in selected areas'); return; }
       try {
         await Promise.all([...groups.entries()].map(([folderPath, items]) =>
           uploadToIgnition({
@@ -227,7 +232,8 @@ export default function AreasView() {
             folderPath, payload: buildInstancesPayload(items),
           })
         ));
-        toast.success(`Moved ${toUpload.length} instance(s) to new Ignition folder`);
+        const total = [...groups.values()].reduce((s, v) => s + v.length, 0);
+        toast.success(`Uploaded ${total} instance(s) across ${groups.size} folder(s) to Ignition`);
       } catch (err) {
         toast.error('Sync to Ignition failed: ' + (err.response?.data?.error || err.message));
       }
@@ -805,13 +811,13 @@ export default function AreasView() {
         />
       )}
 
-      {/* Ignition Sync Diff Dialog */}
-      <SyncDiffDialog
+      {/* Ignition Folder Sync Dialog */}
+      <FolderSyncDialog
         syncDialog={syncDialog}
         onClose={() => setSyncDialog(null)}
-        onToggle={key => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => d.key === key ? { ...d, checked: !d.checked } : d) }))}
-        onSelectAll={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: true })) }))}
-        onDeselectAll={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: false })) }))}
+        onToggle={key => setSyncDialog(sd => ({ ...sd, items: sd.items.map(i => i.key === key ? { ...i, checked: !i.checked } : i) }))}
+        onSelectAll={() => setSyncDialog(sd => ({ ...sd, items: sd.items.map(i => ({ ...i, checked: true })) }))}
+        onDeselectAll={() => setSyncDialog(sd => ({ ...sd, items: sd.items.map(i => ({ ...i, checked: false })) }))}
         onConfirm={applySyncDialog}
       />
       <style>{`@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }`}</style>
