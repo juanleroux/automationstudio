@@ -9,9 +9,30 @@ export default function FolderSyncDialog({
   const { direction, searching, items } = syncDialog;
   const checkedCount = (items || []).filter(i => i.checked).length;
 
+  const titles = {
+    'folders-from': 'Sync Folders ← From Ignition',
+    'folders-to': 'Sync Folders → To Ignition',
+    'instances-from': 'Sync Instance Hierarchy ← From Ignition',
+  };
+  const descriptions = {
+    'folders-from': 'Select Ignition folders to import as local areas. No instances will be moved:',
+    'folders-to': 'Select local areas to create as folders in Ignition. No instances will be uploaded:',
+    'instances-from': 'Select Ignition folders to assign local instances based on where they are found in Ignition:',
+  };
+  const emptyMessages = {
+    'folders-from': 'No folders found in Ignition at the configured path.',
+    'folders-to': 'No areas defined in this project.',
+    'instances-from': 'No instances found in Ignition matching project instances.',
+  };
+  const searchMessages = {
+    'folders-from': 'Fetching folder structure from Ignition…',
+    'folders-to': 'Preparing areas…',
+    'instances-from': 'Locating instances in Ignition…',
+  };
+
   return (
     <Modal
-      title={direction === 'to' ? 'Sync Areas → Ignition' : 'Sync Folders ← Ignition'}
+      title={titles[direction] || direction}
       onClose={onClose}
       width={480}
       footer={
@@ -40,18 +61,16 @@ export default function FolderSyncDialog({
       {searching ? (
         <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
           <RefreshCw size={20} style={{ marginBottom: 8, animation: 'spin 1s linear infinite' }} />
-          <div>{direction === 'to' ? 'Preparing areas…' : 'Fetching folder structure from Ignition…'}</div>
+          <div>{searchMessages[direction] || 'Loading…'}</div>
         </div>
       ) : (items || []).length === 0 ? (
         <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-          {direction === 'to' ? 'No areas defined in this project.' : 'No folders found in Ignition at the configured path.'}
+          {emptyMessages[direction] || 'Nothing to show.'}
         </div>
       ) : (
         <>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-            {direction === 'to'
-              ? 'Select local areas to sync to Ignition. Instances in each area will be uploaded to the matching folder:'
-              : 'Select Ignition folders to import as local areas. Matching instances will be reassigned:'}
+            {descriptions[direction] || ''}
           </div>
           <div style={{
             maxHeight: 420, overflowY: 'auto',

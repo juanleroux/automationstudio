@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Map as MapIcon, Tag, ChevronDown, ChevronRight, Check, X, Upload, Download, RefreshCw } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition, exportFromIgnition } from '../../api/client';
-import { resolveOrCreateAreaPath } from '../../utils/ignition';
+import { resolveOrCreateAreaPath, findUdtInstancesWithPath } from '../../utils/ignition';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import Modal from '../shared/Modal';
 import FolderSyncDialog from '../shared/FolderSyncDialog';
@@ -17,6 +17,7 @@ function nextId(arr) {
 function buildTree(areas, parentId = null) {
   return areas
     .filter(a => (a.parentId ?? null) === parentId)
+    .sort((a, b) => a.name.localeCompare(b.name))
     .map(a => ({ ...a, children: buildTree(areas, a.id) }));
 }
 
@@ -67,6 +68,15 @@ export default function AreasView() {
   const [dragOver, setDragOver] = useState(null);
   const [dragging, setDragging] = useState(null);
   const [syncDialog, setSyncDialog] = useState(null);
+  const [syncMenuOpen, setSyncMenuOpen] = useState(false);
+  const syncMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!syncMenuOpen) return;
+    const handler = e => { if (syncMenuRef.current && !syncMenuRef.current.contains(e.target)) setSyncMenuOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [syncMenuOpen]);
 
   // Multi-select state
   const [selected, setSelected] = useState(new Set());
@@ -105,7 +115,7 @@ export default function AreasView() {
     const areas = project.areas || [];
     const base = eng.folderPath || '';
 
-    if (direction === 'from') {
+    if (direction === 'folders-from') {
       setSyncDialog({ direction, searching: true, items: [] });
       try {
         const result = await exportFromIgnition({
@@ -113,22 +123,66 @@ export default function AreasView() {
           provider: eng.provider || 'default', folderPath: base,
         });
         const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
-        const folderItems = extractFolderTree(rawTags);
-        setSyncDialog({ direction, searching: false, items: folderItems });
+        setSyncDialog({ direction, searching: false, items: extractFolderTree(rawTags) });
       } catch (err) {
         setSyncDialog(null);
         toast.error('Failed to fetch from Ignition: ' + (err.response?.data?.error || err.message));
       }
-    } else {
-      // 'to': show local area tree immediately — no fetch needed
+    } else if (direction === 'folders-to') {
       const areaItems = buildAreaFlatList(areas);
       setSyncDialog({ direction, searching: false, items: areaItems });
+    } else if (direction === 'instances-from') {
+      setSyncDialog({ direction, searching: true, items: [] });
+      try {
+        const result = await exportFromIgnition({
+          gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+          provider: eng.provider || 'default', folderPath: base,
+        });
+        const rawTags = Array.isArray(result.data) ? result.data : (result.data?.tags || []);
+
+        const instanceList = [];
+        for (const t of (project?.templates || []))
+          for (const i of (t.instances || [])) instanceList.push({ template: t, instance: i });
+
+        const instanceIgnPath = new Map();
+        const byTemplate = new Map();
+        for (const item of instanceList) {
+          if (!byTemplate.has(item.template.id)) byTemplate.set(item.template.id, { template: item.template, instances: [] });
+          byTemplate.get(item.template.id).instances.push(item.instance);
+        }
+        for (const { template, instances } of byTemplate.values()) {
+          const nameSet = new Set(instances.map(i => i.name));
+          const found = findUdtInstancesWithPath(rawTags, nameSet, template.name, base);
+          for (const { tag, folderPath } of found) {
+            const inst = instances.find(i => i.name === tag.name);
+            if (inst) instanceIgnPath.set(`${template.id}:${inst.id}`, folderPath);
+          }
+        }
+
+        // Count instances per relative folder path
+        const folderCounts = new Map();
+        for (const [, fullPath] of instanceIgnPath.entries()) {
+          const rel = base && fullPath.startsWith(base + '/') ? fullPath.slice(base.length + 1) : (fullPath === base ? '' : fullPath);
+          folderCounts.set(rel, (folderCounts.get(rel) || 0) + 1);
+        }
+
+        // Build folder items only for folders where instances were found
+        const allFolders = extractFolderTree(rawTags);
+        const folderItems = allFolders
+          .filter(f => folderCounts.has(f.path))
+          .map(f => ({ ...f, instanceCount: folderCounts.get(f.path) || 0 }));
+
+        setSyncDialog({ direction, searching: false, items: folderItems, instanceIgnPath, instanceList });
+      } catch (err) {
+        setSyncDialog(null);
+        toast.error('Failed to fetch from Ignition: ' + (err.response?.data?.error || err.message));
+      }
     }
   };
 
   const applySyncDialog = async () => {
     if (!syncDialog) return;
-    const { direction, items } = syncDialog;
+    const { direction, items, instanceIgnPath, instanceList } = syncDialog;
     const checked = (items || []).filter(i => i.checked);
     if (!checked.length) { setSyncDialog(null); return; }
     setSyncDialog(null);
@@ -136,8 +190,7 @@ export default function AreasView() {
     const eng = project?.engineering;
     const base = eng?.folderPath || '';
 
-    if (direction === 'from') {
-      // Create local areas from checked Ignition folders — folder structure only, no instance changes
+    if (direction === 'folders-from') {
       updateProject(p => {
         let updatedAreas = [...(p.areas || [])];
         for (const item of checked) {
@@ -147,8 +200,8 @@ export default function AreasView() {
         return { ...p, areas: updatedAreas };
       });
       toast.success(`Imported ${checked.length} folder(s) as local areas`);
-    } else {
-      // Upload folder structure for checked areas to Ignition — no instance data
+
+    } else if (direction === 'folders-to') {
       const buildNestedFolders = (flatItems) => {
         const root = [];
         for (const item of flatItems) {
@@ -162,19 +215,52 @@ export default function AreasView() {
         }
         return root;
       };
-
       try {
-        const folderTags = buildNestedFolders(checked);
         await uploadToIgnition({
           gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
           provider: eng.provider || 'default',
           collisionPolicy: eng.collisionPolicy || 'Overwrite',
-          folderPath: base, payload: { tags: folderTags },
+          folderPath: base, payload: { tags: buildNestedFolders(checked) },
         });
         toast.success(`Synced ${checked.length} folder(s) to Ignition`);
       } catch (err) {
         toast.error('Sync to Ignition failed: ' + (err.response?.data?.error || err.message));
       }
+
+    } else if (direction === 'instances-from') {
+      // Build full-path → areaId map from checked items, creating areas as needed
+      updateProject(p => {
+        let updatedAreas = [...(p.areas || [])];
+        const fullPathToAreaId = new Map();
+        for (const item of checked) {
+          const { areaId, areas: newAreas } = resolveOrCreateAreaPath(item.path, '', updatedAreas);
+          updatedAreas = newAreas;
+          const fullPath = [base, item.path].filter(Boolean).join('/');
+          fullPathToAreaId.set(fullPath, areaId);
+        }
+        const instanceAreaMap = new Map();
+        for (const [key, fullPath] of (instanceIgnPath || new Map()).entries()) {
+          if (fullPathToAreaId.has(fullPath)) instanceAreaMap.set(key, fullPathToAreaId.get(fullPath));
+        }
+        return {
+          ...p,
+          areas: updatedAreas,
+          templates: p.templates.map(t => ({
+            ...t,
+            instances: (t.instances || []).map(i => {
+              const newAreaId = instanceAreaMap.get(`${t.id}:${i.id}`);
+              if (newAreaId === undefined) return i;
+              return { ...i, areaId: newAreaId, lastModification: new Date().toISOString() };
+            }),
+          })),
+        };
+      });
+      const total = [...(instanceIgnPath || new Map()).entries()]
+        .filter(([key]) => checked.some(c => {
+          const fullPath = [base, c.path].filter(Boolean).join('/');
+          return (instanceIgnPath || new Map()).get(key) === fullPath;
+        })).length;
+      toast.success(`Assigned ${total} instance(s) to local areas from Ignition hierarchy`);
     }
   };
 
@@ -433,22 +519,45 @@ export default function AreasView() {
         <div className="flex items-center gap-1">
           {project?.engineering?.enableIgnitionMenuItems && (
             <>
-              <button
-                className="btn btn-ghost btn-icon"
-                onClick={() => openSyncDialog('to')}
-                title="Sync All → Ignition"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <Upload size={15} />
-              </button>
-              <button
-                className="btn btn-ghost btn-icon"
-                onClick={() => openSyncDialog('from')}
-                title="Sync All ← Ignition"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <RefreshCw size={15} />
-              </button>
+              <div ref={syncMenuRef} style={{ position: 'relative' }}>
+                <button
+                  className="btn btn-ghost btn-icon"
+                  onClick={() => setSyncMenuOpen(o => !o)}
+                  title="Sync with Ignition"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <RefreshCw size={15} />
+                </button>
+                {syncMenuOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 200,
+                    background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                    borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 260, padding: '4px 0',
+                  }}>
+                    {[
+                      { label: 'Sync Folders ← From Ignition', dir: 'folders-from', Icon: Download },
+                      { label: 'Sync Folders → To Ignition', dir: 'folders-to', Icon: Upload },
+                      { label: 'Sync Instance Hierarchy ← From Ignition', dir: 'instances-from', Icon: RefreshCw },
+                    ].map(({ label, dir, Icon }) => (
+                      <button
+                        key={dir}
+                        onClick={() => { setSyncMenuOpen(false); openSyncDialog(dir); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          width: '100%', padding: '7px 14px', textAlign: 'left',
+                          fontSize: 13, color: 'var(--text-primary)', background: 'none',
+                          border: 'none', cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover, rgba(0,0,0,0.05))'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        <Icon size={13} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 2px' }} />
             </>
           )}
