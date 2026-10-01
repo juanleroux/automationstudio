@@ -136,7 +136,7 @@ export function openCommissioningReport(project) {
 
     @page {
       size: A4 landscape;
-      margin: 0;
+      margin: 14mm 16mm;
     }
 
     body {
@@ -144,7 +144,8 @@ export function openCommissioningReport(project) {
       font-size: 11px;
       color: #1a1a1a;
       background: #fff;
-      padding: 14mm 16mm;
+      margin: 0;
+      padding: 0;
     }
 
     .report-header {
@@ -159,7 +160,7 @@ export function openCommissioningReport(project) {
     .report-project { font-size: 13px; color: #444; margin-top: 2px; }
     .report-meta    { text-align: right; font-size: 10px; color: #666; line-height: 1.8; }
 
-    .template-section { margin-bottom: 24px; page-break-inside: avoid; }
+    .template-section { margin-bottom: 24px; }
     .template-header {
       display: flex;
       align-items: baseline;
