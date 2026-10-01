@@ -29,11 +29,12 @@ export function openCommissioningReport(project) {
   // Arial 11px ≈ 1.65mm average char width (measured at 96dpi→print).
   const CONTENT_MM   = 265;
   const CHECK_MM     = 13;   // per checkbox column (I/O, PLC, SCADA, MES)
-  const NOTES_MM     = 48;
+  const CUSTOM_MM    = 30;
+  const NOTES_MM     = 42;
   const CELL_PAD_MM  = 4.2;  // 8px padding each side × 0.264mm/px
   const AVG_CHAR_MM  = 1.65;
 
-  const fixedMM   = (4 * CHECK_MM) + NOTES_MM;
+  const fixedMM   = (4 * CHECK_MM) + CUSTOM_MM + NOTES_MM;
   const flexMM    = CONTENT_MM - fixedMM;
 
   const rawNameMM = maxNameLen * AVG_CHAR_MM + CELL_PAD_MM * 2;
@@ -54,6 +55,8 @@ export function openCommissioningReport(project) {
   // Convert mm → percentage of content width for CSS
   const pct = v => (v / CONTENT_MM * 100).toFixed(2) + '%';
 
+  const checkData = project?.checkData || {};
+
   // ── Build template sections ──────────────────────────────────────
   let body = '';
 
@@ -61,18 +64,24 @@ export function openCommissioningReport(project) {
     const instances = (tmpl.instances || []).slice().sort((a, b) => a.name.localeCompare(b.name));
 
     const rows = instances.map((inst, idx) => {
+      const c = checkData[`${tmpl.id}:${inst.id}`] || {};
       const flagDot = inst.isFlagged
         ? '<span style="color:#e55353;margin-right:4px;">●</span>'
         : '';
+      const box = checked =>
+        checked
+          ? '<span class="checkbox checked">✓</span>'
+          : '<span class="checkbox"></span>';
       return `
         <tr class="${idx % 2 === 0 ? 'even' : 'odd'}">
           <td class="col-name">${flagDot}${esc(inst.name)}</td>
           <td class="col-desc">${esc(inst.description || '')}</td>
-          <td class="col-check"><span class="checkbox"></span></td>
-          <td class="col-check"><span class="checkbox"></span></td>
-          <td class="col-check"><span class="checkbox"></span></td>
-          <td class="col-check"><span class="checkbox"></span></td>
-          <td class="col-notes"></td>
+          <td class="col-check">${box(c.io)}</td>
+          <td class="col-check">${box(c.plc)}</td>
+          <td class="col-check">${box(c.scada)}</td>
+          <td class="col-check">${box(c.mes)}</td>
+          <td class="col-custom">${esc(c.custom || '')}</td>
+          <td class="col-notes">${esc(c.notes || '')}</td>
         </tr>`;
     }).join('');
 
@@ -91,6 +100,7 @@ export function openCommissioningReport(project) {
             <col style="width:${pct(CHECK_MM)}">
             <col style="width:${pct(CHECK_MM)}">
             <col style="width:${pct(CHECK_MM)}">
+            <col style="width:${pct(CUSTOM_MM)}">
             <col style="width:${pct(NOTES_MM)}">
           </colgroup>
           <thead>
@@ -101,6 +111,7 @@ export function openCommissioningReport(project) {
               <th class="col-check">PLC</th>
               <th class="col-check">SCADA</th>
               <th class="col-check">MES</th>
+              <th class="col-custom">Custom</th>
               <th class="col-notes">Notes</th>
             </tr>
           </thead>
@@ -207,7 +218,17 @@ export function openCommissioningReport(project) {
       height: 13px;
       border: 1.5px solid #555;
       border-radius: 2px;
+      line-height: 13px;
+      font-size: 11px;
+      text-align: center;
     }
+    .checkbox.checked {
+      background: #1a1a1a;
+      border-color: #1a1a1a;
+      color: #fff;
+      font-weight: 700;
+    }
+    .col-custom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .report-footer {
       margin-top: 24px;
