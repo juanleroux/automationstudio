@@ -233,20 +233,33 @@ export default function CheckView() {
 
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto' }}>
-        <table className="data-table" style={{ minWidth: '100%', borderCollapse: 'collapse' }}>
+        <table className="data-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+          <colgroup>
+            <col style={{ width: 150 }} />
+            {show('description')  && <col />}
+            {show('area')         && <col />}
+            {show('flagged')      && <col style={{ width: 84 }} />}
+            {show('lastModified') && <col style={{ width: 124 }} />}
+            {show('io')           && <col style={{ width: 54 }} />}
+            {show('plc')          && <col style={{ width: 54 }} />}
+            {show('scada')        && <col style={{ width: 64 }} />}
+            {show('mes')          && <col style={{ width: 54 }} />}
+            {show('custom')       && <col style={{ width: 140 }} />}
+            {show('notes')        && <col style={{ width: 240 }} />}
+          </colgroup>
           <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
             <tr>
               <th style={thStyle}>Instance</th>
               {show('description')  && <th style={thStyle}>Description</th>}
               {show('area')         && <th style={thStyle}>Area</th>}
-              {show('flagged')      && <th style={{ ...thStyle, width: 80,  textAlign: 'center' }}>Flagged</th>}
-              {show('lastModified') && <th style={{ ...thStyle, width: 130 }}>Last Modified</th>}
-              {show('io')           && <th style={{ ...thStyle, width: 55,  textAlign: 'center' }}>I/O</th>}
-              {show('plc')          && <th style={{ ...thStyle, width: 55,  textAlign: 'center' }}>PLC</th>}
-              {show('scada')        && <th style={{ ...thStyle, width: 65,  textAlign: 'center' }}>SCADA</th>}
-              {show('mes')          && <th style={{ ...thStyle, width: 55,  textAlign: 'center' }}>MES</th>}
-              {show('custom')       && <th style={{ ...thStyle, minWidth: 130 }}>Custom</th>}
-              {show('notes')        && <th style={{ ...thStyle, minWidth: 220 }}>Notes</th>}
+              {show('flagged')      && <th style={{ ...thStyle, textAlign: 'center' }}>Flagged</th>}
+              {show('lastModified') && <th style={thStyle}>Last Modified</th>}
+              {show('io')           && <th style={{ ...thStyle, textAlign: 'center' }}>I/O</th>}
+              {show('plc')          && <th style={{ ...thStyle, textAlign: 'center' }}>PLC</th>}
+              {show('scada')        && <th style={{ ...thStyle, textAlign: 'center' }}>SCADA</th>}
+              {show('mes')          && <th style={{ ...thStyle, textAlign: 'center' }}>MES</th>}
+              {show('custom')       && <th style={thStyle}>Custom</th>}
+              {show('notes')        && <th style={thStyle}>Notes</th>}
             </tr>
             {/* Per-column filter row */}
             <tr>
