@@ -13,83 +13,88 @@ function getAreaLabel(areaId, areas) {
   return parts.join(' / ');
 }
 
-// Textarea that auto-sizes to its content
-const NotesCell = React.memo(function NotesCell({ value, onBlur }) {
-  const [local, setLocal] = useState(value || '');
-  const ref = useRef(null);
-
-  useEffect(() => { setLocal(value || ''); }, [value]);
-
-  const resize = () => {
-    if (ref.current) {
-      ref.current.style.height = 'auto';
-      ref.current.style.height = ref.current.scrollHeight + 'px';
-    }
-  };
-
-  return (
-    <textarea
-      ref={ref}
-      value={local}
-      rows={2}
-      onChange={e => { setLocal(e.target.value); resize(); }}
-      onBlur={e => { if (e.target.value !== value) onBlur(e.target.value); }}
-      placeholder="Add notes…"
-      style={{
-        width: '100%', minWidth: 200, resize: 'vertical',
-        background: 'transparent', border: '1px solid transparent', borderRadius: 4,
-        outline: 'none', fontSize: 12, color: 'var(--text-primary)',
-        fontFamily: 'inherit', lineHeight: 1.5, padding: '4px 6px',
-        boxSizing: 'border-box',
-      }}
-      onFocus={e => (e.target.style.borderColor = 'var(--border)')}
-      onBlurCapture={e => (e.target.style.borderColor = 'transparent')}
-    />
-  );
-});
-
-const ALL_COLUMNS = [
-  { id: 'description',  label: 'Description',  filterType: 'text' },
-  { id: 'area',         label: 'Area',          filterType: 'text' },
-  { id: 'flagged',      label: 'Flagged',       filterType: 'select', options: [['all','All'],['yes','Flagged'],['no','Not flagged']] },
-  { id: 'lastModified', label: 'Last Modified', filterType: 'text' },
-  { id: 'io',           label: 'I/O',           filterType: 'select', options: [['all','All'],['yes','Checked'],['no','Unchecked']] },
-  { id: 'plc',          label: 'PLC',           filterType: 'select', options: [['all','All'],['yes','Checked'],['no','Unchecked']] },
-  { id: 'scada',        label: 'SCADA',         filterType: 'select', options: [['all','All'],['yes','Checked'],['no','Unchecked']] },
-  { id: 'mes',          label: 'MES',           filterType: 'select', options: [['all','All'],['yes','Checked'],['no','Unchecked']] },
-  { id: 'custom',       label: 'Custom',        filterType: 'text' },
-  { id: 'notes',        label: 'Notes',         filterType: 'text' },
+// Column definitions — id, label, filter type, default pixel weight, optional alignment
+const COL_DEFS = [
+  { id: 'description',  label: 'Description',  filterType: 'text',   defaultW: 180 },
+  { id: 'area',         label: 'Area',          filterType: 'text',   defaultW: 150 },
+  { id: 'flagged',      label: 'Flagged',       filterType: 'select', defaultW: 76,  align: 'center',
+    options: [['all','All'],['yes','Flagged'],['no','Not flagged']] },
+  { id: 'lastModified', label: 'Last Modified', filterType: 'text',   defaultW: 112 },
+  { id: 'io',           label: 'I/O',           filterType: 'select', defaultW: 46,  align: 'center',
+    options: [['all','All'],['yes','Checked'],['no','Unchecked']] },
+  { id: 'plc',          label: 'PLC',           filterType: 'select', defaultW: 46,  align: 'center',
+    options: [['all','All'],['yes','Checked'],['no','Unchecked']] },
+  { id: 'scada',        label: 'SCADA',         filterType: 'select', defaultW: 56,  align: 'center',
+    options: [['all','All'],['yes','Checked'],['no','Unchecked']] },
+  { id: 'mes',          label: 'MES',           filterType: 'select', defaultW: 46,  align: 'center',
+    options: [['all','All'],['yes','Checked'],['no','Unchecked']] },
+  { id: 'custom',       label: 'Custom',        filterType: 'text',   defaultW: 120 },
+  { id: 'notes',        label: 'Notes',         filterType: 'text',   defaultW: 180 },
 ];
 
-// instance is always-visible but still filterable — include it in EMPTY_COL_FILTERS
+const DEFAULT_WIDTHS = Object.fromEntries(
+  [['instance', 140], ...COL_DEFS.map(c => [c.id, c.defaultW])]
+);
+
 const EMPTY_COL_FILTERS = {
   instance: '',
-  ...Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.filterType === 'select' ? 'all' : ''])),
+  ...Object.fromEntries(COL_DEFS.map(c => [c.id, c.filterType === 'select' ? 'all' : ''])),
 };
 
-const thStyle = {
-  padding: '7px 10px', textAlign: 'left', fontSize: 11, fontWeight: 600,
+const ROW_H = 34;
+
+const thBase = {
+  padding: '0 10px', textAlign: 'left', fontSize: 11, fontWeight: 600,
   color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em',
-  borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--bg-surface)',
-  overflow: 'hidden',
+  background: 'var(--bg-surface)', whiteSpace: 'nowrap',
+  overflow: 'hidden', height: ROW_H, lineHeight: `${ROW_H}px`,
+  position: 'relative', userSelect: 'none',
 };
-const tfStyle   = { padding: '4px 6px', background: 'var(--bg-surface)', borderBottom: '2px solid var(--border)', overflow: 'hidden' };
-const tdStyle   = { padding: '6px 10px', fontSize: 13, color: 'var(--text-primary)', verticalAlign: 'top', overflow: 'hidden' };
-const finStyle  = { width: '100%', fontSize: 11, padding: '2px 5px', height: 22, background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 3, color: 'var(--text-primary)', boxSizing: 'border-box' };
+const tfBase = {
+  padding: '3px 6px', background: 'var(--bg-surface)',
+  borderBottom: '2px solid var(--border)', overflow: 'hidden',
+};
+const tdBase = {
+  padding: '0 10px', fontSize: 13, color: 'var(--text-primary)',
+  overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+  height: ROW_H, lineHeight: `${ROW_H}px`, verticalAlign: 'middle',
+};
+const finStyle = {
+  width: '100%', fontSize: 11, padding: '2px 5px', height: 22,
+  background: 'var(--bg-main)', border: '1px solid var(--border)',
+  borderRadius: 3, color: 'var(--text-primary)', boxSizing: 'border-box',
+};
 const fselStyle = { ...finStyle, padding: '2px 2px' };
 
 function ColFilter({ col, value, onChange }) {
   if (col.filterType === 'select')
-    return <select value={value} onChange={e => onChange(e.target.value)} style={fselStyle}>{col.options.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select>;
+    return <select value={value} onChange={e => onChange(e.target.value)} style={fselStyle}>{col.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>;
   return <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder="Filter…" style={finStyle} />;
+}
+
+// Drag-to-resize handle rendered inside each <th>
+function ResizeHandle({ onMouseDown }) {
+  return (
+    <span
+      onMouseDown={onMouseDown}
+      style={{
+        position: 'absolute', right: 0, top: 0, bottom: 0, width: 6,
+        cursor: 'col-resize', zIndex: 1,
+        borderRight: '2px solid transparent',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderRightColor = 'var(--border)')}
+      onMouseLeave={e => (e.currentTarget.style.borderRightColor = 'transparent')}
+    />
+  );
 }
 
 export default function CheckView() {
   const { project, updateProject } = useProject();
-  const [colFilters, setColFilters] = useState(EMPTY_COL_FILTERS);
-  const [visibleCols,    setVisibleCols]     = useState(new Set(ALL_COLUMNS.map(c => c.id)));
-  const [colMenuOpen,    setColMenuOpen]     = useState(false);
-  const [expanded,       setExpanded]        = useState(new Set()); // start collapsed
+  const [colFilters,  setColFilters]  = useState(EMPTY_COL_FILTERS);
+  const [visibleCols, setVisibleCols] = useState(new Set(COL_DEFS.map(c => c.id)));
+  const [colMenuOpen, setColMenuOpen] = useState(false);
+  const [expanded,    setExpanded]    = useState(new Set());
+  const [colWidths,   setColWidths]   = useState(DEFAULT_WIDTHS);
   const colMenuRef = useRef(null);
 
   useEffect(() => {
@@ -120,7 +125,6 @@ export default function CheckView() {
 
   const setCF = (col, val) => setColFilters(prev => ({ ...prev, [col]: val }));
   const hasActiveFilters = Object.entries(colFilters).some(([, v]) => v && v !== 'all');
-  const clearFilters = () => setColFilters(EMPTY_COL_FILTERS);
 
   const allRows = useMemo(() => {
     const rows = [];
@@ -136,8 +140,8 @@ export default function CheckView() {
       if (cf.instance    && !instance.name.toLowerCase().includes(cf.instance.toLowerCase())) return false;
       if (cf.description && !(instance.description || '').toLowerCase().includes(cf.description.toLowerCase())) return false;
       if (cf.area) {
-        const areaLbl = getAreaLabel(instance.areaId, areas).toLowerCase();
-        if (!areaLbl.includes(cf.area.toLowerCase())) return false;
+        const lbl = getAreaLabel(instance.areaId, areas).toLowerCase();
+        if (!lbl.includes(cf.area.toLowerCase())) return false;
       }
       if (cf.flagged === 'yes' && !instance.isFlagged) return false;
       if (cf.flagged === 'no'  &&  instance.isFlagged) return false;
@@ -147,8 +151,7 @@ export default function CheckView() {
           : '';
         if (!d.includes(cf.lastModified.toLowerCase())) return false;
       }
-      if (cf.io    !== 'all' || cf.plc !== 'all' || cf.scada !== 'all' || cf.mes !== 'all' ||
-          cf.custom || cf.notes) {
+      if (cf.io !== 'all' || cf.plc !== 'all' || cf.scada !== 'all' || cf.mes !== 'all' || cf.custom || cf.notes) {
         const c = checkData[`${template.id}:${instance.id}`] || {};
         if (cf.io    === 'yes' && !c.io)    return false;
         if (cf.io    === 'no'  &&  c.io)    return false;
@@ -174,13 +177,8 @@ export default function CheckView() {
     return [...map.values()].sort((a, b) => a.template.name.localeCompare(b.template.name));
   }, [filteredRows]);
 
-  const toggleGroup = id => setExpanded(prev => {
-    const s = new Set(prev);
-    s.has(id) ? s.delete(id) : s.add(id);
-    return s;
-  });
-
-  const show      = id => visibleCols.has(id);
+  const toggleGroup = id => setExpanded(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  const show      = id => id === 'instance' || visibleCols.has(id);
   const toggleCol = id => setVisibleCols(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
   const totalInstances = filteredRows.length;
@@ -188,6 +186,31 @@ export default function CheckView() {
     const c = checkData[`${template.id}:${instance.id}`];
     return c && (c.io || c.plc || c.scada || c.mes);
   }).length;
+
+  // Column resize
+  const startResize = (e, colId) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = colWidths[colId];
+    const onMove = ev => {
+      const next = Math.max(40, startW + ev.clientX - startX);
+      setColWidths(prev => ({ ...prev, [colId]: next }));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const visColDefs = [
+    { id: 'instance', label: 'Instance', filterType: 'text', align: undefined },
+    ...COL_DEFS.filter(c => visibleCols.has(c.id)),
+  ];
+
+  const thStyle  = id => ({ ...thBase,  textAlign: COL_DEFS.find(c => c.id === id)?.align || 'left' });
+  const tdStyle  = id => ({ ...tdBase,  textAlign: COL_DEFS.find(c => c.id === id)?.align || 'left' });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -198,18 +221,15 @@ export default function CheckView() {
         flexShrink: 0, flexWrap: 'wrap',
       }}>
         {hasActiveFilters && (
-          <button className="btn btn-ghost" onClick={clearFilters}
+          <button className="btn btn-ghost" onClick={() => setColFilters(EMPTY_COL_FILTERS)}
             style={{ display: 'flex', alignItems: 'center', gap: 4, height: 28, fontSize: 12, color: 'var(--text-muted)' }}>
             <X size={12} /> Clear filters
           </button>
         )}
-
         <div style={{ flex: 1 }} />
-
         <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {totalInstances} instances · {checkedCount} started
         </span>
-
         <div ref={colMenuRef} style={{ position: 'relative' }}>
           <button className="btn btn-ghost" onClick={() => setColMenuOpen(o => !o)}
             style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, height: 28, padding: '0 10px' }}>
@@ -221,7 +241,7 @@ export default function CheckView() {
               background: 'var(--bg-surface)', border: '1px solid var(--border)',
               borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 160, padding: '4px 0',
             }}>
-              {ALL_COLUMNS.map(col => (
+              {COL_DEFS.map(col => (
                 <label key={col.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px', cursor: 'pointer', fontSize: 13, userSelect: 'none' }}>
                   <input type="checkbox" checked={visibleCols.has(col.id)} onChange={() => toggleCol(col.id)} />
                   {col.label}
@@ -234,47 +254,35 @@ export default function CheckView() {
 
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto' }}>
-        <table className="data-table" style={{ tableLayout: 'fixed', borderCollapse: 'collapse', minWidth: '100%' }}>
+        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
           <colgroup>
-            <col style={{ width: 150 }} />
-            {show('description')  && <col style={{ width: 200 }} />}
-            {show('area')         && <col style={{ width: 160 }} />}
-            {show('flagged')      && <col style={{ width: 84 }} />}
-            {show('lastModified') && <col style={{ width: 124 }} />}
-            {show('io')           && <col style={{ width: 54 }} />}
-            {show('plc')          && <col style={{ width: 54 }} />}
-            {show('scada')        && <col style={{ width: 64 }} />}
-            {show('mes')          && <col style={{ width: 54 }} />}
-            {show('custom')       && <col style={{ width: 140 }} />}
-            {show('notes')        && <col style={{ width: 240 }} />}
+            {visColDefs.map(c => (
+              <col key={c.id} style={{ width: colWidths[c.id] || 100 }} />
+            ))}
           </colgroup>
+
           <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-            <tr>
-              <th style={thStyle}>Instance</th>
-              {show('description')  && <th style={thStyle}>Description</th>}
-              {show('area')         && <th style={thStyle}>Area</th>}
-              {show('flagged')      && <th style={{ ...thStyle, textAlign: 'center' }}>Flagged</th>}
-              {show('lastModified') && <th style={thStyle}>Last Modified</th>}
-              {show('io')           && <th style={{ ...thStyle, textAlign: 'center' }}>I/O</th>}
-              {show('plc')          && <th style={{ ...thStyle, textAlign: 'center' }}>PLC</th>}
-              {show('scada')        && <th style={{ ...thStyle, textAlign: 'center' }}>SCADA</th>}
-              {show('mes')          && <th style={{ ...thStyle, textAlign: 'center' }}>MES</th>}
-              {show('custom')       && <th style={thStyle}>Custom</th>}
-              {show('notes')        && <th style={thStyle}>Notes</th>}
+            {/* Header row */}
+            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+              {visColDefs.map(c => (
+                <th key={c.id} style={thStyle(c.id)}>
+                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>
+                    {c.label}
+                  </span>
+                  <ResizeHandle onMouseDown={e => startResize(e, c.id)} />
+                </th>
+              ))}
             </tr>
-            {/* Per-column filter row */}
+            {/* Filter row */}
             <tr>
-              <td style={tfStyle}><input type="text" value={colFilters.instance || ''} onChange={e => setCF('instance', e.target.value)} placeholder="Filter…" style={finStyle} /></td>
-              {show('description')  && <td style={tfStyle}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='description')}  value={colFilters.description}  onChange={v=>setCF('description', v)}  /></td>}
-              {show('area')         && <td style={tfStyle}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='area')}         value={colFilters.area}         onChange={v=>setCF('area', v)}         /></td>}
-              {show('flagged')      && <td style={{ ...tfStyle, textAlign:'center' }}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='flagged')}      value={colFilters.flagged}      onChange={v=>setCF('flagged', v)}      /></td>}
-              {show('lastModified') && <td style={tfStyle}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='lastModified')} value={colFilters.lastModified} onChange={v=>setCF('lastModified', v)} /></td>}
-              {show('io')           && <td style={{ ...tfStyle, textAlign:'center' }}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='io')}           value={colFilters.io}           onChange={v=>setCF('io', v)}           /></td>}
-              {show('plc')          && <td style={{ ...tfStyle, textAlign:'center' }}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='plc')}          value={colFilters.plc}          onChange={v=>setCF('plc', v)}          /></td>}
-              {show('scada')        && <td style={{ ...tfStyle, textAlign:'center' }}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='scada')}        value={colFilters.scada}        onChange={v=>setCF('scada', v)}        /></td>}
-              {show('mes')          && <td style={{ ...tfStyle, textAlign:'center' }}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='mes')}          value={colFilters.mes}          onChange={v=>setCF('mes', v)}          /></td>}
-              {show('custom')       && <td style={tfStyle}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='custom')}       value={colFilters.custom}       onChange={v=>setCF('custom', v)}       /></td>}
-              {show('notes')        && <td style={tfStyle}><ColFilter col={ALL_COLUMNS.find(c=>c.id==='notes')}        value={colFilters.notes}        onChange={v=>setCF('notes', v)}        /></td>}
+              <td style={tfBase}>
+                <input type="text" value={colFilters.instance || ''} onChange={e => setCF('instance', e.target.value)} placeholder="Filter…" style={finStyle} />
+              </td>
+              {COL_DEFS.filter(c => visibleCols.has(c.id)).map(c => (
+                <td key={c.id} style={{ ...tfBase, textAlign: c.align || 'left' }}>
+                  <ColFilter col={c} value={colFilters[c.id]} onChange={v => setCF(c.id, v)} />
+                </td>
+              ))}
             </tr>
           </thead>
 
@@ -289,7 +297,7 @@ export default function CheckView() {
                 <React.Fragment key={template.id}>
                   <tr onClick={() => toggleGroup(template.id)}
                     style={{ cursor: 'pointer', userSelect: 'none', background: 'var(--bg-section, rgba(0,0,0,0.035))' }}>
-                    <td colSpan={99} style={{ padding: '7px 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary, var(--text-muted))' }}>
+                    <td colSpan={99} style={{ padding: '0 12px', height: ROW_H, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary, var(--text-muted))', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         {isExp ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                         {template.name}
@@ -302,29 +310,34 @@ export default function CheckView() {
                     const c = getCheck(template.id, inst.id);
                     return (
                       <tr key={inst.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={tdStyle}>
-                          {inst.isFlagged && <span style={{ color: '#e55353', marginRight: 5 }}>●</span>}
+                        {/* Instance */}
+                        <td style={tdStyle('instance')}>
+                          {inst.isFlagged && <span style={{ color: '#e55353', marginRight: 5, fontSize: 10 }}>●</span>}
                           {inst.name}
                         </td>
 
-                        {show('description') && <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{inst.description || '—'}</td>}
+                        {show('description') && (
+                          <td style={{ ...tdStyle('description'), color: 'var(--text-muted)' }}>{inst.description || '—'}</td>
+                        )}
 
-                        {show('area') && <td style={{ ...tdStyle, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{getAreaLabel(inst.areaId, areas) || '—'}</td>}
+                        {show('area') && (
+                          <td style={{ ...tdStyle('area'), color: 'var(--text-muted)' }}>{getAreaLabel(inst.areaId, areas) || '—'}</td>
+                        )}
 
                         {show('flagged') && (
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            {inst.isFlagged ? <span style={{ color: '#e55353', fontSize: 15 }}>●</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          <td style={tdStyle('flagged')}>
+                            {inst.isFlagged ? <span style={{ color: '#e55353' }}>●</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
                         )}
 
                         {show('lastModified') && (
-                          <td style={{ ...tdStyle, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          <td style={{ ...tdStyle('lastModified'), color: 'var(--text-muted)' }}>
                             {inst.lastModification ? new Date(inst.lastModification).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                           </td>
                         )}
 
-                        {['io','plc','scada','mes'].filter(f => show(f)).map(f => (
-                          <td key={f} style={{ ...tdStyle, textAlign: 'center' }}>
+                        {['io', 'plc', 'scada', 'mes'].filter(f => show(f)).map(f => (
+                          <td key={f} style={tdStyle(f)}>
                             <input type="checkbox" checked={!!c[f]}
                               onChange={e => setCheck(template.id, inst.id, f, e.target.checked)}
                               style={{ cursor: 'pointer' }} />
@@ -332,7 +345,7 @@ export default function CheckView() {
                         ))}
 
                         {show('custom') && (
-                          <td style={tdStyle}>
+                          <td style={tdStyle('custom')}>
                             <input type="text" value={c.custom || ''}
                               onChange={e => setCheck(template.id, inst.id, 'custom', e.target.value)}
                               placeholder="—"
@@ -341,11 +354,11 @@ export default function CheckView() {
                         )}
 
                         {show('notes') && (
-                          <td style={{ ...tdStyle, minWidth: 220 }}>
-                            <NotesCell
-                              value={c.notes}
-                              onBlur={v => setCheck(template.id, inst.id, 'notes', v)}
-                            />
+                          <td style={tdStyle('notes')}>
+                            <input type="text" value={c.notes || ''}
+                              onChange={e => setCheck(template.id, inst.id, 'notes', e.target.value)}
+                              placeholder="Add notes…"
+                              style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit' }} />
                           </td>
                         )}
                       </tr>
