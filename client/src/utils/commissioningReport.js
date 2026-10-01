@@ -241,7 +241,7 @@ export function openCommissioningReport(project) {
     }
 
     @media print {
-      .template-section { page-break-inside: avoid; }
+      .template-header { page-break-after: avoid; }
       thead { display: table-header-group; }
     }
   </style>
