@@ -261,11 +261,11 @@ export function openCommissioningReport(project) {
   ${body}
 
   <div class="report-footer">
-    <span>Automation Studio &mdash; One Technology Limited</span>
     <span>Generated ${now.toLocaleString()}</span>
+    <span>Automation Studio &mdash; One Technology Limited &copy;</span>
   </div>
 
-  <script>window.onload = function() { window.print(); };</script>
+  <script>window.onload = function() { setTimeout(function() { window.print(); }, 400); };</script>
 </body>
 </html>`;
 
