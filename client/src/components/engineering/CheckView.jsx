@@ -85,9 +85,7 @@ function ColFilter({ col, value, onChange }) {
 
 export default function CheckView() {
   const { project, updateProject } = useProject();
-  const [filterTemplate, setFilterTemplate] = useState('all');
-  const [filterStatus,   setFilterStatus]   = useState('all');
-  const [colFilters,     setColFilters]      = useState(EMPTY_COL_FILTERS);
+  const [colFilters, setColFilters] = useState(EMPTY_COL_FILTERS);
   const [visibleCols,    setVisibleCols]     = useState(new Set(ALL_COLUMNS.map(c => c.id)));
   const [colMenuOpen,    setColMenuOpen]     = useState(false);
   const [expanded,       setExpanded]        = useState(new Set()); // start collapsed
@@ -120,9 +118,8 @@ export default function CheckView() {
   }
 
   const setCF = (col, val) => setColFilters(prev => ({ ...prev, [col]: val }));
-  const hasActiveFilters = filterTemplate !== 'all' || filterStatus !== 'all' ||
-    Object.entries(colFilters).some(([, v]) => v && v !== 'all');
-  const clearFilters = () => { setFilterTemplate('all'); setFilterStatus('all'); setColFilters(EMPTY_COL_FILTERS); };
+  const hasActiveFilters = Object.entries(colFilters).some(([, v]) => v && v !== 'all');
+  const clearFilters = () => setColFilters(EMPTY_COL_FILTERS);
 
   const allRows = useMemo(() => {
     const rows = [];
@@ -135,13 +132,6 @@ export default function CheckView() {
   const filteredRows = useMemo(() => {
     const cf = colFilters;
     return allRows.filter(({ template, instance }) => {
-      if (filterTemplate !== 'all' && String(template.id) !== filterTemplate) return false;
-      if (filterStatus !== 'all') {
-        const c = checkData[`${template.id}:${instance.id}`];
-        const any = c && (c.io || c.plc || c.scada || c.mes);
-        if (filterStatus === 'any'  && !any) return false;
-        if (filterStatus === 'none' &&  any) return false;
-      }
       if (cf.instance    && !instance.name.toLowerCase().includes(cf.instance.toLowerCase())) return false;
       if (cf.description && !(instance.description || '').toLowerCase().includes(cf.description.toLowerCase())) return false;
       if (cf.area) {
@@ -172,7 +162,7 @@ export default function CheckView() {
       }
       return true;
     });
-  }, [allRows, filterTemplate, filterStatus, colFilters, checkData, areas]);
+  }, [allRows, colFilters, checkData, areas]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -206,19 +196,6 @@ export default function CheckView() {
         borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)',
         flexShrink: 0, flexWrap: 'wrap',
       }}>
-        <select value={filterTemplate} onChange={e => setFilterTemplate(e.target.value)} style={{ height: 28, fontSize: 12 }}>
-          <option value="all">All Templates</option>
-          {[...templates].sort((a, b) => a.name.localeCompare(b.name)).map(t =>
-            <option key={t.id} value={String(t.id)}>{t.name}</option>
-          )}
-        </select>
-
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ height: 28, fontSize: 12 }}>
-          <option value="all">All status</option>
-          <option value="any">Any checked</option>
-          <option value="none">Not started</option>
-        </select>
-
         {hasActiveFilters && (
           <button className="btn btn-ghost" onClick={clearFilters}
             style={{ display: 'flex', alignItems: 'center', gap: 4, height: 28, fontSize: 12, color: 'var(--text-muted)' }}>
