@@ -71,9 +71,10 @@ const thStyle = {
   padding: '7px 10px', textAlign: 'left', fontSize: 11, fontWeight: 600,
   color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em',
   borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--bg-surface)',
+  overflow: 'hidden',
 };
-const tfStyle   = { padding: '4px 6px', background: 'var(--bg-surface)', borderBottom: '2px solid var(--border)' };
-const tdStyle   = { padding: '6px 10px', fontSize: 13, color: 'var(--text-primary)', verticalAlign: 'top' };
+const tfStyle   = { padding: '4px 6px', background: 'var(--bg-surface)', borderBottom: '2px solid var(--border)', overflow: 'hidden' };
+const tdStyle   = { padding: '6px 10px', fontSize: 13, color: 'var(--text-primary)', verticalAlign: 'top', overflow: 'hidden' };
 const finStyle  = { width: '100%', fontSize: 11, padding: '2px 5px', height: 22, background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 3, color: 'var(--text-primary)', boxSizing: 'border-box' };
 const fselStyle = { ...finStyle, padding: '2px 2px' };
 
@@ -233,11 +234,11 @@ export default function CheckView() {
 
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto' }}>
-        <table className="data-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+        <table className="data-table" style={{ tableLayout: 'fixed', borderCollapse: 'collapse', minWidth: '100%' }}>
           <colgroup>
             <col style={{ width: 150 }} />
-            {show('description')  && <col />}
-            {show('area')         && <col />}
+            {show('description')  && <col style={{ width: 200 }} />}
+            {show('area')         && <col style={{ width: 160 }} />}
             {show('flagged')      && <col style={{ width: 84 }} />}
             {show('lastModified') && <col style={{ width: 124 }} />}
             {show('io')           && <col style={{ width: 54 }} />}
