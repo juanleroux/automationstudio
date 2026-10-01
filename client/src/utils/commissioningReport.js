@@ -145,7 +145,7 @@ export function openCommissioningReport(project) {
       color: #1a1a1a;
       background: #fff;
       margin: 0;
-      padding: 0;
+      padding-bottom: 22px;
     }
 
     .report-header {
@@ -232,13 +232,17 @@ export function openCommissioningReport(project) {
     .col-custom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .report-footer {
-      margin-top: 24px;
-      padding-top: 8px;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 5px 0 4px;
       border-top: 1px solid #ccc;
       font-size: 9px;
       color: #999;
       display: flex;
       justify-content: space-between;
+      background: #fff;
     }
 
     @media print {
