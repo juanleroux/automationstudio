@@ -145,7 +145,7 @@ export function openCommissioningReport(project) {
       color: #1a1a1a;
       background: #fff;
       margin: 0;
-      padding-bottom: 22px;
+      padding: 0;
     }
 
     .report-header {
@@ -231,20 +231,6 @@ export function openCommissioningReport(project) {
     }
     .col-custom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .report-footer {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 5px 0 4px;
-      border-top: 1px solid #ccc;
-      font-size: 9px;
-      color: #999;
-      display: flex;
-      justify-content: space-between;
-      background: #fff;
-    }
-
     @media print {
       .template-header { page-break-after: avoid; }
       thead { display: table-header-group; }
@@ -258,17 +244,13 @@ export function openCommissioningReport(project) {
       <div class="report-project">${esc(project?.name || 'Unnamed Project')}</div>
     </div>
     <div class="report-meta">
+      <div style="font-weight:700;font-size:11px;color:#1a1a1a;">Automation Studio &mdash; One Technology Limited &copy;</div>
       <div>Date: ${dateStr}</div>
       <div>Templates: ${templates.length} &nbsp;·&nbsp; Instances: ${totalInstances}</div>
     </div>
   </div>
 
   ${body}
-
-  <div class="report-footer">
-    <span>Generated ${now.toLocaleString()}</span>
-    <span>Automation Studio &mdash; One Technology Limited &copy;</span>
-  </div>
 
   <script>window.onload = function() { setTimeout(function() { window.print(); }, 400); };</script>
 </body>
