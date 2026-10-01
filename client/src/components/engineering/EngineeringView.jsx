@@ -10,6 +10,7 @@ import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import { useProject } from '../../context/ProjectContext';
 import AreasView from '../areas/AreasView';
+import CheckView from './CheckView';
 import { openCommissioningReport } from '../../utils/commissioningReport';
 import { getFoldersFromIgnition } from '../../api/client';
 import { useToast } from '../shared/Toast';
@@ -823,14 +824,17 @@ export default function EngineeringView() {
 
       {/* View tab bar */}
       <div className="flex items-center flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
-        {['derivation', 'model'].map(tab => (
+        {[
+          { id: 'derivation', label: 'Derivation' },
+          { id: 'model',      label: 'Model' },
+          { id: 'check',      label: 'Check' },
+        ].map(tab => (
           <button
-            key={tab}
-            className={`tab-item ${assetTab === tab ? 'active' : ''}`}
-            onClick={() => setAssetTab(tab)}
-            style={{ textTransform: 'capitalize' }}
+            key={tab.id}
+            className={`tab-item ${assetTab === tab.id ? 'active' : ''}`}
+            onClick={() => setAssetTab(tab.id)}
           >
-            {tab === 'derivation' ? 'Derivation' : 'Model'}
+            {tab.label}
           </button>
         ))}
         <div style={{ flex: 1 }} />
@@ -873,6 +877,7 @@ export default function EngineeringView() {
         )}
 
         {assetTab === 'model' && <AreasView />}
+        {assetTab === 'check' && <CheckView />}
       </div>
     </div>
   );
