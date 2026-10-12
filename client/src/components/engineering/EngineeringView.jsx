@@ -124,13 +124,31 @@ function AOIGroup({ group, s5kSelected, onToggleAOI, onToggleInstance }) {
   );
 }
 
+function DescriptionField({ value, onChange }) {
+  const [local, setLocal] = React.useState(value);
+  React.useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Description</span>
+      <input
+        type="text"
+        value={local}
+        onChange={e => setLocal(e.target.value)}
+        onBlur={() => { if (local !== value) onChange(local); }}
+        placeholder="Add a description…"
+        style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit' }}
+      />
+    </div>
+  );
+}
+
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 260;
 
 const BLANK_PROFILE = { name: '', description: '', exportType: 0, formatType: 0, tabularExportDelimiter: ',', structuralExportTemplate: '', customFormat: '' };
 
-function RightPanel({ selected, selectedTemplate, selectedInstance, project, onUpdateTemplateAttrs, onUpdateInstanceAttrs, onUpdateTemplate }) {
+function RightPanel({ selected, selectedTemplate, selectedInstance, project, onUpdateTemplateAttrs, onUpdateInstanceAttrs, onUpdateTemplate, onUpdateInstance }) {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState(0);
   const [showAddProfileModal, setShowAddProfileModal] = useState(false);
@@ -372,7 +390,13 @@ function RightPanel({ selected, selectedTemplate, selectedInstance, project, onU
         )}
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" style={{ display: 'flex', flexDirection: 'column' }}>
+        {activeTab === 0 && mode === 'instance' && (
+          <DescriptionField
+            value={selectedInstance?.description || ''}
+            onChange={v => onUpdateInstance('description', v)}
+          />
+        )}
         {activeTab === 0 ? (
           <AttributeGrid
             attributes={mode === 'instance' ? (selectedInstance?.attributes || []) : (selectedTemplate?.attributes || [])}
@@ -484,6 +508,26 @@ export default function EngineeringView() {
               instances: (t.instances || []).map(i =>
                 i.id === selectedInstance.id
                   ? { ...i, lastModification: now, attributes: typeof updater === 'function' ? updater(i.attributes || []) : updater }
+                  : i
+              )
+            }
+          : t
+      )
+    }));
+  }, [selectedTemplate, selectedInstance, updateProject]);
+
+  const handleUpdateInstance = useCallback((field, value) => {
+    if (!selectedTemplate || !selectedInstance) return;
+    const now = new Date().toISOString();
+    updateProject(p => ({
+      ...p,
+      templates: p.templates.map(t =>
+        t.id === selectedTemplate.id
+          ? {
+              ...t,
+              instances: (t.instances || []).map(i =>
+                i.id === selectedInstance.id
+                  ? { ...i, lastModification: now, [field]: value }
                   : i
               )
             }
@@ -871,6 +915,7 @@ export default function EngineeringView() {
                 onUpdateTemplateAttrs={handleUpdateTemplateAttrs}
                 onUpdateInstanceAttrs={handleUpdateInstanceAttrs}
                 onUpdateTemplate={handleUpdateTemplate}
+                onUpdateInstance={handleUpdateInstance}
               />
             </div>
           </div>
