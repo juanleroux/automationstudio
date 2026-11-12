@@ -138,7 +138,7 @@ function collectUdtTypes(tags, bucket = [], currentPath = '') {
  * Convert one Ignition UdtType (+ its sibling instances) to our template format.
  */
 // Ignition's documentation field is a string or { value: "..." }
-function extractDoc(doc) {
+export function extractDoc(doc) {
   if (!doc) return '';
   if (typeof doc === 'string') return doc;
   if (typeof doc === 'object' && doc.value != null) return String(doc.value);
