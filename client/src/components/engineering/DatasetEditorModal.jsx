@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 
 const COL_TYPES = [
@@ -88,7 +89,7 @@ export default function DatasetEditorModal({ value, onApply, onCancel }) {
 
   const selectedColDef = selCol !== null && selCol < columns.length ? columns[selCol] : null;
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, zIndex: 2000,
       background: 'rgba(0,0,0,0.45)',
@@ -264,6 +265,7 @@ export default function DatasetEditorModal({ value, onApply, onCancel }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
