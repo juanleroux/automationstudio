@@ -12,6 +12,7 @@ export const DATA_TYPES = [
   { value: 8, label: 'Float' },
   { value: 9, label: 'String' },
   { value: 10, label: 'Int4' },
+  { value: 11, label: 'Dataset' },
 ];
 
 export function dataTypeName(val) {

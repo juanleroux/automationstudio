@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Edit2 } from 'lucide-react';
 import DataTypeSelect, { dataTypeName } from '../shared/DataTypeSelect';
+import DatasetEditorModal, { datasetLabel } from './DatasetEditorModal';
 
 function nextId(attrs) {
   if (!attrs || !attrs.length) return 1;
@@ -54,6 +55,7 @@ function EditCell({ value, onChange, disabled, type = 'text', style }) {
 export default function AttributeGrid({ attributes, templateAttributes, mode, onChange, hideDefaults = true, instanceArea }) {
   // mode: 'template' | 'instance'
   const isTemplate = mode === 'template';
+  const [datasetEditId, setDatasetEditId] = useState(null);
 
   const updateAttr = useCallback((id, field, value) => {
     onChange(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
@@ -189,20 +191,54 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                   )}
                 </td>
                 <td>
-                  <EditCell
-                    value={attr.value}
-                    onChange={v => {
-                      if (isTemplate) {
-                        updateAttr(attr.id, 'value', v);
-                      } else {
-                        onChange(prev => {
-                          const exists = prev.find(a => a.id === attr.id);
-                          if (exists) return prev.map(a => a.id === attr.id ? { ...a, value: v } : a);
-                          return [...prev, { id: attr.id, value: v }];
-                        });
-                      }
-                    }}
-                  />
+                  {attr.dataType === 11 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        {datasetLabel(attr.value)}
+                      </span>
+                      <button
+                        className="btn-ghost btn-icon"
+                        style={{ padding: 2 }}
+                        title="Edit dataset"
+                        onClick={() => setDatasetEditId(attr.id)}
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      {datasetEditId === attr.id && (
+                        <DatasetEditorModal
+                          value={attr.value}
+                          onApply={v => {
+                            if (isTemplate) {
+                              updateAttr(attr.id, 'value', v);
+                            } else {
+                              onChange(prev => {
+                                const exists = prev.find(a => a.id === attr.id);
+                                if (exists) return prev.map(a => a.id === attr.id ? { ...a, value: v } : a);
+                                return [...prev, { id: attr.id, value: v }];
+                              });
+                            }
+                            setDatasetEditId(null);
+                          }}
+                          onCancel={() => setDatasetEditId(null)}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <EditCell
+                      value={attr.value}
+                      onChange={v => {
+                        if (isTemplate) {
+                          updateAttr(attr.id, 'value', v);
+                        } else {
+                          onChange(prev => {
+                            const exists = prev.find(a => a.id === attr.id);
+                            if (exists) return prev.map(a => a.id === attr.id ? { ...a, value: v } : a);
+                            return [...prev, { id: attr.id, value: v }];
+                          });
+                        }
+                      }}
+                    />
+                  )}
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   <input
