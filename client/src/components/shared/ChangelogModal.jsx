@@ -172,6 +172,13 @@ export default function ChangelogModal({ onClose }) {
                     }}>
                       {entry.hash}
                     </span>
+                    <span style={{
+                      fontFamily: 'monospace', fontSize: 10,
+                      color: 'var(--accent)', flexShrink: 0,
+                      paddingTop: 2, minWidth: 56,
+                    }}>
+                      {entry.version}
+                    </span>
                     {type && <Tag type={type} />}
                     <span style={{ fontSize: 12, color: 'var(--text-primary)', flex: 1, lineHeight: 1.4 }}>
                       {clean}

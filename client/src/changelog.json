@@ -1,2012 +1,2420 @@
 [
   {
-    "hash": "bc6a587",
+    "hash": "1be7d4c1",
     "date": "2026-11-12",
+    "version": "v1.2.163",
+    "subject": "feat: clickable version badge opens changelog dialog"
+  },
+  {
+    "hash": "bc6a5874",
+    "date": "2026-11-12",
+    "version": "v1.2.162",
     "subject": "feat: show version number below app title in sidebar when expanded"
   },
   {
-    "hash": "7374555",
+    "hash": "73745557",
     "date": "2026-11-12",
+    "version": "v1.2.161",
     "subject": "feat: expand Dataset values to CSV in structural profile templates"
   },
   {
-    "hash": "677c2ed",
+    "hash": "677c2ed5",
     "date": "2026-11-12",
+    "version": "v1.2.160",
     "subject": "fix: support hyphenated attribute names in structural profile templates"
   },
   {
-    "hash": "0650beb",
+    "hash": "0650beb5",
     "date": "2026-11-12",
+    "version": "v1.2.159",
     "subject": "feat: support {Token}.AttrName.Value shorthand in structural templates"
   },
   {
-    "hash": "45d04cf",
+    "hash": "45d04cfe",
     "date": "2026-11-12",
+    "version": "v1.2.158",
     "subject": "fix: include Dataset attributes in Ignition sync regardless of parameter flag"
   },
   {
-    "hash": "149c660",
+    "hash": "149c660e",
     "date": "2026-11-12",
+    "version": "v1.2.157",
     "subject": "fix: normalize Dataset values before sync diff comparison"
   },
   {
-    "hash": "71d30ee",
+    "hash": "71d30ee9",
     "date": "2026-11-12",
+    "version": "v1.2.156",
     "subject": "fix: correct CSS variable names in DatasetEditorModal"
   },
   {
-    "hash": "d406543",
+    "hash": "d4065435",
     "date": "2026-11-12",
+    "version": "v1.2.155",
     "subject": "fix: use React portal for DatasetEditorModal to escape CSS containment"
   },
   {
-    "hash": "6213456",
+    "hash": "62134560",
     "date": "2026-11-12",
+    "version": "v1.2.154",
     "subject": "fix: preserve checkbox multi-selection when clicking instance rows"
   },
   {
-    "hash": "9e5bdc0",
+    "hash": "9e5bdc0d",
     "date": "2026-11-12",
+    "version": "v1.2.153",
     "subject": "fix: render DatasetEditorModal outside table to fix fixed positioning"
   },
   {
-    "hash": "a8c3f79",
+    "hash": "a8c3f79a",
     "date": "2026-11-12",
+    "version": "v1.2.152",
     "subject": "feat: add Dataset attribute type with grid editor"
   },
   {
-    "hash": "7d02558",
+    "hash": "7d025588",
     "date": "2026-11-12",
+    "version": "v1.2.151",
     "subject": "feat: support {Instance.Name}.Parameter.AttrName.Value path syntax in structural templates"
   },
   {
-    "hash": "4517119",
+    "hash": "45171196",
     "date": "2026-11-12",
+    "version": "v1.2.150",
     "subject": "feat: add coalesce fallback syntax to structural profile templates"
   },
   {
-    "hash": "fc84160",
+    "hash": "fc841601",
     "date": "2026-11-12",
+    "version": "v1.2.149",
     "subject": "feat: extend structural profile template to support attribute references"
   },
   {
-    "hash": "c3338ae",
+    "hash": "c3338aeb",
     "date": "2026-10-12",
+    "version": "v1.2.148",
     "subject": "feat(derivation): expose description field on instance panel"
   },
   {
-    "hash": "df771a9",
+    "hash": "df771a96",
     "date": "2026-10-01",
+    "version": "v1.2.147",
     "subject": "feat(print): move branding to header top-right, remove footer"
   },
   {
-    "hash": "4427f4c",
+    "hash": "4427f4cd",
     "date": "2026-10-01",
+    "version": "v1.2.146",
     "subject": "fix(print): make footer fixed so it appears on every page"
   },
   {
-    "hash": "bef82e7",
+    "hash": "bef82e7a",
     "date": "2026-10-01",
+    "version": "v1.2.145",
     "subject": "fix(print): actually remove page-break-inside:avoid from base CSS rule"
   },
   {
-    "hash": "1456936",
+    "hash": "1456936c",
     "date": "2026-10-01",
+    "version": "v1.2.144",
     "subject": "fix(print): remove page-break-inside:avoid that caused blank first page"
   },
   {
-    "hash": "9c99eb6",
+    "hash": "9c99eb61",
     "date": "2026-10-01",
+    "version": "v1.2.143",
     "subject": "fix(print): delay print call to prevent blank first page; update footer"
   },
   {
-    "hash": "a87ecab",
+    "hash": "a87ecabc",
     "date": "2026-10-01",
+    "version": "v1.2.142",
     "subject": "fix(print): populate check state and notes from project.checkData"
   },
   {
-    "hash": "2d35f8a",
+    "hash": "2d35f8a9",
     "date": "2026-10-01",
+    "version": "v1.2.141",
     "subject": "feat(check-view): fill space, resizable columns, single-line rows"
   },
   {
-    "hash": "87afae2",
+    "hash": "87afae20",
     "date": "2026-10-01",
+    "version": "v1.2.140",
     "subject": "fix(check-view): prevent cell content overflow causing visual overlap"
   },
   {
-    "hash": "b7954e6",
+    "hash": "b7954e66",
     "date": "2026-10-01",
+    "version": "v1.2.139",
     "subject": "fix(check-view): stabilise column widths with table-layout:fixed and colgroup"
   },
   {
-    "hash": "da23645",
+    "hash": "da23645e",
     "date": "2026-10-01",
+    "version": "v1.2.138",
     "subject": "feat(check-view): remove All Templates and All Status toolbar filters"
   },
   {
-    "hash": "77c4a6d",
+    "hash": "77c4a6db",
     "date": "2026-10-01",
+    "version": "v1.2.137",
     "subject": "fix(check-view): resolve hang on navigation by defaulting groups to collapsed"
   },
   {
-    "hash": "0bd77be",
+    "hash": "0bd77bee",
     "date": "2026-10-01",
+    "version": "v1.2.136",
     "subject": "feat(check-view): per-column filters and large Notes field"
   },
   {
-    "hash": "181b477",
+    "hash": "181b4779",
     "date": "2026-10-01",
+    "version": "v1.2.135",
     "subject": "feat: add Check view tab to Assets with persistent commissioning state"
   },
   {
-    "hash": "9f29527",
+    "hash": "9f295277",
     "date": "2026-09-18",
+    "version": "v1.2.134",
     "subject": "feat(folder-sync-dialog): expand/collapse folder tree nodes"
   },
   {
-    "hash": "6e9070a",
+    "hash": "6e9070ad",
     "date": "2026-09-18",
+    "version": "v1.2.133",
     "subject": "fix: alphabetical folder sort in sync dialog; AI enabled default false, saved per-project"
   },
   {
-    "hash": "34f3e6d",
+    "hash": "34f3e6d7",
     "date": "2026-09-18",
+    "version": "v1.2.132",
     "subject": "feat(model-view): alphabetical sort, sync dropdown, instance hierarchy sync"
   },
   {
-    "hash": "a35f2f7",
+    "hash": "a35f2f78",
     "date": "2026-09-18",
+    "version": "v1.2.131",
     "subject": "fix(folder-sync): uncheck children when parent folder is deselected"
   },
   {
-    "hash": "f70a3f9",
+    "hash": "f70a3f98",
     "date": "2026-09-18",
+    "version": "v1.2.130",
     "subject": "fix(model-view): restrict sync to folder structure only"
   },
   {
-    "hash": "670cf3a",
+    "hash": "670cf3af",
     "date": "2026-09-18",
+    "version": "v1.2.129",
     "subject": "feat(model-view): show folder tree with checkboxes in sync dialog"
   },
   {
-    "hash": "c8a4019",
+    "hash": "c8a40198",
     "date": "2026-09-18",
+    "version": "v1.2.128",
     "subject": "v1.2.128: Model View sync is folder/area placement only"
   },
   {
-    "hash": "cd832e3",
+    "hash": "cd832e3b",
     "date": "2026-09-18",
+    "version": "v1.2.127",
     "subject": "v1.2.127: Fix Map constructor shadowed by lucide-react Map icon"
   },
   {
-    "hash": "8a27811",
+    "hash": "8a278119",
     "date": "2026-09-18",
+    "version": "v1.2.126",
     "subject": "v1.2.126: Add Sync To/From Ignition to Model View"
   },
   {
-    "hash": "54a3e4a",
+    "hash": "54a3e4a0",
     "date": "2026-09-17",
+    "version": "v1.2.125",
     "subject": "v1.2.125: Fix parent area counts and AI toggle immediacy"
   },
   {
-    "hash": "c477b95",
+    "hash": "c477b95f",
     "date": "2026-09-17",
+    "version": "v1.2.124",
     "subject": "v1.2.124: Auto-create area hierarchy on Sync From Ignition"
   },
   {
-    "hash": "91de5a5",
+    "hash": "91de5a5b",
     "date": "2026-09-17",
+    "version": "v1.2.123",
     "subject": "v1.2.123: AI disable option + area mismatch in sync diff"
   },
   {
-    "hash": "bd9e7de",
+    "hash": "bd9e7dea",
     "date": "2026-09-17",
+    "version": "v1.2.122",
     "subject": "v1.2.122: Fix applySyncDialog not uploading — missing instanceIgnPath destructure"
   },
   {
-    "hash": "a3df59e",
+    "hash": "a3df59e9",
     "date": "2026-09-17",
+    "version": "v1.2.121",
     "subject": "v1.2.121: Fix Sync To Ignition uploading to wrong folder (creates duplicate)"
   },
   {
-    "hash": "d7b801d",
+    "hash": "d7b801dd",
     "date": "2026-09-17",
+    "version": "v1.2.120",
     "subject": "v1.2.120: Move Hide Defaults to tab bar; add Area row to instance AttributeGrid"
   },
   {
-    "hash": "79ec888",
+    "hash": "79ec888b",
     "date": "2026-09-17",
+    "version": "v1.2.119",
     "subject": "v1.2.119: Add Hide Defaults checkbox to instance AttributeGrid"
   },
   {
-    "hash": "589c6a8",
+    "hash": "589c6a82",
     "date": "2026-09-17",
+    "version": "v1.2.118",
     "subject": "v1.2.118: Ignition Sync diff dialog with tag search and per-attribute confirm"
   },
   {
-    "hash": "aa585f4",
+    "hash": "aa585f45",
     "date": "2026-09-17",
+    "version": "v1.2.117",
     "subject": "v1.2.117: Ignition Sync submenu on instance context menu"
   },
   {
-    "hash": "4d306e6",
+    "hash": "4d306e6d",
     "date": "2026-09-10",
+    "version": "v1.2.116",
     "subject": "v1.2.116: Fix vertical→horizontal transition routing (simple L-shape)"
   },
   {
-    "hash": "521b325",
+    "hash": "521b325e",
     "date": "2026-09-10",
+    "version": "v1.2.115",
     "subject": "v1.2.115: Fix arrow direction for left/right port entry; center transition bar at true midpoint"
   },
   {
-    "hash": "53a895e",
+    "hash": "53a895e9",
     "date": "2026-09-10",
+    "version": "v1.2.114",
     "subject": "feat(sequences): breadcrumb title, Line Style dropdown; remove Routing option (v1.2.114)"
   },
   {
-    "hash": "412b59d",
+    "hash": "412b59d6",
     "date": "2026-09-10",
+    "version": "v1.2.113",
     "subject": "fix(sequences): SFC bar always on vertical segment; arrows arrive in correct direction (v1.2.113)"
   },
   {
-    "hash": "c69f253",
+    "hash": "c69f2531",
     "date": "2026-09-10",
+    "version": "v1.2.112",
     "subject": "fix(sequences): condition text always right of SFC bar, never overlapping (v1.2.112)"
   },
   {
-    "hash": "252d048",
+    "hash": "252d048b",
     "date": "2026-09-10",
+    "version": "v1.2.111",
     "subject": "feat(sequences): draggable jog handles on orthogonal transition lines (v1.2.111)"
   },
   {
-    "hash": "bdc5c67",
+    "hash": "bdc5c673",
     "date": "2026-09-10",
+    "version": "v1.2.110",
     "subject": "fix: default transition routing to orthogonal; bar placed on actual path (v1.2.110)"
   },
   {
-    "hash": "2265108",
+    "hash": "2265108b",
     "date": "2026-09-10",
+    "version": "v1.2.109",
     "subject": "feat: port anchors and line-type routing for transitions (v1.2.109)"
   },
   {
-    "hash": "ffedbdf",
+    "hash": "ffedbdfb",
     "date": "2026-09-10",
+    "version": "v1.2.108",
     "subject": "feat: grid, snap, multi-select, align and distribute for Sequences (v1.2.108)"
   },
   {
-    "hash": "2d96709",
+    "hash": "2d967098",
     "date": "2026-09-10",
+    "version": "v1.2.107",
     "subject": "feat: SFC-style transition bars and free colour picker for steps (v1.2.107)"
   },
   {
-    "hash": "f75ec79",
+    "hash": "f75ec791",
     "date": "2026-09-10",
+    "version": "v1.2.106",
     "subject": "feat: redesign Sequences view as interactive canvas (v1.2.106)"
   },
   {
-    "hash": "47b5a44",
+    "hash": "47b5a448",
     "date": "2026-09-10",
+    "version": "v1.2.105",
     "subject": "feat: add Sequences view for state machine definitions (v1.2.105)"
   },
   {
-    "hash": "0210974",
+    "hash": "02109749",
     "date": "2026-09-08",
+    "version": "v1.2.104",
     "subject": "fix: profile toolbar — reorder icons, JSON export, fix import for array format (v1.2.104)"
   },
   {
-    "hash": "9639a32",
+    "hash": "9639a32c",
     "date": "2026-09-08",
+    "version": "v1.2.103",
     "subject": "fix: remove --- separator from structural exports; move profile actions to outer tab bar; add profile import (v1.2.103)"
   },
   {
-    "hash": "a6dc0f2",
+    "hash": "a6dc0f2d",
     "date": "2026-09-03",
+    "version": "v1.2.102",
     "subject": "fix: send full project data to Anthropic/DeepSeek — no context cap (v1.2.102)"
   },
   {
-    "hash": "745d3ae",
+    "hash": "745d3aef",
     "date": "2026-09-03",
+    "version": "v1.2.101",
     "subject": "fix: include all instances in AI context, remove per-template truncation (v1.2.101)"
   },
   {
-    "hash": "c426490",
+    "hash": "c426490d",
     "date": "2026-09-03",
+    "version": "v1.2.100",
     "subject": "feat: add DeepSeek as AI provider option (v1.2.100)"
   },
   {
-    "hash": "ef2af00",
+    "hash": "ef2af006",
     "date": "2026-09-03",
+    "version": "v1.2.99",
     "subject": "fix: Groq lite mode — skip tools to stay within 8k TPM free tier (v1.2.99)"
   },
   {
-    "hash": "664c83a",
+    "hash": "664c83a4",
     "date": "2026-09-03",
+    "version": "v1.2.98",
     "subject": "fix: simplify system prompt for small model compatibility (v1.2.98)"
   },
   {
-    "hash": "3ccc2b3",
+    "hash": "3ccc2b37",
     "date": "2026-09-03",
+    "version": "v1.2.97",
     "subject": "fix: increase Ollama/OpenAI-compat request timeout to 300s (v1.2.97)"
   },
   {
-    "hash": "5137bde",
+    "hash": "5137bdef",
     "date": "2026-09-03",
+    "version": "v1.2.96",
     "subject": "fix: use ollama service name as default URL (v1.2.96)"
   },
   {
-    "hash": "3189155",
+    "hash": "31891553",
     "date": "2026-09-03",
+    "version": "v1.2.95",
     "subject": "fix: use host.docker.internal for Ollama default URL (v1.2.95)"
   },
   {
-    "hash": "c8681ea",
+    "hash": "c8681ea7",
     "date": "2026-09-03",
+    "version": "v1.2.94",
     "subject": "fix: provider-aware context budget to stay within Groq free tier (v1.2.94)"
   },
   {
-    "hash": "baec627",
+    "hash": "baec6273",
     "date": "2026-09-03",
+    "version": "v1.2.93",
     "subject": "fix: restore instance attribute values in AI project summary (v1.2.93)"
   },
   {
-    "hash": "1ec2dc4",
+    "hash": "1ec2dc46",
     "date": "2026-09-03",
+    "version": "v1.2.92",
     "subject": "fix: reduce context size sent to AI providers (v1.2.92)"
   },
   {
-    "hash": "2562a11",
+    "hash": "2562a111",
     "date": "2026-09-03",
+    "version": "v1.2.91",
     "subject": "fix: graceful fallback when model doesn't support tool calling (v1.2.91)"
   },
   {
-    "hash": "e3ec14a",
+    "hash": "e3ec14a4",
     "date": "2026-09-03",
+    "version": "v1.2.90",
     "subject": "feat: live model loading from provider API in AI settings (v1.2.90)"
   },
   {
-    "hash": "adf1424",
+    "hash": "adf1424a",
     "date": "2026-09-03",
+    "version": "v1.2.89",
     "subject": "fix: replace Groq model dropdown with free-text input (v1.2.89)"
   },
   {
-    "hash": "e50bbc5",
+    "hash": "e50bbc5f",
     "date": "2026-09-03",
+    "version": "v1.2.88",
     "subject": "fix: update Groq models to current non-deprecated IDs (v1.2.88)"
   },
   {
-    "hash": "94ac562",
+    "hash": "94ac562e",
     "date": "2026-09-03",
+    "version": "v1.2.87",
     "subject": "fix: remove duplicate border key in AiChat send button style"
   },
   {
-    "hash": "d04e941",
+    "hash": "d04e9415",
     "date": "2026-09-03",
+    "version": "v1.2.86",
     "subject": "fix: update Groq model list to stable widely-available IDs"
   },
   {
-    "hash": "c18de9d",
+    "hash": "c18de9da",
     "date": "2026-09-03",
+    "version": "v1.2.85",
     "subject": "fix: set default model when switching AI provider, add server-side fallback"
   },
   {
-    "hash": "9c688ef",
+    "hash": "9c688ef8",
     "date": "2026-09-03",
+    "version": "v1.2.84",
     "subject": "feat: add AI provider selection with free options (Ollama, Groq)"
   },
   {
-    "hash": "ccd87c5",
+    "hash": "ccd87c5f",
     "date": "2026-09-02",
+    "version": "v1.2.84",
     "subject": "Fix syntax error: apostrophe in single-quoted string in ai.js"
   },
   {
-    "hash": "d29b19d",
+    "hash": "d29b19dd",
     "date": "2026-09-02",
+    "version": "v1.2.83",
     "subject": "v1.2.83: Add AI chat assistant with full project control"
   },
   {
-    "hash": "f557067",
+    "hash": "f557067e",
     "date": "2026-09-01",
+    "version": "v1.2.82",
     "subject": "v1.2.82: TIA network title = description only; fallback to Description attr when LongDesc absent"
   },
   {
-    "hash": "7d675cb",
+    "hash": "7d675cb7",
     "date": "2026-08-18",
+    "version": "v1.2.81",
     "subject": "v1.2.81: highlight duplicate instance names in red in Derivation tree (instance name + template/type name)"
   },
   {
-    "hash": "4dee88f",
+    "hash": "4dee88f6",
     "date": "2026-08-18",
+    "version": "v1.2.80",
     "subject": "v1.2.80: Reset coil connected to ENO of FB call, not directly from Powerrail"
   },
   {
-    "hash": "4e22409",
+    "hash": "4e224093",
     "date": "2026-08-18",
+    "version": "v1.2.79",
     "subject": "v1.2.79: single Powerrail wire fans out to FB call and Reset coil (LAD only allows one power rail per network)"
   },
   {
-    "hash": "bcd9833",
+    "hash": "bcd98339",
     "date": "2026-08-18",
+    "version": "v1.2.78",
     "subject": "v1.2.78: merge Reset coil into same network as FB call (single CompileUnit per instance)"
   },
   {
-    "hash": "0d34768",
+    "hash": "0d347683",
     "date": "2026-08-18",
+    "version": "v1.2.77",
     "subject": "Bump to v1.2.77"
   },
   {
-    "hash": "5abbf0e",
+    "hash": "5abbf0e7",
     "date": "2026-08-18",
+    "version": "v1.2.77",
     "subject": "Fix Reset coil wire: Access connects via IdentCon not NameCon"
   },
   {
-    "hash": "7e1622f",
+    "hash": "7e1622f0",
     "date": "2026-08-18",
+    "version": "v1.2.77",
     "subject": "Fix RCoil: self-closing Part element, no TemplateValue children"
   },
   {
-    "hash": "dd3e10b",
+    "hash": "dd3e10b0",
     "date": "2026-08-18",
+    "version": "v1.2.77",
     "subject": "Fix Reset coil XML: use Part Name=\"RCoil\" instead of invalid Coil element"
   },
   {
-    "hash": "4dadfca",
+    "hash": "4dadfca7",
     "date": "2026-08-18",
+    "version": "v1.2.76",
     "subject": "v1.2.76: network title Tag+Description, Add Reset toggle per template FB mapping"
   },
   {
-    "hash": "692e8fa",
+    "hash": "692e8fa1",
     "date": "2026-08-18",
+    "version": "v1.2.75",
     "subject": "fix(bridge): Instance needs Component child element for DB name in FlgNet"
   },
   {
-    "hash": "0385443",
+    "hash": "03854433",
     "date": "2026-08-18",
+    "version": "v1.2.74",
     "subject": "fix(bridge): Instance requires Scope attr, UId cross-refs Access element"
   },
   {
-    "hash": "44eaebd",
+    "hash": "44eaebd2",
     "date": "2026-08-18",
+    "version": "v1.2.73",
     "subject": "fix(bridge): correct FlgNet Instance structure for TIA Portal V21"
   },
   {
-    "hash": "780a6fe",
+    "hash": "780a6fe5",
     "date": "2026-08-17",
+    "version": "v1.2.72",
     "subject": "fix(bridge): use Scope not Declaration in FlgNet Instance element"
   },
   {
-    "hash": "f6c73de",
+    "hash": "f6c73de7",
     "date": "2026-08-17",
+    "version": "v1.2.71",
     "subject": "fix(bridge): remove invalid Scope attr from FlgNet Instance, add console logging"
   },
   {
-    "hash": "bdb30f8",
+    "hash": "bdb30f89",
     "date": "2026-08-17",
+    "version": "v1.2.70",
     "subject": "fix: bridge version in startup message, narrow language dropdown"
   },
   {
-    "hash": "c43ea3c",
+    "hash": "c43ea3c6",
     "date": "2026-08-17",
+    "version": "v1.2.69",
     "subject": "feat(siemens): per-template FC language selection (LAD/FBD/SCL)"
   },
   {
-    "hash": "442ecb2",
+    "hash": "442ecb2f",
     "date": "2026-08-17",
+    "version": "v1.2.68",
     "subject": "fix(topology): correct PRINT_ICON_PATHS keys to match node types"
   },
   {
-    "hash": "a7aac45",
+    "hash": "a7aac451",
     "date": "2026-08-17",
+    "version": "v1.2.67",
     "subject": "feat(topology): icon top-left, node name wraps to two lines"
   },
   {
-    "hash": "9404698",
+    "hash": "94046980",
     "date": "2026-08-17",
+    "version": "v1.2.66",
     "subject": "feat(topology): render actual icons in print output, add footer"
   },
   {
-    "hash": "cb762b3",
+    "hash": "cb762b32",
     "date": "2026-08-17",
+    "version": "v1.2.65",
     "subject": "feat(topology): remove level height upper limit, allow unrestricted drag"
   },
   {
-    "hash": "cd085ad",
+    "hash": "cd085ad6",
     "date": "2026-08-17",
+    "version": "v1.2.64",
     "subject": "feat(topology): line style/width dropdowns + node confirmed badge"
   },
   {
-    "hash": "f31357e",
+    "hash": "f31357e7",
     "date": "2026-08-17",
+    "version": "v1.2.63",
     "subject": "feat(topology): replace level +/- buttons with drag-to-resize dividers"
   },
   {
-    "hash": "8034884",
+    "hash": "80348840",
     "date": "2026-08-17",
+    "version": "v1.2.62",
     "subject": "feat(topology): distribute and spacing controls for multi-selected nodes"
   },
   {
-    "hash": "934e262",
+    "hash": "934e2621",
     "date": "2026-08-17",
+    "version": "v1.2.61",
     "subject": "feat(topology): connection line style and width picker"
   },
   {
-    "hash": "fcec1a8",
+    "hash": "fcec1a81",
     "date": "2026-08-17",
+    "version": "v1.2.60",
     "subject": "feat(topology): per-level row height controls and multi-node alignment"
   },
   {
-    "hash": "c2b8050",
+    "hash": "c2b8050d",
     "date": "2026-08-11",
+    "version": "v1.2.60",
     "subject": "fix(bridge): load Siemens DLLs via AssemblyResolve, not CopyLocal"
   },
   {
-    "hash": "c91fb0f",
+    "hash": "c91fb0fc",
     "date": "2026-08-11",
+    "version": "v1.2.59",
     "subject": "chore: bump version to v1.2.59"
   },
   {
-    "hash": "6110646",
+    "hash": "61106464",
     "date": "2026-08-11",
+    "version": "v1.2.59",
     "subject": "fix(bridge): expose full exception chain in error responses"
   },
   {
-    "hash": "e43e0be",
+    "hash": "e43e0bef",
     "date": "2026-08-11",
+    "version": "v1.2.58",
     "subject": "chore: bump version to v1.2.58"
   },
   {
-    "hash": "23e8a1a",
+    "hash": "23e8a1a5",
     "date": "2026-08-11",
+    "version": "v1.2.58",
     "subject": "fix(bridge): use Private=true; document V21 Bin\\PublicAPI DLL location"
   },
   {
-    "hash": "294d97e",
+    "hash": "294d97eb",
     "date": "2026-08-11",
+    "version": "v1.2.58",
     "subject": "fix(bridge): revert Siemens DLLs to Private=false to avoid GAC conflict"
   },
   {
-    "hash": "ba037e1",
+    "hash": "ba037e10",
     "date": "2026-08-11",
+    "version": "v1.2.58",
     "subject": "docs: fix .gitignore dist path and expand bridge lib README for V21"
   },
   {
-    "hash": "681f9ef",
+    "hash": "681f9ef7",
     "date": "2026-08-11",
+    "version": "v1.2.58",
     "subject": "Bridge: copy Siemens DLLs to output dir (Private=true)"
   },
   {
-    "hash": "d6b52dc",
+    "hash": "d6b52dca",
     "date": "2026-08-11",
+    "version": "v1.2.57",
     "subject": "v1.2.57 – clarify TIA project path hint text"
   },
   {
-    "hash": "3f6f90c",
+    "hash": "3f6f90c6",
     "date": "2026-08-11",
+    "version": "v1.2.57",
     "subject": "Dockerfile: use npm install instead of npm ci for client build"
   },
   {
-    "hash": "92af1d9",
+    "hash": "92af1d9b",
     "date": "2026-08-11",
+    "version": "v1.2.57",
     "subject": "Add client/package-lock.json for Docker build"
   },
   {
-    "hash": "59595a1",
+    "hash": "59595a18",
     "date": "2026-08-11",
+    "version": "v1.2.57",
     "subject": "Flatten bridge/SiemensTiaBridge/ into bridge/"
   },
   {
-    "hash": "06f0605",
+    "hash": "06f06053",
     "date": "2026-08-11",
+    "version": "v1.2.57",
     "subject": "Move web/.dockerignore to repo root"
   },
   {
-    "hash": "daec991",
+    "hash": "daec9918",
     "date": "2026-08-10",
+    "version": "v1.2.56",
     "subject": "Move web/ contents to repo root"
   },
   {
-    "hash": "e9e23f6",
+    "hash": "e9e23f67",
     "date": "2026-08-10",
+    "version": "v1.2.56",
     "subject": "Move bridge/ into web/bridge/"
   },
   {
-    "hash": "ac0f38a",
+    "hash": "ac0f38a8",
     "date": "2026-08-10",
+    "version": "v1.2.56",
     "subject": "Extend .gitignore to cover remaining legacy WPF artefacts"
   },
   {
-    "hash": "6c6372a",
+    "hash": "6c6372a4",
     "date": "2026-08-10",
+    "version": "v1.2.56",
     "subject": "Remove legacy TagCreator WPF app artefacts"
   },
   {
-    "hash": "b64d1f0",
+    "hash": "b64d1f05",
     "date": "2026-06-29",
+    "version": "v1.2.56",
     "subject": "v1.2.56 – change Close Project dialog confirm button from Delete to Close"
   },
   {
-    "hash": "d0a0c77",
+    "hash": "d0a0c774",
     "date": "2026-06-29",
+    "version": "v1.2.56",
     "subject": "v1.2.55 – fix Notes tab bar height by giving + button the tab-item class"
   },
   {
-    "hash": "677432c",
+    "hash": "677432cf",
     "date": "2026-06-29",
+    "version": "v1.2.56",
     "subject": "v1.2.54 – fix Notes tab bar height jump between zero and one tab"
   },
   {
-    "hash": "65b7875",
+    "hash": "65b7875b",
     "date": "2026-06-29",
+    "version": "v1.2.56",
     "subject": "v1.2.53 – fix Notes tab bar height when no tabs exist"
   },
   {
-    "hash": "3fe0309",
+    "hash": "3fe0309c",
     "date": "2026-06-29",
+    "version": "v1.2.56",
     "subject": "v1.2.52 – match Notes tab strip height to Assets tab strip"
   },
   {
-    "hash": "2dec775",
+    "hash": "2dec7753",
     "date": "2026-06-29",
+    "version": "v1.2.56",
     "subject": "v1.2.51 – fix TopBar labels for Topology and Notes"
   },
   {
-    "hash": "e718764",
+    "hash": "e7187641",
     "date": "2026-06-29",
+    "version": "v1.2.56",
     "subject": "v1.2.50 – add Notes section with tabbed table canvas"
   },
   {
-    "hash": "738d3c7",
+    "hash": "738d3c7c",
     "date": "2026-06-20",
+    "version": "v1.2.56",
     "subject": "v1.2.49 – guide user through TIA Openness dialog on project open"
   },
   {
-    "hash": "4c5137b",
+    "hash": "4c5137bf",
     "date": "2026-06-20",
+    "version": "v1.2.56",
     "subject": "v1.2.48: Use per-instance DB attribute for DB number, remove global startDbIndex"
   },
   {
-    "hash": "b767039",
+    "hash": "b7670393",
     "date": "2026-06-20",
+    "version": "v1.2.56",
     "subject": "v1.2.47: Add required UId to Text element inside LineComment"
   },
   {
-    "hash": "01cc4d8",
+    "hash": "01cc4d8f",
     "date": "2026-06-18",
+    "version": "v1.2.56",
     "subject": "v1.2.46: Add LongDesc as inline SCL line comment after each instance call"
   },
   {
-    "hash": "c12a6d6",
+    "hash": "c12a6d6a",
     "date": "2026-06-18",
+    "version": "v1.2.56",
     "subject": "v1.2.45: Consolidate all instance calls into single SCL CompileUnit"
   },
   {
-    "hash": "6034ffd",
+    "hash": "6034ffd9",
     "date": "2026-06-18",
+    "version": "v1.2.56",
     "subject": "v1.2.44: Add required UId to Component element in StructuredText"
   },
   {
-    "hash": "6471371",
+    "hash": "64713714",
     "date": "2026-06-18",
+    "version": "v1.2.56",
     "subject": "v1.2.43: Add required UId to Symbol element in StructuredText Access"
   },
   {
-    "hash": "e0cd0a3",
+    "hash": "e0cd0a34",
     "date": "2026-06-18",
+    "version": "v1.2.56",
     "subject": "v1.2.42: Add required UId attribute to Access and Token elements in StructuredText"
   },
   {
-    "hash": "49794c1",
+    "hash": "49794c19",
     "date": "2026-06-18",
+    "version": "v1.2.56",
     "subject": "v1.2.41: Export block body with WithDefaults option"
   },
   {
-    "hash": "94b2dd2",
+    "hash": "94b2dd21",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "v1.2.40: Fix Token attribute — Text not Kind"
   },
   {
-    "hash": "9163208",
+    "hash": "91632083",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "v1.2.39: Use structured token elements for SCL network source"
   },
   {
-    "hash": "d59ad56",
+    "hash": "d59ad565",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "v1.2.38: Save generated FC XML to temp debug file before import attempt"
   },
   {
-    "hash": "40d4478",
+    "hash": "40d4478a",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "v1.2.38: Add block export diagnostic endpoint + fix StructuredText xmlns"
   },
   {
-    "hash": "0bfcd90",
+    "hash": "0bfcd901",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "v1.2.37: Switch FC networks to SCL to avoid FlgNet schema issues"
   },
   {
-    "hash": "01c2be3",
+    "hash": "01c2be34",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "v1.2.36: Fix FlgNet uid casing — schema requires lowercase uid not UId"
   },
   {
-    "hash": "9957d9e",
+    "hash": "9957d9eb",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "v1.2.35: Fix FC FlgNet call structure for instance DB networks"
   },
   {
-    "hash": "db479d0",
+    "hash": "db479d00",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "v1.2.34: Fix FC XML import by adding <Namespace> element to AttributeList"
   },
   {
-    "hash": "376c7ae",
+    "hash": "376c7aeb",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix FC XML format: create via API then export-modify-import (v1.2.33)"
   },
   {
-    "hash": "712ead4",
+    "hash": "712ead47",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix FC XML import: add CompositionName and Namespace attributes (v1.2.32)"
   },
   {
-    "hash": "66a80d3",
+    "hash": "66a80d3a",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Create FC with per-instance LAD networks alongside instance DBs (v1.2.31)"
   },
   {
-    "hash": "2c0258a",
+    "hash": "2c0258a6",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix FB Mapping table layout: separate columns for Folder and Start DB (v1.2.30)"
   },
   {
-    "hash": "5b5bb9e",
+    "hash": "5b5bb9eb",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Add target folder per template for TIA Portal instance placement (v1.2.29)"
   },
   {
-    "hash": "092b43d",
+    "hash": "092b43d4",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix startDbIndex not forwarded through Node proxy to bridge (v1.2.28)"
   },
   {
-    "hash": "e71eace",
+    "hash": "e71eace7",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Add per-template starting DB index for TIA Portal instance creation (v1.2.27)"
   },
   {
-    "hash": "d3c2093",
+    "hash": "d3c2093d",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Revert \"Sanitize TIA block names to fix invalid name errors (v1.2.27)\""
   },
   {
-    "hash": "1f6cda1",
+    "hash": "1f6cda19",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Sanitize TIA block names to fix invalid name errors (v1.2.27)"
   },
   {
-    "hash": "346322c",
+    "hash": "346322cc",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix FB mapping persistence and sort templates A-Z in Siemens tab (v1.2.26)"
   },
   {
-    "hash": "efeddf4",
+    "hash": "efeddf44",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Bump version to v1.2.25"
   },
   {
-    "hash": "8c8c1fd",
+    "hash": "8c8c1fdf",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix missing CloseProject method declaration in TiaOpennessService (v1.2.24)"
   },
   {
-    "hash": "6192dd8",
+    "hash": "6192dd80",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Add Export to TIA Portal: create instance DBs directly in open TIA project (v1.2.24)"
   },
   {
-    "hash": "f9737af",
+    "hash": "f9737af9",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Add Open/Close TIA project buttons to Siemens settings tab (v1.2.23)"
   },
   {
-    "hash": "c844ce9",
+    "hash": "c844ce9d",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix missing testSiemensConnection import in SettingsView (v1.2.22)"
   },
   {
-    "hash": "0e6e03a",
+    "hash": "0e6e03a6",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Add FB mapping table to Siemens settings tab (v1.2.22)"
   },
   {
-    "hash": "a4cad87",
+    "hash": "a4cad873",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Listen on all interfaces (http://+:port/) for network access (v1.2.21)"
   },
   {
-    "hash": "5be7cdc",
+    "hash": "5be7cdc6",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Skip inconsistent FBs on export rather than failing entire list (v1.2.20)"
   },
   {
-    "hash": "4812d1e",
+    "hash": "4812d1e2",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix SoftwareContainer namespace: HW.Features not HW.Extensions (v1.2.19)"
   },
   {
-    "hash": "a41374b",
+    "hash": "a41374ba",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Reference all Siemens Openness DLLs via lib\\ glob in csproj (v1.2.18)"
   },
   {
-    "hash": "ee33c68",
+    "hash": "ee33c681",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix TiaOpennessService: use SoftwareContainer and XML export for FB interface (v1.2.17)"
   },
   {
-    "hash": "4925aaf",
+    "hash": "4925aafd",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Add FB discovery: GET /api/fb/list enumerates TIA FB types and parameters (v1.2.16)"
   },
   {
-    "hash": "a902029",
+    "hash": "a9020296",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Set LangVersion 8.0 to allow null-coalescing assignment on net48 (v1.2.15)"
   },
   {
-    "hash": "de9a51d",
+    "hash": "de9a51d1",
     "date": "2026-06-17",
+    "version": "v1.2.56",
     "subject": "Fix bridge health check to not require Openness DLL at startup (v1.2.14)"
   },
   {
-    "hash": "81c2bcc",
+    "hash": "81c2bccf",
     "date": "2026-06-16",
+    "version": "v1.2.56",
     "subject": "Add SiemensTiaBridge: TIA Portal Openness HTTP bridge (v1.2.13)"
   },
   {
-    "hash": "9a70006",
+    "hash": "9a700063",
     "date": "2026-06-16",
+    "version": "v1.2.56",
     "subject": "Move Company settings into a General sub-tab (v1.2.12)"
   },
   {
-    "hash": "adae487",
+    "hash": "adae4876",
     "date": "2026-06-15",
+    "version": "v1.2.56",
     "subject": "Restructure settings sidebar to brand / Project Settings hierarchy (v1.2.11)"
   },
   {
-    "hash": "c2620c7",
+    "hash": "c2620c79",
     "date": "2026-06-15",
+    "version": "v1.2.56",
     "subject": "Rename settings sidebar menu items (v1.2.10)"
   },
   {
-    "hash": "87c38ac",
+    "hash": "87c38ac2",
     "date": "2026-06-15",
+    "version": "v1.2.56",
     "subject": "Redesign Settings layout to match Calculators sidebar style (v1.2.09)"
   },
   {
-    "hash": "cacd374",
+    "hash": "cacd374a",
     "date": "2026-06-14",
+    "version": "v1.2.56",
     "subject": "Add per-instance Studio 5000 and Control Expert export (v1.2.08)"
   },
   {
-    "hash": "38db861",
+    "hash": "38db8612",
     "date": "2026-06-14",
+    "version": "v1.2.56",
     "subject": "Fix XBD export format to match Control Expert FBDExchangeFile structure (v1.2.07)"
   },
   {
-    "hash": "dbbafc4",
+    "hash": "dbbafc4c",
     "date": "2026-06-14",
+    "version": "v1.2.56",
     "subject": "Add Control Expert tab and import/export feature (v1.2.06)"
   },
   {
-    "hash": "d6a0f7d",
+    "hash": "d6a0f7d6",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Rename 'Profile File Location' to 'Project File Location'"
   },
   {
-    "hash": "d77f7ac",
+    "hash": "d77f7ac5",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Fix imported AOI attributes marked as parameters incorrectly"
   },
   {
-    "hash": "ee6064c",
+    "hash": "ee6064cc",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Fix data type mapping for Studio 5000 AOI parameter import"
   },
   {
-    "hash": "7a8fd0f",
+    "hash": "7a8fd0ff",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Bump version to v1.2.02 (patch rolled over at 99)"
   },
   {
-    "hash": "450e351",
+    "hash": "450e3512",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Bump version to v1.1.102"
   },
   {
-    "hash": "4d2ae18",
+    "hash": "4d2ae18b",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Populate template attributes from AOI Input/Output parameters on import"
   },
   {
-    "hash": "98b8e48",
+    "hash": "98b8e482",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Add Import from Studio 5000 to TemplateTree blank context menu"
   },
   {
-    "hash": "1570799",
+    "hash": "15707992",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Show Studio 5000 import menu item whenever enableMenuItems is on"
   },
   {
-    "hash": "91ec4f0",
+    "hash": "91ec4f0d",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Add Studio 5000 project L5X import feature"
   },
   {
-    "hash": "d0be427",
+    "hash": "d0be427d",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Bump version to v1.1.97"
   },
   {
-    "hash": "5ecadde",
+    "hash": "5ecadde9",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Fix AOI XML extraction to skip plural wrapper element"
   },
   {
-    "hash": "ab822ea",
+    "hash": "ab822ea8",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Fix multi-instance Studio 5000 L5X export"
   },
   {
-    "hash": "b27b165",
+    "hash": "b27b165f",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Fix Studio 5000 settings not persisting across view changes"
   },
   {
-    "hash": "b359966",
+    "hash": "b3599664",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Add Studio 5000 settings tab and Export to Studio 5000 feature"
   },
   {
-    "hash": "de914cb",
+    "hash": "de914cbf",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Add Start, Stop, Restart gateway controls to Settings/Ignition API"
   },
   {
-    "hash": "1b3ddf2",
+    "hash": "1b3ddf2a",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Fix Ignition password reset: pipe new password to interactive gwcmd.sh -p"
   },
   {
-    "hash": "3170e5d",
+    "hash": "3170e5d7",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Fix reset-password: use Docker socket API instead of docker CLI"
   },
   {
-    "hash": "5f845f3",
+    "hash": "5f845f32",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Wire Import button to populate Model view with selected Ignition folders"
   },
   {
-    "hash": "bb0ac5f",
+    "hash": "bb0ac5fa",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Add Reset Administrator Password button to Settings/Ignition API"
   },
   {
-    "hash": "7441848",
+    "hash": "74418487",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Rename context menu item to \"Import from Ignition\""
   },
   {
-    "hash": "5dac5b7",
+    "hash": "5dac5b77",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Add folder selection checkboxes with All/None to Ignition folder modal"
   },
   {
-    "hash": "d9cb221",
+    "hash": "d9cb2219",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "Add right-click context menu in Assets view to download Ignition folder structure"
   },
   {
-    "hash": "0e2cbd6",
+    "hash": "0e2cbd62",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "fix(topology): fill full canvas height, no blank bar below level bands"
   },
   {
-    "hash": "fe60ffe",
+    "hash": "fe60ffe4",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "fix(topology): guarantee single-page print via CSS overflow:hidden"
   },
   {
-    "hash": "7bb4062",
+    "hash": "7bb40622",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "fix(topology): scale print SVG to fit exactly one landscape page"
   },
   {
-    "hash": "31d9683",
+    "hash": "31d96833",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "fix(topology): reliable print-to-PDF via dedicated print window"
   },
   {
-    "hash": "ec5df32",
+    "hash": "ec5df32f",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "feat(topology): animated travel bubble on connections"
   },
   {
-    "hash": "b7350f2",
+    "hash": "b7350f2e",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "feat(topology): custom node colour, icon picker, remove type dropdown"
   },
   {
-    "hash": "0b8951d",
+    "hash": "0b8951d7",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "feat(topology): icons per node type, Print button, right-click add menu, centred delete buttons"
   },
   {
-    "hash": "fea701c",
+    "hash": "fea701c4",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "fix(topology): fix connection panel not opening; add per-type line styles"
   },
   {
-    "hash": "3b94048",
+    "hash": "3b940488",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "feat(api): add TCP ping endpoint and pingNode client export"
   },
   {
-    "hash": "c2c506f",
+    "hash": "c2c506f7",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "feat(topology): add ping button to node panel and expand connection types"
   },
   {
-    "hash": "e9838e5",
+    "hash": "e9838e5d",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "v1.1.78 — ISA-95 Topology view"
   },
   {
-    "hash": "71c9d1f",
+    "hash": "71c9d1fb",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "v1.1.77 — fix orphaned single-instance nodes via scoped repulsion"
   },
   {
-    "hash": "bd80f58",
+    "hash": "bd80f58f",
     "date": "2026-06-12",
+    "version": "v1.2.56",
     "subject": "v1.1.76 — remove areas from graph view to fix orphaned instances"
   },
   {
-    "hash": "1748ea0",
+    "hash": "1748ea0d",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "v1.1.75 — project-centred graph hierarchy: project → templates → instances"
   },
   {
-    "hash": "3a7bf1b",
+    "hash": "3a7bf1b6",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "v1.1.74 — remove stat counts from dashboard sub-toolbar"
   },
   {
-    "hash": "415e3f7",
+    "hash": "415e3f76",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "v1.1.73 — fix orphaned instances in graph view"
   },
   {
-    "hash": "d297820",
+    "hash": "d297820d",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "v1.1.72 — fix graph view blank screen + improve template-instance layout"
   },
   {
-    "hash": "c383787",
+    "hash": "c383787a",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "v1.1.71 — persistent dashboard toolbar + graph view fixes"
   },
   {
-    "hash": "20bf512",
+    "hash": "20bf512b",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "feat(dashboard): add graph view toggle (Obsidian-style force-directed network)"
   },
   {
-    "hash": "b4c2af3",
+    "hash": "b4c2af31",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "feat(settings): custom floating color picker with hex input"
   },
   {
-    "hash": "ed308bb",
+    "hash": "ed308bb8",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "feat(settings): redesign Appearance section with color scheme dropdown and accent picker"
   },
   {
-    "hash": "6f065aa",
+    "hash": "6f065aa8",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "rename: RL calculator desc to \"Signal range to RL elevation\""
   },
   {
-    "hash": "5e0ad91",
+    "hash": "5e0ad91f",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "feat(calculators): add Reduced Level (RL) calculator"
   },
   {
-    "hash": "9932cf6",
+    "hash": "9932cf6e",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "fix(estimator): set all MES default values to 10 min/pt"
   },
   {
-    "hash": "3c523a8",
+    "hash": "3c523a86",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "rename: Project Estimator description to \"Time effort & cost estimate\""
   },
   {
-    "hash": "757b56a",
+    "hash": "757b56ab",
     "date": "2026-06-11",
+    "version": "v1.2.56",
     "subject": "feat(calculators): add Project Estimator - Development Estimation"
   },
   {
-    "hash": "502a6db",
+    "hash": "502a6dbf",
     "date": "2026-06-08",
+    "version": "v1.2.56",
     "subject": "feat(settings): add Project Details section to General tab"
   },
   {
-    "hash": "434408a",
+    "hash": "434408ab",
     "date": "2026-06-08",
+    "version": "v1.2.56",
     "subject": "feat: switch project storage to local filesystem file picker"
   },
   {
-    "hash": "ed3477d",
+    "hash": "ed3477da",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "fix(sidebar): uniform 8px vertical padding on all nav items"
   },
   {
-    "hash": "712ea27",
+    "hash": "712ea275",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "fix(sidebar): eliminate icon jump on collapse/expand animation"
   },
   {
-    "hash": "17f6bc5",
+    "hash": "17f6bc50",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "fix(sidebar): remove separator line above Calculators"
   },
   {
-    "hash": "b2ace1a",
+    "hash": "b2ace1ad",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "fix(sidebar): move tool nav into bottom section to eliminate flex spacer gap"
   },
   {
-    "hash": "e1b75ab",
+    "hash": "e1b75aba",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.56 — Reduce sidebar icon row height to thin separator gaps"
   },
   {
-    "hash": "bd473cd",
+    "hash": "bd473cd0",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.55 — Fix thick separator in collapsed sidebar"
   },
   {
-    "hash": "24bad79",
+    "hash": "24bad79d",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.54 — Fix sidebar icon jump on expand/collapse"
   },
   {
-    "hash": "bd526ed",
+    "hash": "bd526ed1",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.53 — Fix icon alignment in expanded sidebar"
   },
   {
-    "hash": "1a20b07",
+    "hash": "1a20b073",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.52 — Uniform icon size (16px) across all sidebar nav items"
   },
   {
-    "hash": "5274c37",
+    "hash": "5274c375",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.51 — Fix sidebar icon alignment in collapsed state"
   },
   {
-    "hash": "d0155c5",
+    "hash": "d0155c5d",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.50 — Bottom-align Calculators and Connections in sidebar nav"
   },
   {
-    "hash": "180710d",
+    "hash": "180710db",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.49 — Split sidebar nav into project vs tool groups"
   },
   {
-    "hash": "0f25f21",
+    "hash": "0f25f211",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.48 — Fix input dark-mode styling for untyped inputs"
   },
   {
-    "hash": "3f4c2be",
+    "hash": "3f4c2be5",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.47 — Add EtherNet/IP, PROFINET, SNMP tabs; remove Beta badge"
   },
   {
-    "hash": "df32e0d",
+    "hash": "df32e0d8",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.46 — Default host to host.docker.internal; add MQTT publish panel"
   },
   {
-    "hash": "581adfe",
+    "hash": "581adfe0",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.45 — Show Docker localhost hint in Connections view"
   },
   {
-    "hash": "b4dc650",
+    "hash": "b4dc6501",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.44 — Rename 4-20mA calculator description to \"Signal range converter\""
   },
   {
-    "hash": "f14f70a",
+    "hash": "f14f70af",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "v1.1.43 — Connections explorer: compact row + live OPC UA/MQTT/Modbus browser"
   },
   {
-    "hash": "22c5536",
+    "hash": "22c55362",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "Rename Communications to Connections"
   },
   {
-    "hash": "8e541d1",
+    "hash": "8e541d17",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "Move Beta badge from sidebar to top toolbar"
   },
   {
-    "hash": "3b13303",
+    "hash": "3b133033",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "Rename Comm Test to Communications; add Beta badge in sidebar"
   },
   {
-    "hash": "45d0139",
+    "hash": "45d01399",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "Track server package-lock.json for Docker npm ci compatibility"
   },
   {
-    "hash": "f9bba78",
+    "hash": "f9bba783",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "Add Comm Test view for OPC UA, MQTT, and Modbus TCP connection testing"
   },
   {
-    "hash": "112cddd",
+    "hash": "112cddd3",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "Rename Unit Conversion description to 'Engineering unit converter'"
   },
   {
-    "hash": "a63f395",
+    "hash": "a63f395f",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "Add sliders to both calculators"
   },
   {
-    "hash": "9399e8d",
+    "hash": "9399e8da",
     "date": "2026-05-29",
+    "version": "v1.2.56",
     "subject": "Add Calculators view with 4-20mA Scaling and Unit Conversion"
   },
   {
-    "hash": "074a155",
+    "hash": "074a155e",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Fix Areas card height timing; add expand/collapse to area hierarchy"
   },
   {
-    "hash": "6994a02",
+    "hash": "6994a022",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Dashboard: Templates natural height, Areas matches via ResizeObserver, hierarchy view"
   },
   {
-    "hash": "1c14908",
+    "hash": "1c149084",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Fix dashboard Areas/Templates height sync using CSS Grid"
   },
   {
-    "hash": "7b16d15",
+    "hash": "7b16d154",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Areas card matches Templates card height exactly with scroll"
   },
   {
-    "hash": "06761a1",
+    "hash": "06761a19",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Constrain Areas tile height to Templates tile with expand/collapse"
   },
   {
-    "hash": "1aa0bd6",
+    "hash": "1aa0bd6e",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Add Import and Export icons to Model toolbar"
   },
   {
-    "hash": "77380c2",
+    "hash": "77380c22",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Update report footer branding to One Technology Limited"
   },
   {
-    "hash": "870ca89",
+    "hash": "870ca896",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Auto-size report columns so every instance row fits on one line"
   },
   {
-    "hash": "2a9097f",
+    "hash": "2a9097f8",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Fix report: remove about:blank, landscape layout, skip empty templates"
   },
   {
-    "hash": "d332a07",
+    "hash": "d332a074",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Move print button to far right; redesign commissioning report"
   },
   {
-    "hash": "e11ad21",
+    "hash": "e11ad21c",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Add commissioning check sheet print report"
   },
   {
-    "hash": "7d68ddb",
+    "hash": "7d68ddba",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Correct Siemens API settings to reflect TIA Openness architecture"
   },
   {
-    "hash": "78637de",
+    "hash": "78637dea",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Add Browse button for TIA Project Path in Siemens API settings"
   },
   {
-    "hash": "23c122e",
+    "hash": "23c122ee",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Add Siemens API tab to Settings"
   },
   {
-    "hash": "e8c9fce",
+    "hash": "e8c9fcec",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Remove duplicate Settings header from SettingsView"
   },
   {
-    "hash": "4988132",
+    "hash": "4988132f",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Fix Import Profile dropping attributes array"
   },
   {
-    "hash": "eb7e189",
+    "hash": "eb7e1897",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Fix Export Profiles JSON always visible in template Export submenu"
   },
   {
-    "hash": "021b9cb",
+    "hash": "021b9cb0",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Add Import Profile to template context menu"
   },
   {
-    "hash": "a65a545",
+    "hash": "a65a5459",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Convert Settings from modal dialog to full-page view"
   },
   {
-    "hash": "79eadea",
+    "hash": "79eadeab",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Rename Settings 'Engineering' tab to 'Ignition API' (v1.1.16)"
   },
   {
-    "hash": "ed850d6",
+    "hash": "ed850d6f",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Sort templates (not instances) with A→Z / Z→A button (v1.1.15)"
   },
   {
-    "hash": "5b9b087",
+    "hash": "5b9b087e",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Fix submenu disappearing when moving mouse across the gap (v1.1.14)"
   },
   {
-    "hash": "d016a3c",
+    "hash": "d016a3cc",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Move instance sort to render point for reliable A→Z / Z→A ordering (v1.1.13)"
   },
   {
-    "hash": "6c641bf",
+    "hash": "6c641bf6",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Fix sort button — replace icons not available in lucide-react 0.344.0 (v1.1.12)"
   },
   {
-    "hash": "b630bf2",
+    "hash": "b630bf2b",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Fix single-instance delete from context menu (v1.1.11)"
   },
   {
-    "hash": "45405e8",
+    "hash": "45405e88",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Add A→Z / Z→A sort toggle to Derivation view (v1.1.10)"
   },
   {
-    "hash": "556d79b",
+    "hash": "556d79b6",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Add shift+click multi-select and bulk delete for instances (v1.1.9)"
   },
   {
-    "hash": "eee3e96",
+    "hash": "eee3e963",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Handle Windows-1252 encoded CSVs to preserve special characters (v1.1.8)"
   },
   {
-    "hash": "a5a932f",
+    "hash": "a5a932fc",
     "date": "2026-05-27",
+    "version": "v1.2.56",
     "subject": "Sort instances alphabetically in Derivation view (v1.1.7)"
   },
   {
-    "hash": "3e2bc2b",
+    "hash": "3e2bc2b6",
     "date": "2026-05-26",
+    "version": "v1.2.56",
     "subject": "Set light as the default theme (v1.1.6)"
   },
   {
-    "hash": "ebb42c9",
+    "hash": "ebb42c92",
     "date": "2026-05-26",
+    "version": "v1.2.56",
     "subject": "Fix Model view hardcoded dark colours for light mode compatibility (v1.1.5)"
   },
   {
-    "hash": "c2920bf",
+    "hash": "c2920bf7",
     "date": "2026-05-26",
+    "version": "v1.2.56",
     "subject": "Fix light mode contrast by wiring Tailwind colors to CSS variables (v1.1.4)"
   },
   {
-    "hash": "c1ca9fe",
+    "hash": "c1ca9fe5",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Add watermark to No Project Open view (v1.1.3)"
   },
   {
-    "hash": "2aef1af",
+    "hash": "2aef1afc",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Reposition No Project Open prompt to bottom-left, inline with sidebar buttons (v1.1.2)"
   },
   {
-    "hash": "750275b",
+    "hash": "750275b1",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Add pulsating sidebar arrow to No Project Open prompt (v1.1.1)"
   },
   {
-    "hash": "f1d42f4",
+    "hash": "f1d42f42",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Reset version to 1.1.0 (Major.Minor.Patch format)"
   },
   {
-    "hash": "c513353",
+    "hash": "c5133533",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Update top bar to 'One Technology Limited ©', remove version badge (v1.3)"
   },
   {
-    "hash": "e0b5508",
+    "hash": "e0b55083",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Fix splash screen heading to show Automation Studio (v1.2)"
   },
   {
-    "hash": "5ce4021",
+    "hash": "5ce4021c",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Update top bar branding and centralise version number (v1.1)"
   },
   {
-    "hash": "b970c49",
+    "hash": "b970c499",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Swap splash screen title and copyright text positions"
   },
   {
-    "hash": "2ae64bc",
+    "hash": "2ae64bcd",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Auto-size attribute grid columns to fit content"
   },
   {
-    "hash": "505cb51",
+    "hash": "505cb511",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "Truncate long values in attribute grid to single-line rows"
   },
   {
-    "hash": "46a03fc",
+    "hash": "46a03fcf",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "fix: use RFC 4180 CSV parser to correctly handle quoted fields on import"
   },
   {
-    "hash": "6752e6f",
+    "hash": "6752e6f6",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: map Ignition Documentation field to description on import"
   },
   {
-    "hash": "dc192a8",
+    "hash": "dc192a80",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "fix: remove duplicate function declarations in ignition.js"
   },
   {
-    "hash": "925f7b6",
+    "hash": "925f7b6f",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "style: match New/Open buttons to Close Project style in sidebar"
   },
   {
-    "hash": "7029bbf",
+    "hash": "7029bbf9",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "fix: use separate upload calls per area so instances land in correct folder"
   },
   {
-    "hash": "7d02304",
+    "hash": "7d02304b",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: place instances in area folders when uploading to Ignition"
   },
   {
-    "hash": "e4696a0",
+    "hash": "e4696a03",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: move '+ Add Area' to after last area in each parent's subtree"
   },
   {
-    "hash": "b56d18a",
+    "hash": "b56d18a3",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: multi-select instances in Model view for batch drag/drop"
   },
   {
-    "hash": "badbad6",
+    "hash": "badbad67",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: show expand chevron on all non-system areas so sub-areas get '+ Add Area'"
   },
   {
-    "hash": "dccf777",
+    "hash": "dccf7772",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: add inline '+ Add Area' row below each expanded area's instances"
   },
   {
-    "hash": "a948ffb",
+    "hash": "a948ffb3",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: use renameProject API in handleSaveEdit to update filename on rename"
   },
   {
-    "hash": "b49f620",
+    "hash": "b49f6208",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: add renameProject API call"
   },
   {
-    "hash": "4a7ff17",
+    "hash": "4a7ff17d",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: add PATCH /api/projects/:filename to rename project file"
   },
   {
-    "hash": "8b779aa",
+    "hash": "8b779aab",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: add rename (name + description) to Open Project dialog"
   },
   {
-    "hash": "25185f7",
+    "hash": "25185f70",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: add sub-area support to Model view"
   },
   {
-    "hash": "b8207c7",
+    "hash": "b8207c78",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: remove areas from TopBar view labels"
   },
   {
-    "hash": "1118de0",
+    "hash": "1118de0c",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: remove standalone areas view (now embedded in Assets)"
   },
   {
-    "hash": "cf2a7f7",
+    "hash": "cf2a7f78",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: remove Model nav item (now lives inside Assets view)"
   },
   {
-    "hash": "7ff2ca4",
+    "hash": "7ff2ca42",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: add Derivation/Model tabs inside Assets view"
   },
   {
-    "hash": "ae2414d",
+    "hash": "ae2414df",
     "date": "2026-05-18",
+    "version": "v1.2.56",
     "subject": "feat: add Close Project button to sidebar toolbar"
   },
   {
-    "hash": "5187726",
+    "hash": "5187726b",
     "date": "2026-05-17",
+    "version": "v1.2.56",
     "subject": "fix: update config route to read/write from config/ subdirectory"
   },
   {
-    "hash": "a62d1f4",
+    "hash": "a62d1f44",
     "date": "2026-05-17",
+    "version": "v1.2.56",
     "subject": "fix: move config file into config/ subdir for Docker volume compatibility"
   },
   {
-    "hash": "e39d7e4",
+    "hash": "e39d7e4d",
     "date": "2026-05-17",
+    "version": "v1.2.56",
     "subject": "fix: remove accidental app.config.json directory from Docker image"
   },
   {
-    "hash": "7562e69",
+    "hash": "7562e69a",
     "date": "2026-05-17",
+    "version": "v1.2.56",
     "subject": "fix: log actual error on config save failure"
   },
   {
-    "hash": "c442977",
+    "hash": "c4429777",
     "date": "2026-05-17",
+    "version": "v1.2.56",
     "subject": "fix: show actual server error message on save failure"
   },
   {
-    "hash": "c365209",
+    "hash": "c365209b",
     "date": "2026-05-17",
+    "version": "v1.2.56",
     "subject": "fix: ensure projects dir exists before PUT, add error detail logging"
   },
   {
-    "hash": "d311546",
+    "hash": "d311546c",
     "date": "2026-05-17",
+    "version": "v1.2.56",
     "subject": "fix: bind server to 0.0.0.0 so Docker port mapping works"
   },
   {
-    "hash": "6543059",
+    "hash": "65430594",
     "date": "2026-05-17",
+    "version": "v1.2.56",
     "subject": "Add Docker support"
   },
   {
-    "hash": "c57eaf9",
+    "hash": "c57eaf95",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add Dashboard view with project metrics as default landing page"
   },
   {
-    "hash": "9a7aab8",
+    "hash": "9a7aab8c",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Change site accent colour to #888888"
   },
   {
-    "hash": "18f125e",
+    "hash": "18f125e9",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Use Favicon.png as site favicon"
   },
   {
-    "hash": "a140901",
+    "hash": "a140901a",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add README for server and client setup; include favicon image"
   },
   {
-    "hash": "7c92938",
+    "hash": "7c92938b",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Restore favicon to original gray-on-white colour scheme"
   },
   {
-    "hash": "92cc0a7",
+    "hash": "92cc0a70",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add One Technology Limited hexagon logo as site favicon"
   },
   {
-    "hash": "7f8fe72",
+    "hash": "7f8fe72a",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add One Technology Limited copyright to watermark panel"
   },
   {
-    "hash": "f8f0eb8",
+    "hash": "f8f0eb84",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Remove Upload to Ignition button from template editor toolbar"
   },
   {
-    "hash": "1ebb4af",
+    "hash": "1ebb4af2",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Darken accent and danger colours in light theme for contrast"
   },
   {
-    "hash": "6d1137c",
+    "hash": "6d1137c8",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Darken muted/disabled text colours in light theme for readability"
   },
   {
-    "hash": "74119dd",
+    "hash": "74119dd5",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Fix TopBar hardcoded dark background — use theme CSS variables"
   },
   {
-    "hash": "d7ddb1e",
+    "hash": "d7ddb1e7",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Replace empty state text with logo watermark"
   },
   {
-    "hash": "8d0afb4",
+    "hash": "8d0afb46",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add Import button to New Project dialog"
   },
   {
-    "hash": "1efa63f",
+    "hash": "1efa63f2",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add delete, import, and export to Open Project dialog"
   },
   {
-    "hash": "c1370e6",
+    "hash": "c1370e6a",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Strip _types_/ prefix from imported template names"
   },
   {
-    "hash": "176fa2c",
+    "hash": "176fa2c8",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Include folder path in imported template name (folder/udt)"
   },
   {
-    "hash": "413e097",
+    "hash": "413e0978",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Fix instance JSON export to use Ignition native tag format"
   },
   {
-    "hash": "37ac966",
+    "hash": "37ac966a",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add multi-select and export to instance context menu"
   },
   {
-    "hash": "31954d7",
+    "hash": "31954d7b",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Fix Ignition data type names to match DataType enum"
   },
   {
-    "hash": "e86cd8e",
+    "hash": "e86cd8e1",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Fix Ignition import: drop path param, log response body"
   },
   {
-    "hash": "20d5f52",
+    "hash": "20d5f523",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Wrap UDT type in _types_ folder in Ignition import payload"
   },
   {
-    "hash": "64f4b80",
+    "hash": "64f4b804",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add type=json parameter to Ignition import URL"
   },
   {
-    "hash": "414b3c9",
+    "hash": "414b3c92",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Fix EngineeringView upload to Ignition using old API logic"
   },
   {
-    "hash": "1753fc7",
+    "hash": "1753fc72",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add filter input to Import from Ignition dialog"
   },
   {
-    "hash": "b8a0ef4",
+    "hash": "b8a0ef44",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Fix Import from Ignition selecting all same-named UDTs across folders"
   },
   {
-    "hash": "4e614e5",
+    "hash": "4e614e59",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Show folder path for each UDT in Import from Ignition dialog"
   },
   {
-    "hash": "49a15e6",
+    "hash": "49a15e62",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add API key diagnostic log to Ignition export route"
   },
   {
-    "hash": "0d4d791",
+    "hash": "0d4d7915",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Switch Ignition integration to standard REST API (/data/api/v1/tags)"
   },
   {
-    "hash": "08bc452",
+    "hash": "08bc4527",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Strip HTML errors and add badURI hint in Ignition export/upload routes"
   },
   {
-    "hash": "60747a0",
+    "hash": "60747a03",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add Ignition import utilities to ignition.js"
   },
   {
-    "hash": "4c3e3b9",
+    "hash": "4c3e3b98",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add Import from Ignition modal to TemplateTree"
   },
   {
-    "hash": "4d08d6f",
+    "hash": "4d08d6f9",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Support AttributeName.Property syntax in profile export expressions"
   },
   {
-    "hash": "efd5174",
+    "hash": "efd51743",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Implement expression evaluator for profile export rules"
   },
   {
-    "hash": "214239b",
+    "hash": "214239b2",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Fix profile tabular export producing empty rows"
   },
   {
-    "hash": "bf534cf",
+    "hash": "bf534cf1",
     "date": "2026-05-16",
+    "version": "v1.2.56",
     "subject": "Add profile export to template context menu"
   },
   {
-    "hash": "198d90f",
+    "hash": "198d90f6",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Revert \"Add bottom toolbar with 'One Technology Limited ©' right-aligned\""
   },
   {
-    "hash": "8c67d5a",
+    "hash": "8c67d5a3",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Add bottom toolbar with 'One Technology Limited ©' right-aligned"
   },
   {
-    "hash": "ac6fa01",
+    "hash": "ac6fa014",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Default sidebar to collapsed on load"
   },
   {
-    "hash": "0d50cd6",
+    "hash": "0d50cd66",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix Ignition upload: use native http module with explicit Content-Length, switch to native export format"
   },
   {
-    "hash": "ae6b7fa",
+    "hash": "ae6b7fa7",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Normalize gateway URL, strip HTML from error toasts, add URL to error response"
   },
   {
-    "hash": "f8b2804",
+    "hash": "f8b28047",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix Ignition upload payload format — use proper data types and parameter structure"
   },
   {
-    "hash": "20a9737",
+    "hash": "20a9737e",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix Ignition upload: wrap payload in array, add provider and collisionPolicy params"
   },
   {
-    "hash": "0490a56",
+    "hash": "0490a567",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Replace Export Ignition with Upload to Ignition via API in template context menu"
   },
   {
-    "hash": "825d0d4",
+    "hash": "825d0d4d",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Add 'Export Ignition' to template Export submenu when Ignition is enabled"
   },
   {
-    "hash": "0f5e358",
+    "hash": "0f5e358b",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Move '+ Add Template' to inline row below last template"
   },
   {
-    "hash": "edac559",
+    "hash": "edac559c",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix whitespace context menu not showing — add stopPropagation"
   },
   {
-    "hash": "4e0f378",
+    "hash": "4e0f3786",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Add whitespace right-click context menu in template tree"
   },
   {
-    "hash": "91a1d49",
+    "hash": "91a1d499",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Capitalize 'Enable Ignition Menu Items' label"
   },
   {
-    "hash": "18590bc",
+    "hash": "18590bc0",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Move '+ Add Profile' tab next to last profile, style to match add-row"
   },
   {
-    "hash": "2615316",
+    "hash": "26153160",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Persist engineering settings to disk immediately on Save Settings"
   },
   {
-    "hash": "37f9aa3",
+    "hash": "37f9aa39",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Move Add Area from header button to inline row at bottom of areas table"
   },
   {
-    "hash": "a181433",
+    "hash": "a1814334",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Rename Engineering to Assets and Areas to Model throughout the UI"
   },
   {
-    "hash": "64d4619",
+    "hash": "64d4619c",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Remove SCADA Tag Manager subtitle and logo section border from sidebar"
   },
   {
-    "hash": "50d8554",
+    "hash": "50d85549",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Add light/dark mode toggle via General tab in Settings; convert hardcoded colors to CSS variables"
   },
   {
-    "hash": "4979f46",
+    "hash": "4979f46d",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix profile export: case-insensitive rule matching and surface template attribute names as rule suggestions"
   },
   {
-    "hash": "c3f8252",
+    "hash": "c3f8252a",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix profile tabular export to correctly resolve rules and quote CSV cells"
   },
   {
-    "hash": "48133c2",
+    "hash": "48133c2b",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Remove green background from Export icon button in Profiles view"
   },
   {
-    "hash": "a38a5e6",
+    "hash": "a38a5e66",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Change Export button in Profiles view to icon only"
   },
   {
-    "hash": "250b8e9",
+    "hash": "250b8e9e",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix empty state text to say '+ Add Column'"
   },
   {
-    "hash": "4164651",
+    "hash": "41646518",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Show placeholder example syntax in Rule/Expression input when editing"
   },
   {
-    "hash": "6f12ecc",
+    "hash": "6f12ecc0",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Move Add Column from footer button to inline row at bottom of profile attribute table"
   },
   {
-    "hash": "673f4d7",
+    "hash": "673f4d79",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Move Add Attribute from footer button to inline row at bottom of attribute table"
   },
   {
-    "hash": "b5c7fdf",
+    "hash": "b5c7fdff",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Remove Add Profile button from ProfilePanel; profiles added via + Profile tab only"
   },
   {
-    "hash": "abfe4bb",
+    "hash": "abfe4bb2",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Show Add Profile modal with export type selection instead of defaulting to Tabular"
   },
   {
-    "hash": "0fcc6be",
+    "hash": "0fcc6bec",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Remove project name section from sidebar navigation"
   },
   {
-    "hash": "69c8fe2",
+    "hash": "69c8fe22",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Rename Import CSV to Import Instances and add Import Attributes to Import submenu"
   },
   {
-    "hash": "acf6b8e",
+    "hash": "acf6b8ea",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Nest Import CSV under Import submenu in template context menu"
   },
   {
-    "hash": "f1d6d4c",
+    "hash": "f1d6d4c2",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Nest Export Attributes and Export Instances under Export submenu in template context menu"
   },
   {
-    "hash": "37dc680",
+    "hash": "37dc680c",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Split template context menu Export CSV into Export Attributes and Export Instances"
   },
   {
-    "hash": "0c00115",
+    "hash": "0c001154",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Remove Proposal view from navigation"
   },
   {
-    "hash": "1a3c52c",
+    "hash": "1a3c52c4",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix blank screen: extract RightPanel as top-level component, remove StrictMode"
   },
   {
-    "hash": "781fefc",
+    "hash": "781fefc0",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix projects route: ensure dir exists on each request, add error logging"
   },
   {
-    "hash": "1c93394",
+    "hash": "1c93394c",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Fix PostCSS and Tailwind configs to use CommonJS syntax"
   },
   {
-    "hash": "1e793bc",
+    "hash": "1e793bcc",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Complete React/Node.js Automation Studio web application"
   },
   {
-    "hash": "cd42605",
+    "hash": "cd426055",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Initial React/Node.js web app scaffold for Automation Studio"
   },
   {
-    "hash": "a3af21a",
+    "hash": "a3af21a6",
     "date": "2026-05-15",
+    "version": "v1.2.56",
     "subject": "Initial WPF source"
   }
 ]
