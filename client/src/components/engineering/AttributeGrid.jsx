@@ -123,6 +123,8 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
     return sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />;
   }
 
+  const datasetEditAttr = datasetEditId !== null ? rows.find(a => a.id === datasetEditId) : null;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto">
@@ -204,24 +206,6 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                       >
                         <Edit2 size={12} />
                       </button>
-                      {datasetEditId === attr.id && (
-                        <DatasetEditorModal
-                          value={attr.value}
-                          onApply={v => {
-                            if (isTemplate) {
-                              updateAttr(attr.id, 'value', v);
-                            } else {
-                              onChange(prev => {
-                                const exists = prev.find(a => a.id === attr.id);
-                                if (exists) return prev.map(a => a.id === attr.id ? { ...a, value: v } : a);
-                                return [...prev, { id: attr.id, value: v }];
-                              });
-                            }
-                            setDatasetEditId(null);
-                          }}
-                          onCancel={() => setDatasetEditId(null)}
-                        />
-                      )}
                     </div>
                   ) : (
                     <EditCell
@@ -278,6 +262,24 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
           </tbody>
         </table>
       </div>
+      {datasetEditAttr && (
+        <DatasetEditorModal
+          value={datasetEditAttr.value}
+          onApply={v => {
+            if (isTemplate) {
+              updateAttr(datasetEditAttr.id, 'value', v);
+            } else {
+              onChange(prev => {
+                const exists = prev.find(a => a.id === datasetEditAttr.id);
+                if (exists) return prev.map(a => a.id === datasetEditAttr.id ? { ...a, value: v } : a);
+                return [...prev, { id: datasetEditAttr.id, value: v }];
+              });
+            }
+            setDatasetEditId(null);
+          }}
+          onCancel={() => setDatasetEditId(null)}
+        />
+      )}
     </div>
   );
 }
