@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { VERSION } from '../../version';
 import {
   Cpu, LayoutDashboard, Settings, ChevronLeft, ChevronRight,
   FilePlus, FolderOpen, FolderX, Save, SaveAll, Zap,
@@ -154,6 +155,7 @@ export default function Sidebar({ activeView, onChangeView }) {
             <div className="font-bold text-text-primary text-sm leading-tight">
               Automation Studio
             </div>
+            <div className="text-text-muted" style={{ fontSize: 10 }}>{VERSION}</div>
           </div>
         </div>
 
