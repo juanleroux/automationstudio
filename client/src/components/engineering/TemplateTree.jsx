@@ -1023,12 +1023,14 @@ export default function TemplateTree({ selected, onSelect }) {
           try { return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v); }
           catch { return String(v); }
         };
-        const localVal  = normalize(ta.value);
-        const ignVal    = normalize(ignItem.value);
-        const localDesc = ta.description || '';
-        const ignDesc   = extractDoc(ignItem.documentation);
-        const ignDt     = internalDataType(ignItem.dataType);
-        if (localVal !== ignVal || localDesc !== ignDesc || ta.dataType !== ignDt) {
+        const localVal   = normalize(ta.value);
+        const ignVal     = normalize(ignItem.value);
+        const localDesc  = ta.description || '';
+        const ignDesc    = extractDoc(ignItem.documentation);
+        // Don't sync dataType for Dataset (11) — stored as String in Ignition
+        const ignDt      = isDataset ? ta.dataType : internalDataType(ignItem.dataType);
+        const ignIsParam = ignParam !== undefined;
+        if (localVal !== ignVal || localDesc !== ignDesc || (!isDataset && ta.dataType !== ignDt) || ta.parameter !== ignIsParam) {
           diffs.push({
             key: `tmpl:${template.id}:${ta.id}`,
             templateId: template.id, attrId: ta.id,
@@ -1036,7 +1038,8 @@ export default function TemplateTree({ selected, onSelect }) {
             attributeName: ta.name,
             localValue: localVal, ignitionValue: ignVal,
             ignDescription: ignDesc,
-            ignDataType: ignItem.dataType,
+            ignDataTypeNum: isDataset ? undefined : ignDt,
+            ignIsParam,
             checked: true,
           });
         }
@@ -1095,7 +1098,8 @@ export default function TemplateTree({ selected, onSelect }) {
           if (!diff) return a;
           const updated = { ...a, value: diff.ignitionValue };
           if (diff.ignDescription != null) updated.description = diff.ignDescription;
-          if (diff.ignDataType != null) updated.dataType = internalDataType(diff.ignDataType);
+          if (diff.ignDataTypeNum != null) updated.dataType = diff.ignDataTypeNum;
+          if (diff.ignIsParam != null) updated.parameter = diff.ignIsParam;
           return updated;
         });
         // Add new attributes from Ignition, creating folder items as needed
