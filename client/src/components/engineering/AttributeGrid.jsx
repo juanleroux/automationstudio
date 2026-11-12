@@ -137,7 +137,6 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   const childAttrs   = source.filter(a => !a.folder && a.folderId != null);
   const ungrouped    = source.filter(a => !a.folder && a.folderId == null);
 
-  // Sorting for ungrouped attrs only (folders keep their position)
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
 
@@ -147,12 +146,17 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   };
 
   function sortAttrs(list) {
-    if (!sortCol) return list;
+    const col = sortCol || 'name';
+    const dir = sortCol ? sortDir : 'asc';
     return [...list].sort((a, b) => {
-      const av = String(a[sortCol] || '').toLowerCase();
-      const bv = String(b[sortCol] || '').toLowerCase();
-      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      const av = String(a[col] || '').toLowerCase();
+      const bv = String(b[col] || '').toLowerCase();
+      return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
     });
+  }
+
+  function sortFolders(list) {
+    return [...list].sort((a, b) => String(a.name || '').toLowerCase().localeCompare(String(b.name || '').toLowerCase()));
   }
 
   // Hide-defaults filter for instance mode
@@ -308,8 +312,8 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
 
               function renderFolderGroup(folder, depth) {
                 const collapsed     = collapsedFolders.has(folder.id);
-                const directAttrs   = childAttrs.filter(a => a.folderId === folder.id);
-                const subFolders    = folderItems.filter(f => f.parentFolderId === folder.id);
+                const directAttrs   = sortAttrs(childAttrs.filter(a => a.folderId === folder.id));
+                const subFolders    = sortFolders(folderItems.filter(f => f.parentFolderId === folder.id));
                 const visibleAttrs  = filterDefaults(directAttrs);
                 const headerIndent  = depth * 16;
                 const childIndent   = headerIndent + 20;
@@ -374,7 +378,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                 );
               }
 
-              return folderItems.filter(f => f.parentFolderId == null).map(f => renderFolderGroup(f, 0));
+              return sortFolders(folderItems.filter(f => f.parentFolderId == null)).map(f => renderFolderGroup(f, 0));
             })()}
 
             {/* ── Ungrouped attributes ─────────────────────────────── */}
