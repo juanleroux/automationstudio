@@ -123,10 +123,16 @@ function buildTabularCSV(profile, template) {
 
 function buildStructuralText(profile, template) {
   const tmpl = profile.structuralExportTemplate || '';
+  // Matches either:
+  //   {Token}.Parameter.AttrName[.Value]  → attribute value lookup
+  //   {Token|Fallback}                    → first non-empty resolveKeyword
+  const RE = /\{([^}]+)\}\.Parameter\.(\w+)(?:\.Value)?|\{([^}]+)\}/g;
   return (template.instances || []).map(inst =>
-    // {Token} → resolveKeyword; {A|B} → first non-empty of A or B
-    tmpl.replace(/\{([^}]+)\}/g, (_, token) => {
-      const parts = token.split('|');
+    tmpl.replace(RE, (_, chainToken, attrName, simpleToken) => {
+      if (attrName) {
+        return lookupAttribute(attrName, inst, template);
+      }
+      const parts = simpleToken.split('|');
       for (const part of parts) {
         const val = resolveKeyword(part.trim(), null, inst, template);
         if (val) return val;
