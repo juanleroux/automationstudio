@@ -172,6 +172,7 @@ export default function TemplateTree({ selected, onSelect }) {
   const [ceSelected, setCeSelected] = useState(new Set());
   const [multiSelected, setMultiSelected] = useState(new Set()); // "templateId:instanceId"
   const [syncDialog, setSyncDialog] = useState(null); // { direction, searching, diffs, notFound, instanceList }
+  const [templateSyncDialog, setTemplateSyncDialog] = useState(null); // { searching, diffs, notFound, template }
 
   const renameInputRef = useRef(null);
 
@@ -950,6 +951,102 @@ export default function TemplateTree({ selected, onSelect }) {
     }
   };
 
+  // ── Template-level sync: compare template attribute DEFAULTS against Ignition UDT definition ──
+  const openTemplateSyncDialog = async (template) => {
+    setContextMenu(null);
+    const eng = project?.engineering;
+    if (!eng?.ignitionGateway) { toast.error('Configure Ignition gateway in Settings first'); return; }
+
+    setTemplateSyncDialog({ searching: true, diffs: [], notFound: [], template });
+
+    try {
+      // Fetch UDT definitions from _types_ folder
+      const result = await exportFromIgnition({
+        gatewayUrl: eng.ignitionGateway, apiKey: eng.apiKey,
+        provider: eng.provider || 'default', folderPath: '_types_',
+      });
+      const udts = parseIgnitionResponse(result.data);
+
+      // Find the UdtType matching this template (by short name or full name)
+      const shortName = template.name.includes('/') ? template.name.split('/').pop() : template.name;
+      const match = udts.find(u =>
+        u.udtType.name === template.name ||
+        u.udtType.name === shortName
+      );
+
+      if (!match) {
+        setTemplateSyncDialog({ searching: false, diffs: [], notFound: [template.name], template });
+        return;
+      }
+
+      const ignUdt = match.udtType;
+      const diffs = [];
+
+      // Compare all non-folder attributes by name
+      for (const ta of (template.attributes || [])) {
+        if (ta.folder) continue;
+        const isDataset = ta.dataType === 11;
+        // Look for this attribute in Ignition parameters or tags
+        const ignParam = ignUdt.parameters?.[ta.name];
+        const ignTag   = (ignUdt.tags || []).find(t => t.name === ta.name);
+        const ignItem  = ignParam ?? ignTag;
+
+        if (!ignItem) continue; // attribute not in Ignition — skip for now
+
+        const rawLocal = ta.value ?? '';
+        const rawIgn   = ignItem.value ?? '';
+
+        const normalize = (v) => {
+          if (!isDataset) return String(v);
+          try { return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v); }
+          catch { return String(v); }
+        };
+        const localVal = normalize(rawLocal);
+        const ignVal   = normalize(rawIgn);
+
+        if (localVal !== ignVal) {
+          diffs.push({
+            key: `tmpl:${template.id}:${ta.id}`,
+            templateId: template.id, attrId: ta.id,
+            instanceName: template.name,
+            attributeName: ta.name,
+            localValue: localVal, ignitionValue: ignVal,
+            checked: true,
+          });
+        }
+      }
+
+      setTemplateSyncDialog({ searching: false, diffs, notFound: [], template });
+    } catch (err) {
+      setTemplateSyncDialog(null);
+      toast.error('Failed to fetch UDT definition from Ignition: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const applyTemplateSyncDialog = () => {
+    if (!templateSyncDialog) return;
+    const { diffs, template } = templateSyncDialog;
+    const checked = diffs.filter(d => d.checked);
+    if (!checked.length) { setTemplateSyncDialog(null); return; }
+    setTemplateSyncDialog(null);
+
+    updateProject(p => ({
+      ...p,
+      templates: p.templates.map(t => {
+        if (t.id !== template.id) return t;
+        return {
+          ...t,
+          lastModification: new Date().toISOString(),
+          attributes: (t.attributes || []).map(a => {
+            const diff = checked.find(d => d.attrId === a.id);
+            return diff ? { ...a, value: diff.ignitionValue } : a;
+          }),
+        };
+      }),
+    }));
+    toast.success(`Applied ${checked.length} template attribute default(s) from Ignition`);
+  };
+
   const exportInstancesToJSON = (instanceList) => {
     setContextMenu(null);
     const payload = buildInstancesPayload(instanceList);
@@ -1571,6 +1668,41 @@ export default function TemplateTree({ selected, onSelect }) {
                   </div>
                 </div>
               </div>
+              {project?.engineering?.enableIgnitionMenuItems && (
+                <>
+                  <div className="context-menu-submenu">
+                    <div className="context-menu-item">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><RefreshCw size={14} /> Sync</span>
+                      <ChevronRight size={12} style={{ opacity: 0.6 }} />
+                    </div>
+                    <div className="context-menu-submenu-panel">
+                      <div className="context-menu-item" onClick={() => {
+                        const t = templates.find(x => x.id === contextMenu.templateId);
+                        if (!t) return;
+                        const instanceList = (t.instances || []).map(inst => ({ template: t, instance: inst }));
+                        openSyncDialog('from', instanceList);
+                      }}>
+                        <RefreshCw size={14} /> Sync All Instances ← Ignition
+                      </div>
+                      <div className="context-menu-item" onClick={() => {
+                        const t = templates.find(x => x.id === contextMenu.templateId);
+                        if (!t) return;
+                        const instanceList = (t.instances || []).map(inst => ({ template: t, instance: inst }));
+                        openSyncDialog('to', instanceList);
+                      }}>
+                        <Upload size={14} /> Sync All Instances → Ignition
+                      </div>
+                      <div className="context-menu-separator" />
+                      <div className="context-menu-item" onClick={() => {
+                        const t = templates.find(x => x.id === contextMenu.templateId);
+                        if (t) openTemplateSyncDialog(t);
+                      }}>
+                        <RefreshCw size={14} /> Sync Template ← Ignition
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="context-menu-separator" />
               <div className="context-menu-item danger" onClick={() => {
                 const t = templates.find(x => x.id === contextMenu.templateId);
@@ -1782,6 +1914,15 @@ export default function TemplateTree({ selected, onSelect }) {
         onSelectAll={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: true })) }))}
         onDeselectAll={() => setSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: false })) }))}
         onConfirm={applySyncDialog}
+      />
+      {/* Template Sync Dialog (syncs template attribute DEFAULTS from Ignition UDT definition) */}
+      <SyncDiffDialog
+        syncDialog={templateSyncDialog ? { ...templateSyncDialog, direction: 'from' } : null}
+        onClose={() => setTemplateSyncDialog(null)}
+        onToggle={key => setTemplateSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => d.key === key ? { ...d, checked: !d.checked } : d) }))}
+        onSelectAll={() => setTemplateSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: true })) }))}
+        onDeselectAll={() => setTemplateSyncDialog(sd => ({ ...sd, diffs: sd.diffs.map(d => ({ ...d, checked: false })) }))}
+        onConfirm={applyTemplateSyncDialog}
       />
       <style>{`@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }`}</style>
 
