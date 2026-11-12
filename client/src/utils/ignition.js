@@ -18,8 +18,9 @@ const IGNITION_TYPE_MAP = {
   'uint8': 5,
   'uint16': 6,
   'uint32': 7,
-  'float4': 8, 'float': 8, 'float8': 8, 'double': 8,
+  'float4': 8, 'float': 8, 'float8': 8, 'double': 8, 'real': 8,
   'string': 9,
+  'dataset': 11,
 };
 
 export function internalDataType(ignType) {

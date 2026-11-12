@@ -9,6 +9,7 @@ import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
 import { exportFromIgnition, createTiaInstances } from '../../api/client';
 import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates, findUdtInstancesWithPath, resolveOrCreateAreaPath, internalDataType, extractDoc } from '../../utils/ignition';
+import { dataTypeName } from '../shared/DataTypeSelect';
 import { runProfileExport } from '../../utils/profileExport';
 import { downloadStudio5000Routine, parseProjectL5X, mapL5XDataType } from '../../utils/studio5000Export';
 import { parseXDB, mapCEDataType, downloadXBD } from '../../utils/controlExpertExport';
@@ -1040,6 +1041,9 @@ export default function TemplateTree({ selected, onSelect }) {
             ignDescription: ignDesc,
             ignDataTypeNum: isDataset ? undefined : ignDt,
             ignIsParam,
+            ignTypeChange: (!isDataset && ta.dataType !== ignDt)
+              ? `${dataTypeName(ta.dataType)} → ${dataTypeName(ignDt)}`
+              : undefined,
             checked: true,
           });
         }
@@ -1067,6 +1071,7 @@ export default function TemplateTree({ selected, onSelect }) {
           ignParameter: ignAttr.parameter,
           ignFolderName: ignAttr.folderName,
           ignDescription: extractDoc(ignAttr.documentation),
+          ignTypeChange: dataTypeName(internalDataType(ignAttr.dataType)),
           checked: true,
         });
       }

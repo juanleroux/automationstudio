@@ -104,6 +104,11 @@ export default function SyncDiffDialog({ syncDialog, onClose, onToggle, onSelect
                         </td>
                         <td style={{ padding: '6px 8px', color: '#16a34a', fontFamily: 'monospace', fontWeight: 500 }}>
                           {direction === 'to' ? d.localValue : d.ignitionValue}
+                          {d.ignTypeChange && (
+                            <div style={{ fontFamily: 'sans-serif', fontWeight: 400, fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                              type: {d.ignTypeChange}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
