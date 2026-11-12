@@ -124,9 +124,15 @@ function buildTabularCSV(profile, template) {
 function buildStructuralText(profile, template) {
   const tmpl = profile.structuralExportTemplate || '';
   return (template.instances || []).map(inst =>
-    tmpl.replace(/\{([^}]+)\}/g, (_, token) =>
-      resolveKeyword(token.trim(), null, inst, template)
-    )
+    // {Token} → resolveKeyword; {A|B} → first non-empty of A or B
+    tmpl.replace(/\{([^}]+)\}/g, (_, token) => {
+      const parts = token.split('|');
+      for (const part of parts) {
+        const val = resolveKeyword(part.trim(), null, inst, template);
+        if (val) return val;
+      }
+      return '';
+    })
   ).join('\n');
 }
 
