@@ -127,7 +127,9 @@ function buildStructuralText(profile, template) {
   //   {Token}.Parameter.AttrName[.Value]  → attribute value lookup (explicit .Parameter. prefix)
   //   {Token}.AttrName.Value              → attribute value lookup (shorthand, .Value suffix required)
   //   {Token|Fallback}                    → first non-empty resolveKeyword
-  const RE = /\{([^}]+)\}\.Parameter\.(\w+)(?:\.Value)?|\{([^}]+)\}\.(\w+)\.Value|\{([^}]+)\}/g;
+  // AttrName uses [^.\s}]+ to support hyphens and other non-dot chars (e.g. PI-01, FT-100).
+  // Pattern 2 has (?!Parameter\.) so it cannot steal matches intended for Pattern 1.
+  const RE = /\{([^}]+)\}\.Parameter\.([^.\s}]+)(?:\.Value)?|\{([^}]+)\}\.(?!Parameter\.)([^.\s}]+)\.Value|\{([^}]+)\}/g;
   return (template.instances || []).map(inst =>
     tmpl.replace(RE, (_, paramToken, paramAttr, shortToken, shortAttr, simpleToken) => {
       if (paramAttr) {
