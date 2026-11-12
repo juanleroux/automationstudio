@@ -9,6 +9,7 @@ import { useProject, supportsFileSystemAccess } from '../../context/ProjectConte
 import { useToast } from '../shared/Toast';
 import Modal from '../shared/Modal';
 import ConfirmDialog from '../shared/ConfirmDialog';
+import ChangelogModal from '../shared/ChangelogModal';
 
 const PROJECT_NAV = [
   { id: 'dashboard',   label: 'Dashboard', icon: LayoutDashboard, alwaysEnabled: true },
@@ -36,6 +37,7 @@ export default function Sidebar({ activeView, onChangeView }) {
   const [newName, setNewName]             = useState('');
   const [creating, setCreating]           = useState(false);
   const [confirmClose, setConfirmClose]   = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   // Hidden file input — fallback for browsers without File System Access API
   const openFileRef = useRef(null);
@@ -155,7 +157,15 @@ export default function Sidebar({ activeView, onChangeView }) {
             <div className="font-bold text-text-primary text-sm leading-tight">
               Automation Studio
             </div>
-            <div className="text-text-muted" style={{ fontSize: 10 }}>{VERSION}</div>
+            <button
+              onClick={() => setShowChangelog(true)}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                color: 'var(--text-muted)', fontSize: 10, textAlign: 'left',
+              }}
+            >
+              {VERSION}
+            </button>
           </div>
         </div>
 
@@ -285,6 +295,10 @@ export default function Sidebar({ activeView, onChangeView }) {
             />
           </div>
         </Modal>
+      )}
+
+      {showChangelog && (
+        <ChangelogModal onClose={() => setShowChangelog(false)} />
       )}
 
       {confirmClose && (
