@@ -809,9 +809,18 @@ export default function TemplateTree({ selected, onSelect }) {
         for (const ta of (template.attributes || [])) {
           if (!ta.parameter) continue;
           const instAttr = (instance.attributes || []).find(a => a.id === ta.id);
-          const localVal = instAttr != null ? String(instAttr.value ?? '') : String(ta.value ?? '');
           const ignParam = ignInst.parameters?.[ta.name];
-          const ignVal   = ignParam != null ? String(ignParam.value ?? '') : String(ta.value ?? '');
+          const rawLocal = instAttr != null ? (instAttr.value ?? '') : (ta.value ?? '');
+          const rawIgn   = ignParam != null ? (ignParam.value ?? '') : (ta.value ?? '');
+          // Dataset (type 11): normalize by parsing+re-serializing so object vs JSON-string
+          // comparisons and key-ordering differences don't mask real changes.
+          const normalize = (v) => {
+            if (ta.dataType !== 11) return String(v);
+            try { return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v); }
+            catch { return String(v); }
+          };
+          const localVal = normalize(rawLocal);
+          const ignVal   = normalize(rawIgn);
           if (localVal !== ignVal) {
             diffs.push({
               key: `${template.id}:${instance.id}:${ta.id}`,
