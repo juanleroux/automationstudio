@@ -314,7 +314,8 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                 const collapsed     = collapsedFolders.has(folder.id);
                 const directAttrs   = sortAttrs(childAttrs.filter(a => a.folderId === folder.id));
                 const subFolders    = sortFolders(folderItems.filter(f => f.parentFolderId === folder.id));
-                const visibleAttrs  = filterDefaults(directAttrs);
+                const visibleParams = filterDefaults(directAttrs.filter(a => a.parameter));
+                const visibleAttrs  = filterDefaults(directAttrs.filter(a => !a.parameter));
                 const headerIndent  = depth * 16;
                 const childIndent   = headerIndent + 20;
 
@@ -360,6 +361,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                       )}
                     </tr>
                     {!collapsed && subFolders.map(sf => renderFolderGroup(sf, depth + 1))}
+                    {!collapsed && visibleParams.map(attr => renderAttrRow(attr, childIndent))}
                     {!collapsed && visibleAttrs.map(attr => renderAttrRow(attr, childIndent))}
                     {!collapsed && isTemplate && (
                       <tr
@@ -381,8 +383,9 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
               return sortFolders(folderItems.filter(f => f.parentFolderId == null)).map(f => renderFolderGroup(f, 0));
             })()}
 
-            {/* ── Ungrouped attributes ─────────────────────────────── */}
-            {filterDefaults(sortAttrs(ungrouped)).map(attr => renderAttrRow(attr, false))}
+            {/* ── Ungrouped: parameters first, then attributes ─────── */}
+            {filterDefaults(sortAttrs(ungrouped.filter(a => a.parameter))).map(attr => renderAttrRow(attr, 0))}
+            {filterDefaults(sortAttrs(ungrouped.filter(a => !a.parameter))).map(attr => renderAttrRow(attr, 0))}
 
             {/* Empty state */}
             {folderItems.length === 0 && filterDefaults(ungrouped).length === 0 && !areaVisible && (
