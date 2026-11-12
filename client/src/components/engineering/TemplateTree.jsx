@@ -967,12 +967,13 @@ export default function TemplateTree({ selected, onSelect }) {
       });
       const udts = parseIgnitionResponse(result.data);
 
-      // Find the UdtType matching this template (by short name or full name)
-      const shortName = template.name.includes('/') ? template.name.split('/').pop() : template.name;
-      const match = udts.find(u =>
-        u.udtType.name === template.name ||
-        u.udtType.name === shortName
-      );
+      // Match by reconstructing the full path the same way convertUdt does:
+      // cleanPath = folderPath stripped of leading "_types_/", then fullName = cleanPath/udtType.name
+      const match = udts.find(u => {
+        const cleanPath = (u.folderPath || '').replace(/^_types_\/?/i, '');
+        const fullName  = cleanPath ? `${cleanPath}/${u.udtType.name}` : u.udtType.name;
+        return fullName === template.name;
+      });
 
       if (!match) {
         setTemplateSyncDialog({ searching: false, diffs: [], notFound: [template.name], template });
