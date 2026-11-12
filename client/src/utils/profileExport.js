@@ -121,6 +121,21 @@ function buildTabularCSV(profile, template) {
   return [header, ...rows].join('\r\n');
 }
 
+function formatDataset(value) {
+  if (!value) return value;
+  try {
+    const ds = JSON.parse(value);
+    if (!ds || !Array.isArray(ds.columns) || !Array.isArray(ds.rows)) return value;
+    const header = ds.columns.map(c => c.name).join(',');
+    const rows = ds.rows.map(row =>
+      row.map(cell => csvCell(cell == null ? '' : String(cell), ',')).join(',')
+    );
+    return [header, ...rows].join('\n');
+  } catch {
+    return value;
+  }
+}
+
 function buildStructuralText(profile, template) {
   const tmpl = profile.structuralExportTemplate || '';
   // Matches (in order of priority):
@@ -133,14 +148,14 @@ function buildStructuralText(profile, template) {
   return (template.instances || []).map(inst =>
     tmpl.replace(RE, (_, paramToken, paramAttr, shortToken, shortAttr, simpleToken) => {
       if (paramAttr) {
-        return lookupAttribute(paramAttr, inst, template);
+        return formatDataset(lookupAttribute(paramAttr, inst, template));
       }
       if (shortAttr) {
-        return lookupAttribute(shortAttr, inst, template);
+        return formatDataset(lookupAttribute(shortAttr, inst, template));
       }
       const parts = simpleToken.split('|');
       for (const part of parts) {
-        const val = resolveKeyword(part.trim(), null, inst, template);
+        const val = formatDataset(resolveKeyword(part.trim(), null, inst, template));
         if (val) return val;
       }
       return '';
