@@ -124,10 +124,9 @@ function buildTabularCSV(profile, template) {
 function buildStructuralText(profile, template) {
   const tmpl = profile.structuralExportTemplate || '';
   return (template.instances || []).map(inst =>
-    tmpl
-      .replace(/\{Instance\.Name\}/gi,        inst.name || '')
-      .replace(/\{Instance\.Description\}/gi, inst.description || '')
-      .replace(/\{Template\.Name\}/gi,        template.name || '')
+    tmpl.replace(/\{([^}]+)\}/g, (_, token) =>
+      resolveKeyword(token.trim(), null, inst, template)
+    )
   ).join('\n');
 }
 
