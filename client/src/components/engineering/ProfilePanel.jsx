@@ -75,7 +75,7 @@ export default function ProfilePanel({ profile, profileIndex, template, onUpdate
               style={{ fontFamily: 'monospace', fontSize: 12 }}
             />
             <p className="text-xs text-text-muted mt-2">
-              Available placeholders: {'{Instance.Name}'}, {'{Instance.Description}'}, {'{Template.Name}'}, {'{AttributeName}'}, {'{Instance.Name}.Parameter.PI01.Value'} (parameter value), {'{A|B}'} (first non-empty)
+              Available placeholders: {'{Instance.Name}'}, {'{Instance.Description}'}, {'{Template.Name}'}, {'{AttributeName}'}, {'{Instance.Name}.Index.Value'} or {'{Instance.Name}.Parameter.Index.Value'} (attribute value), {'{A|B}'} (first non-empty)
             </p>
           </div>
         )}
