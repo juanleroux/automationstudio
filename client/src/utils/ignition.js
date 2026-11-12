@@ -45,19 +45,30 @@ function buildUdtType(template) {
     tags: [],
   };
   const folderItems = (template.attributes || []).filter(a => a.folder);
+
+  // Recursively find or create a Folder tag for the given folder item id,
+  // building nested containers as needed.
+  function getOrCreateFolderTag(folderId) {
+    const folderItem = folderItems.find(f => f.id === folderId);
+    if (!folderItem) return null;
+    const parentContainer = folderItem.parentFolderId != null
+      ? (getOrCreateFolderTag(folderItem.parentFolderId) || udtType)
+      : udtType;
+    let ft = parentContainer.tags.find(t => t.tagType === 'Folder' && t.name === folderItem.name);
+    if (!ft) {
+      ft = { name: folderItem.name, tagType: 'Folder', tags: [] };
+      parentContainer.tags.push(ft);
+    }
+    return ft;
+  }
+
   (template.attributes || []).forEach(attr => {
     if (attr.folder) return;
     const dt = ignitionDataType(attr.dataType);
     if (attr.parameter) {
       udtType.parameters[attr.name] = { dataType: dt, value: attr.value ?? '' };
     } else if (attr.folderId != null) {
-      const folder = folderItems.find(f => f.id === attr.folderId);
-      const folderName = folder?.name || 'Unknown';
-      let folderTag = udtType.tags.find(t => t.tagType === 'Folder' && t.name === folderName);
-      if (!folderTag) {
-        folderTag = { name: folderName, tagType: 'Folder', tags: [] };
-        udtType.tags.push(folderTag);
-      }
+      const folderTag = getOrCreateFolderTag(attr.folderId) || udtType;
       folderTag.tags.push({ name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' });
     } else {
       udtType.tags.push({ name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' });
@@ -166,6 +177,7 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
     for (const tag of (tagList || [])) {
       if (tag.tagType === 'Folder') {
         const folder = { id: attrId++, folder: true, name: tag.name };
+        if (folderId != null) folder.parentFolderId = folderId;
         attributes.push(folder);
         addTags(tag.tags || [], folder.id);
       } else if (tag.tagType === 'AtomicTag' || !tag.tagType) {

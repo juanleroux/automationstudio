@@ -96,12 +96,23 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   }, [attributes, isTemplate, onChange]);
 
   const removeFolder = useCallback((folderId) => {
-    // Remove folder and move its children to ungrouped
+    // Collect the folder and all descendant folder IDs
+    const toRemove = new Set([folderId]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      attributes.forEach(a => {
+        if (a.folder && a.parentFolderId != null && toRemove.has(a.parentFolderId) && !toRemove.has(a.id)) {
+          toRemove.add(a.id);
+          changed = true;
+        }
+      });
+    }
     onChange(prev => prev
-      .filter(a => a.id !== folderId)
-      .map(a => a.folderId === folderId ? { ...a, folderId: undefined } : a)
+      .filter(a => !toRemove.has(a.id))
+      .map(a => a.folderId != null && toRemove.has(a.folderId) ? { ...a, folderId: undefined } : a)
     );
-  }, [onChange]);
+  }, [attributes, onChange]);
 
   const removeAttr = useCallback((id) => {
     onChange(prev => prev.filter(a => a.id !== id));
@@ -168,10 +179,10 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   const datasetEditAttr = datasetEditId !== null ? source.find(a => a.id === datasetEditId) : null;
 
   // ── Attribute row renderer ───────────────────────────────────────────────
-  function renderAttrRow(attr, indent = false) {
+  function renderAttrRow(attr, indentPx = 0) {
     return (
-      <tr key={attr.id} style={indent ? { background: 'var(--bg-card)' } : undefined}>
-        <td style={indent ? { paddingLeft: 28 } : undefined}>
+      <tr key={attr.id} style={indentPx > 0 ? { background: 'var(--bg-card)' } : undefined}>
+        <td style={{ paddingLeft: 8 + indentPx }}>
           <EditCell
             value={attr.name}
             onChange={v => updateAttr(attr.id, 'name', v)}
@@ -288,77 +299,83 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
               </tr>
             )}
 
-            {/* ── Folders ─────────────────────────────────────────── */}
-            {folderItems.map(folder => {
-              const collapsed = collapsedFolders.has(folder.id);
-              const children  = childAttrs.filter(a => a.folderId === folder.id);
-              const visibleChildren = filterDefaults(children);
+            {/* ── Folders (recursive, supports nesting) ───────────── */}
+            {(() => {
+              function countDeep(fid) {
+                return childAttrs.filter(a => a.folderId === fid).length
+                  + folderItems.filter(f => f.parentFolderId === fid).reduce((n, sf) => n + countDeep(sf.id), 0);
+              }
 
-              return (
-                <React.Fragment key={folder.id}>
-                  {/* Folder header row */}
-                  <tr style={{ background: 'var(--bg-main)' }}>
-                    <td colSpan={isTemplate ? 5 : 4} style={{ padding: '5px 8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button
-                          onClick={() => toggleFolder(folder.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-muted)', display: 'flex' }}
-                        >
-                          {collapsed
-                            ? <ChevronRight size={14} />
-                            : <ChevronDown size={14} />}
-                        </button>
-                        <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                        {isTemplate ? (
-                          <EditCell
-                            value={folder.name}
-                            onChange={v => updateAttr(folder.id, 'name', v)}
-                            style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}
-                          />
-                        ) : (
-                          <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
-                            {folder.name}
+              function renderFolderGroup(folder, depth) {
+                const collapsed     = collapsedFolders.has(folder.id);
+                const directAttrs   = childAttrs.filter(a => a.folderId === folder.id);
+                const subFolders    = folderItems.filter(f => f.parentFolderId === folder.id);
+                const visibleAttrs  = filterDefaults(directAttrs);
+                const headerIndent  = depth * 16;
+                const childIndent   = headerIndent + 20;
+
+                return (
+                  <React.Fragment key={folder.id}>
+                    <tr style={{ background: 'var(--bg-main)' }}>
+                      <td colSpan={isTemplate ? 5 : 4} style={{ padding: '5px 8px', paddingLeft: 8 + headerIndent }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            onClick={() => toggleFolder(folder.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-muted)', display: 'flex' }}
+                          >
+                            {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                          </button>
+                          <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                          {isTemplate ? (
+                            <EditCell
+                              value={folder.name}
+                              onChange={v => updateAttr(folder.id, 'name', v)}
+                              style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}
+                            />
+                          ) : (
+                            <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
+                              {folder.name}
+                            </span>
+                          )}
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 2 }}>
+                            ({countDeep(folder.id)})
                           </span>
-                        )}
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 2 }}>
-                          ({children.length})
-                        </span>
-                      </div>
-                    </td>
-                    {isTemplate && (
-                      <td style={{ textAlign: 'right', paddingRight: 6 }}>
-                        <button
-                          className="btn-ghost btn-icon"
-                          style={{ padding: 3, color: '#e55353' }}
-                          onClick={() => removeFolder(folder.id)}
-                          title="Delete folder"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        </div>
                       </td>
-                    )}
-                  </tr>
-
-                  {/* Children */}
-                  {!collapsed && visibleChildren.map(attr => renderAttrRow(attr, true))}
-
-                  {/* Add attribute to folder (template only) */}
-                  {!collapsed && isTemplate && (
-                    <tr
-                      onClick={() => addAttr(folder.id)}
-                      style={{ cursor: 'pointer', background: 'var(--bg-card)' }}
-                      className="add-row"
-                    >
-                      <td colSpan={6} style={{ padding: '5px 12px 5px 28px' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
-                          <Plus size={12} /> Add Attribute
-                        </span>
-                      </td>
+                      {isTemplate && (
+                        <td style={{ textAlign: 'right', paddingRight: 6 }}>
+                          <button
+                            className="btn-ghost btn-icon"
+                            style={{ padding: 3, color: '#e55353' }}
+                            onClick={() => removeFolder(folder.id)}
+                            title="Delete folder"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                    {!collapsed && subFolders.map(sf => renderFolderGroup(sf, depth + 1))}
+                    {!collapsed && visibleAttrs.map(attr => renderAttrRow(attr, childIndent))}
+                    {!collapsed && isTemplate && (
+                      <tr
+                        onClick={() => addAttr(folder.id)}
+                        style={{ cursor: 'pointer', background: 'var(--bg-card)' }}
+                        className="add-row"
+                      >
+                        <td colSpan={6} style={{ padding: '5px 12px 5px', paddingLeft: 12 + childIndent }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
+                            <Plus size={12} /> Add Attribute
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              }
+
+              return folderItems.filter(f => f.parentFolderId == null).map(f => renderFolderGroup(f, 0));
+            })()}
 
             {/* ── Ungrouped attributes ─────────────────────────────── */}
             {filterDefaults(sortAttrs(ungrouped)).map(attr => renderAttrRow(attr, false))}

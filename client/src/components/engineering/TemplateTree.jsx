@@ -998,14 +998,14 @@ export default function TemplateTree({ selected, onSelect }) {
         return null;
       }
 
-      // Recursively flatten tags, tracking folder name for new-attr detection
-      function flattenIgnTags(tagList, folderName = null) {
+      // Recursively flatten tags, tracking the full folder path as an array
+      function flattenIgnTags(tagList, folderPath = []) {
         const result = [];
         for (const t of (tagList || [])) {
           if (t.tagType === 'Folder') {
-            result.push(...flattenIgnTags(t.tags || [], t.name));
+            result.push(...flattenIgnTags(t.tags || [], [...folderPath, t.name]));
           } else if (t.tagType === 'AtomicTag' || !t.tagType) {
-            result.push({ name: t.name, value: String(t.value ?? ''), dataType: t.dataType, parameter: false, folderName, documentation: t.documentation });
+            result.push({ name: t.name, value: String(t.value ?? ''), dataType: t.dataType, parameter: false, folderPath, documentation: t.documentation });
           }
         }
         return result;
@@ -1053,7 +1053,7 @@ export default function TemplateTree({ selected, onSelect }) {
       const localNames = new Set(localAttrs.map(a => a.name));
 
       const ignParams = Object.entries(ignUdt.parameters || {}).map(([name, p]) => ({
-        name, value: String(p.value ?? ''), dataType: p.dataType, parameter: true, folderName: null, documentation: p.documentation,
+        name, value: String(p.value ?? ''), dataType: p.dataType, parameter: true, folderPath: [], documentation: p.documentation,
       }));
       const ignTagsFlat = flattenIgnTags(ignUdt.tags || []);
 
@@ -1069,7 +1069,7 @@ export default function TemplateTree({ selected, onSelect }) {
           ignitionValue: ignAttr.value,
           ignDataType: ignAttr.dataType,
           ignParameter: ignAttr.parameter,
-          ignFolderName: ignAttr.folderName,
+          ignFolderPath: ignAttr.folderPath || [],
           ignDescription: extractDoc(ignAttr.documentation),
           ignTypeChange: dataTypeName(internalDataType(ignAttr.dataType)),
           checked: true,
@@ -1112,17 +1112,22 @@ export default function TemplateTree({ selected, onSelect }) {
           let nextId = attrs.reduce((m, a) => Math.max(m, a.id || 0), 0);
           newAttrDiffs.forEach(d => {
             let folderId = null;
-            if (d.ignFolderName) {
-              let folderItem = attrs.find(a => a.folder && a.name === d.ignFolderName);
-              if (!folderItem) {
-                nextId++;
-                folderItem = { id: nextId, folder: true, name: d.ignFolderName };
-                // Insert folder before first ungrouped attr so folders stay on top
-                const firstUngrouped = attrs.findIndex(a => !a.folder && a.folderId == null);
-                if (firstUngrouped >= 0) attrs.splice(firstUngrouped, 0, folderItem);
-                else attrs.push(folderItem);
+            const folderPath = d.ignFolderPath || [];
+            if (folderPath.length > 0) {
+              let parentFolderId = null;
+              for (const folderName of folderPath) {
+                let folderItem = attrs.find(
+                  a => a.folder && a.name === folderName && (a.parentFolderId ?? null) === parentFolderId
+                );
+                if (!folderItem) {
+                  nextId++;
+                  folderItem = { id: nextId, folder: true, name: folderName };
+                  if (parentFolderId != null) folderItem.parentFolderId = parentFolderId;
+                  attrs.push(folderItem);
+                }
+                parentFolderId = folderItem.id;
               }
-              folderId = folderItem.id;
+              folderId = parentFolderId;
             }
             nextId++;
             attrs.push({
@@ -1131,7 +1136,7 @@ export default function TemplateTree({ selected, onSelect }) {
               description: d.ignDescription || '',
               dataType: internalDataType(d.ignDataType),
               value: d.ignitionValue,
-              parameter: d.ignParameter ?? true,
+              parameter: d.ignParameter ?? false,
               ...(folderId != null ? { folderId } : {}),
             });
           });
