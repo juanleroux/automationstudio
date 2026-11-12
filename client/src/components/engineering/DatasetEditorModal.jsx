@@ -32,7 +32,7 @@ const TOOL_BTN = {
   width: 28, height: 28,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   border: '1px solid var(--border)', borderRadius: 4,
-  background: 'transparent', cursor: 'pointer', color: 'var(--text)',
+  background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)',
 };
 
 export default function DatasetEditorModal({ value, onApply, onCancel }) {
@@ -96,7 +96,7 @@ export default function DatasetEditorModal({ value, onApply, onCancel }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
+        background: 'var(--bg-surface)', border: '1px solid var(--border)',
         borderRadius: 6, width: 720, maxWidth: '95vw',
         display: 'flex', flexDirection: 'column', maxHeight: '80vh',
         boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
@@ -130,8 +130,8 @@ export default function DatasetEditorModal({ value, onApply, onCancel }) {
                         onClick={() => { setSelCol(ci); setSelRow(null); }}
                         style={{
                           border: '1px solid var(--border)', padding: '4px 8px',
-                          background: selCol === ci ? 'var(--accent, #3b82f6)' : 'var(--surface-alt)',
-                          color: selCol === ci ? '#fff' : 'var(--text)',
+                          background: selCol === ci ? 'var(--accent, #3b82f6)' : 'var(--bg-card)',
+                          color: selCol === ci ? '#fff' : 'var(--text-primary)',
                           cursor: 'pointer', userSelect: 'none',
                           maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}
@@ -170,7 +170,7 @@ export default function DatasetEditorModal({ value, onApply, onCancel }) {
                       style={{
                         background: selRow === ri
                           ? 'rgba(59,130,246,0.12)'
-                          : ri % 2 === 0 ? 'var(--surface)' : 'var(--surface-alt)',
+                          : ri % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-card)',
                         cursor: 'pointer',
                       }}
                     >
@@ -192,7 +192,7 @@ export default function DatasetEditorModal({ value, onApply, onCancel }) {
                               style={{
                                 width: '100%', padding: '3px 6px', fontSize: 12,
                                 border: 'none', outline: '2px solid var(--accent, #3b82f6)',
-                                background: 'var(--surface)',
+                                background: 'var(--bg-surface)',
                               }}
                             />
                           ) : (
