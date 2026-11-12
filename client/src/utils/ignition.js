@@ -43,10 +43,21 @@ function buildUdtType(template) {
     parameters: {},
     tags: [],
   };
+  const folderItems = (template.attributes || []).filter(a => a.folder);
   (template.attributes || []).forEach(attr => {
+    if (attr.folder) return;
     const dt = ignitionDataType(attr.dataType);
     if (attr.parameter) {
       udtType.parameters[attr.name] = { dataType: dt, value: attr.value ?? '' };
+    } else if (attr.folderId != null) {
+      const folder = folderItems.find(f => f.id === attr.folderId);
+      const folderName = folder?.name || 'Unknown';
+      let folderTag = udtType.tags.find(t => t.tagType === 'Folder' && t.name === folderName);
+      if (!folderTag) {
+        folderTag = { name: folderName, tagType: 'Folder', tags: [] };
+        udtType.tags.push(folderTag);
+      }
+      folderTag.tags.push({ name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' });
     } else {
       udtType.tags.push({ name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' });
     }
@@ -150,14 +161,25 @@ function convertUdt(udtType, siblingInstances, templateId, folderPath) {
     });
   });
 
-  (udtType.tags || []).filter(t => t.tagType === 'AtomicTag' || !t.tagType).forEach(tag => {
-    attributes.push({
-      id: attrId++, name: tag.name, description: extractDoc(tag.documentation),
-      dataType: internalDataType(tag.dataType),
-      value: String(tag.value ?? ''),
-      parameter: false,
-    });
-  });
+  function addTags(tagList, folderId) {
+    for (const tag of (tagList || [])) {
+      if (tag.tagType === 'Folder') {
+        const folder = { id: attrId++, folder: true, name: tag.name };
+        attributes.push(folder);
+        addTags(tag.tags || [], folder.id);
+      } else if (tag.tagType === 'AtomicTag' || !tag.tagType) {
+        const attr = {
+          id: attrId++, name: tag.name, description: extractDoc(tag.documentation),
+          dataType: internalDataType(tag.dataType),
+          value: String(tag.value ?? ''),
+          parameter: false,
+        };
+        if (folderId != null) attr.folderId = folderId;
+        attributes.push(attr);
+      }
+    }
+  }
+  addTags(udtType.tags || [], null);
 
   let instId = 1;
   const instances = siblingInstances.map(inst => {

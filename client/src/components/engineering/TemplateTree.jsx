@@ -984,11 +984,37 @@ export default function TemplateTree({ selected, onSelect }) {
       const diffs = [];
       const localAttrs = (template.attributes || []).filter(a => !a.folder);
 
+      // Recursively find a tag by name inside possibly-nested folder tags
+      function findIgnTag(tagList, name) {
+        for (const t of (tagList || [])) {
+          if (t.tagType === 'Folder') {
+            const found = findIgnTag(t.tags || [], name);
+            if (found) return found;
+          } else if (t.name === name) {
+            return t;
+          }
+        }
+        return null;
+      }
+
+      // Recursively flatten tags, tracking folder name for new-attr detection
+      function flattenIgnTags(tagList, folderName = null) {
+        const result = [];
+        for (const t of (tagList || [])) {
+          if (t.tagType === 'Folder') {
+            result.push(...flattenIgnTags(t.tags || [], t.name));
+          } else if (t.tagType === 'AtomicTag' || !t.tagType) {
+            result.push({ name: t.name, value: String(t.value ?? ''), dataType: t.dataType, parameter: false, folderName });
+          }
+        }
+        return result;
+      }
+
       // 1. Compare existing local attributes against Ignition (value diffs)
       for (const ta of localAttrs) {
         const isDataset = ta.dataType === 11;
         const ignParam  = ignUdt.parameters?.[ta.name];
-        const ignTag    = (ignUdt.tags || []).find(t => t.name === ta.name);
+        const ignTag    = findIgnTag(ignUdt.tags, ta.name);
         const ignItem   = ignParam ?? ignTag;
         if (!ignItem) continue;
 
@@ -1015,13 +1041,11 @@ export default function TemplateTree({ selected, onSelect }) {
       const localNames = new Set(localAttrs.map(a => a.name));
 
       const ignParams = Object.entries(ignUdt.parameters || {}).map(([name, p]) => ({
-        name, value: String(p.value ?? ''), dataType: p.dataType, parameter: true,
+        name, value: String(p.value ?? ''), dataType: p.dataType, parameter: true, folderName: null,
       }));
-      const ignTags = (ignUdt.tags || [])
-        .filter(t => t.tagType === 'AtomicTag' || !t.tagType)
-        .map(t => ({ name: t.name, value: String(t.value ?? ''), dataType: t.dataType, parameter: false }));
+      const ignTagsFlat = flattenIgnTags(ignUdt.tags || []);
 
-      for (const ignAttr of [...ignParams, ...ignTags]) {
+      for (const ignAttr of [...ignParams, ...ignTagsFlat]) {
         if (localNames.has(ignAttr.name)) continue;
         diffs.push({
           key: `tmpl:new:${template.id}:${ignAttr.name}`,
@@ -1033,6 +1057,7 @@ export default function TemplateTree({ selected, onSelect }) {
           ignitionValue: ignAttr.value,
           ignDataType: ignAttr.dataType,
           ignParameter: ignAttr.parameter,
+          ignFolderName: ignAttr.folderName,
           checked: true,
         });
       }
@@ -1063,17 +1088,32 @@ export default function TemplateTree({ selected, onSelect }) {
           const diff = valueDiffs.find(d => d.attrId === a.id);
           return diff ? { ...a, value: diff.ignitionValue } : a;
         });
-        // Add new attributes from Ignition (ungrouped, after existing)
+        // Add new attributes from Ignition, creating folder items as needed
         if (newAttrDiffs.length) {
-          const maxId = attrs.reduce((m, a) => Math.max(m, a.id || 0), 0);
-          newAttrDiffs.forEach((d, i) => {
+          let nextId = attrs.reduce((m, a) => Math.max(m, a.id || 0), 0);
+          newAttrDiffs.forEach(d => {
+            let folderId = null;
+            if (d.ignFolderName) {
+              let folderItem = attrs.find(a => a.folder && a.name === d.ignFolderName);
+              if (!folderItem) {
+                nextId++;
+                folderItem = { id: nextId, folder: true, name: d.ignFolderName };
+                // Insert folder before first ungrouped attr so folders stay on top
+                const firstUngrouped = attrs.findIndex(a => !a.folder && a.folderId == null);
+                if (firstUngrouped >= 0) attrs.splice(firstUngrouped, 0, folderItem);
+                else attrs.push(folderItem);
+              }
+              folderId = folderItem.id;
+            }
+            nextId++;
             attrs.push({
-              id: maxId + i + 1,
+              id: nextId,
               name: d.attributeName,
               description: '',
               dataType: internalDataType(d.ignDataType),
               value: d.ignitionValue,
               parameter: d.ignParameter ?? true,
+              ...(folderId != null ? { folderId } : {}),
             });
           });
         }
