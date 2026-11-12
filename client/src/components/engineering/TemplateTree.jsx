@@ -807,15 +807,18 @@ export default function TemplateTree({ selected, onSelect }) {
         const ignInst = ignByKey.get(`${template.id}:${instance.name}`);
         if (!ignInst) continue;
         for (const ta of (template.attributes || [])) {
-          if (!ta.parameter) continue;
+          const isDataset = ta.dataType === 11;
+          if (!ta.parameter && !isDataset) continue;
           const instAttr = (instance.attributes || []).find(a => a.id === ta.id);
-          const ignParam = ignInst.parameters?.[ta.name];
+          // Dataset values stored without parameter flag live in ignInst.tags, not .parameters
+          const ignParam = ignInst.parameters?.[ta.name]
+            ?? (isDataset ? (ignInst.tags || []).find(t => t.name === ta.name) : undefined);
           const rawLocal = instAttr != null ? (instAttr.value ?? '') : (ta.value ?? '');
           const rawIgn   = ignParam != null ? (ignParam.value ?? '') : (ta.value ?? '');
-          // Dataset (type 11): normalize by parsing+re-serializing so object vs JSON-string
+          // Dataset: normalize by parsing+re-serializing so object vs JSON-string
           // comparisons and key-ordering differences don't mask real changes.
           const normalize = (v) => {
-            if (ta.dataType !== 11) return String(v);
+            if (!isDataset) return String(v);
             try { return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v); }
             catch { return String(v); }
           };

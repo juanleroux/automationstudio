@@ -185,7 +185,10 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                   {isTemplate ? (
                     <DataTypeSelect
                       value={attr.dataType}
-                      onChange={v => updateAttr(attr.id, 'dataType', v)}
+                      onChange={v => {
+                        updateAttr(attr.id, 'dataType', v);
+                        if (v === 11 && !attr.parameter) updateAttr(attr.id, 'parameter', true);
+                      }}
                       style={{ padding: '2px 6px', fontSize: 12 }}
                     />
                   ) : (
