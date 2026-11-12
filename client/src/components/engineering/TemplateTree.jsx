@@ -655,7 +655,6 @@ export default function TemplateTree({ selected, onSelect }) {
       return;
     }
 
-    setMultiSelected(new Set());
     onSelect({ type: 'instance', templateId, instanceId });
     lastClickedRef.current = key;
   };
