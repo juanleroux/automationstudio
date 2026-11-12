@@ -8,7 +8,7 @@ import { useProject } from '../../context/ProjectContext';
 import { useToast } from '../shared/Toast';
 import { uploadToIgnition } from '../../api/client';
 import { exportFromIgnition, createTiaInstances } from '../../api/client';
-import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates, findUdtInstancesWithPath, resolveOrCreateAreaPath } from '../../utils/ignition';
+import { buildIgnitionPayload, buildInstancesPayload, buildAreaPath, parseIgnitionResponse, convertUdtsToTemplates, findUdtInstancesWithPath, resolveOrCreateAreaPath, internalDataType } from '../../utils/ignition';
 import { runProfileExport } from '../../utils/profileExport';
 import { downloadStudio5000Routine, parseProjectL5X, mapL5XDataType } from '../../utils/studio5000Export';
 import { parseXDB, mapCEDataType, downloadXBD } from '../../utils/controlExpertExport';
@@ -981,29 +981,23 @@ export default function TemplateTree({ selected, onSelect }) {
 
       const ignUdt = match.udtType;
       const diffs = [];
+      const localAttrs = (template.attributes || []).filter(a => !a.folder);
 
-      // Compare all non-folder attributes by name
-      for (const ta of (template.attributes || [])) {
-        if (ta.folder) continue;
+      // 1. Compare existing local attributes against Ignition (value diffs)
+      for (const ta of localAttrs) {
         const isDataset = ta.dataType === 11;
-        // Look for this attribute in Ignition parameters or tags
-        const ignParam = ignUdt.parameters?.[ta.name];
-        const ignTag   = (ignUdt.tags || []).find(t => t.name === ta.name);
-        const ignItem  = ignParam ?? ignTag;
-
-        if (!ignItem) continue; // attribute not in Ignition — skip for now
-
-        const rawLocal = ta.value ?? '';
-        const rawIgn   = ignItem.value ?? '';
+        const ignParam  = ignUdt.parameters?.[ta.name];
+        const ignTag    = (ignUdt.tags || []).find(t => t.name === ta.name);
+        const ignItem   = ignParam ?? ignTag;
+        if (!ignItem) continue;
 
         const normalize = (v) => {
-          if (!isDataset) return String(v);
+          if (!isDataset) return String(v ?? '');
           try { return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v); }
           catch { return String(v); }
         };
-        const localVal = normalize(rawLocal);
-        const ignVal   = normalize(rawIgn);
-
+        const localVal = normalize(ta.value);
+        const ignVal   = normalize(ignItem.value);
         if (localVal !== ignVal) {
           diffs.push({
             key: `tmpl:${template.id}:${ta.id}`,
@@ -1014,6 +1008,32 @@ export default function TemplateTree({ selected, onSelect }) {
             checked: true,
           });
         }
+      }
+
+      // 2. Find attributes in Ignition NOT present locally → offer to add them
+      const localNames = new Set(localAttrs.map(a => a.name));
+
+      const ignParams = Object.entries(ignUdt.parameters || {}).map(([name, p]) => ({
+        name, value: String(p.value ?? ''), dataType: p.dataType, parameter: true,
+      }));
+      const ignTags = (ignUdt.tags || [])
+        .filter(t => t.tagType === 'AtomicTag' || !t.tagType)
+        .map(t => ({ name: t.name, value: String(t.value ?? ''), dataType: t.dataType, parameter: false }));
+
+      for (const ignAttr of [...ignParams, ...ignTags]) {
+        if (localNames.has(ignAttr.name)) continue;
+        diffs.push({
+          key: `tmpl:new:${template.id}:${ignAttr.name}`,
+          templateId: template.id, attrId: null,
+          diffType: 'new',
+          instanceName: template.name,
+          attributeName: ignAttr.name,
+          localValue: '(not in template)',
+          ignitionValue: ignAttr.value,
+          ignDataType: ignAttr.dataType,
+          ignParameter: ignAttr.parameter,
+          checked: true,
+        });
       }
 
       setTemplateSyncDialog({ searching: false, diffs, notFound: [], template });
@@ -1030,21 +1050,36 @@ export default function TemplateTree({ selected, onSelect }) {
     if (!checked.length) { setTemplateSyncDialog(null); return; }
     setTemplateSyncDialog(null);
 
+    const valueDiffs = checked.filter(d => !d.diffType);
+    const newAttrDiffs = checked.filter(d => d.diffType === 'new');
+
     updateProject(p => ({
       ...p,
       templates: p.templates.map(t => {
         if (t.id !== template.id) return t;
-        return {
-          ...t,
-          lastModification: new Date().toISOString(),
-          attributes: (t.attributes || []).map(a => {
-            const diff = checked.find(d => d.attrId === a.id);
-            return diff ? { ...a, value: diff.ignitionValue } : a;
-          }),
-        };
+        // Apply value updates to existing attributes
+        let attrs = (t.attributes || []).map(a => {
+          const diff = valueDiffs.find(d => d.attrId === a.id);
+          return diff ? { ...a, value: diff.ignitionValue } : a;
+        });
+        // Add new attributes from Ignition (ungrouped, after existing)
+        if (newAttrDiffs.length) {
+          const maxId = attrs.reduce((m, a) => Math.max(m, a.id || 0), 0);
+          newAttrDiffs.forEach((d, i) => {
+            attrs.push({
+              id: maxId + i + 1,
+              name: d.attributeName,
+              description: '',
+              dataType: internalDataType(d.ignDataType),
+              value: d.ignitionValue,
+              parameter: d.ignParameter ?? true,
+            });
+          });
+        }
+        return { ...t, lastModification: new Date().toISOString(), attributes: attrs };
       }),
     }));
-    toast.success(`Applied ${checked.length} template attribute default(s) from Ignition`);
+    toast.success(`Applied ${valueDiffs.length} value update(s) and added ${newAttrDiffs.length} new attribute(s) from Ignition`);
   };
 
   const exportInstancesToJSON = (instanceList) => {

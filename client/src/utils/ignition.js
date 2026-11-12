@@ -22,7 +22,7 @@ const IGNITION_TYPE_MAP = {
   'string': 9,
 };
 
-function internalDataType(ignType) {
+export function internalDataType(ignType) {
   return IGNITION_TYPE_MAP[(ignType || '').toLowerCase()] ?? 9;
 }
 
