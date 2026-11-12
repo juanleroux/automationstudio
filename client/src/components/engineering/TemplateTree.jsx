@@ -485,7 +485,7 @@ export default function TemplateTree({ selected, onSelect }) {
 
   // Export attributes as CSV
   const exportAttributesCSV = (template) => {
-    const attrs = template.attributes || [];
+    const attrs = (template.attributes || []).filter(a => !a.folder);
     const header = ['Name', 'Description', 'DataType', 'Value', 'Parameter'];
     const rows = attrs.map(a => [a.name, a.description || '', a.dataType, a.value || '', a.parameter ? 'true' : 'false']);
     const csv = [header, ...rows].map(r => r.join(',')).join('\n');
@@ -502,7 +502,7 @@ export default function TemplateTree({ selected, onSelect }) {
 
   // Export instances as CSV
   const exportInstancesCSV = (template) => {
-    const attrs = template.attributes || [];
+    const attrs = (template.attributes || []).filter(a => !a.folder);
     const header = ['Name', 'Description', ...attrs.map(a => a.name)];
     const rows = (template.instances || []).map(inst => {
       const vals = attrs.map(ta => {
@@ -807,6 +807,7 @@ export default function TemplateTree({ selected, onSelect }) {
         const ignInst = ignByKey.get(`${template.id}:${instance.name}`);
         if (!ignInst) continue;
         for (const ta of (template.attributes || [])) {
+          if (ta.folder) continue; // skip folder items
           const isDataset = ta.dataType === 11;
           if (!ta.parameter && !isDataset) continue;
           const instAttr = (instance.attributes || []).find(a => a.id === ta.id);
