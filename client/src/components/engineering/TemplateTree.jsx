@@ -1027,7 +1027,8 @@ export default function TemplateTree({ selected, onSelect }) {
         const ignVal    = normalize(ignItem.value);
         const localDesc = ta.description || '';
         const ignDesc   = extractDoc(ignItem.documentation);
-        if (localVal !== ignVal || localDesc !== ignDesc) {
+        const ignDt     = internalDataType(ignItem.dataType);
+        if (localVal !== ignVal || localDesc !== ignDesc || ta.dataType !== ignDt) {
           diffs.push({
             key: `tmpl:${template.id}:${ta.id}`,
             templateId: template.id, attrId: ta.id,
@@ -1035,6 +1036,7 @@ export default function TemplateTree({ selected, onSelect }) {
             attributeName: ta.name,
             localValue: localVal, ignitionValue: ignVal,
             ignDescription: ignDesc,
+            ignDataType: ignItem.dataType,
             checked: true,
           });
         }
@@ -1093,6 +1095,7 @@ export default function TemplateTree({ selected, onSelect }) {
           if (!diff) return a;
           const updated = { ...a, value: diff.ignitionValue };
           if (diff.ignDescription != null) updated.description = diff.ignDescription;
+          if (diff.ignDataType != null) updated.dataType = internalDataType(diff.ignDataType);
           return updated;
         });
         // Add new attributes from Ignition, creating folder items as needed
