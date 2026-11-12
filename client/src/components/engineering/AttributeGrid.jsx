@@ -55,10 +55,10 @@ function EditCell({ value, onChange, disabled, type = 'text', style }) {
 export default function AttributeGrid({ attributes, templateAttributes, mode, onChange, hideDefaults = true, instanceArea }) {
   const isTemplate = mode === 'template';
   const [datasetEditId, setDatasetEditId] = useState(null);
-  const [collapsedFolders, setCollapsedFolders] = useState(new Set());
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
 
   const toggleFolder = (id) => {
-    setCollapsedFolders(prev => {
+    setExpandedFolders(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -311,7 +311,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
               }
 
               function renderFolderGroup(folder, depth) {
-                const collapsed     = collapsedFolders.has(folder.id);
+                const collapsed     = !expandedFolders.has(folder.id);
                 const directAttrs   = sortAttrs(childAttrs.filter(a => a.folderId === folder.id));
                 const subFolders    = sortFolders(folderItems.filter(f => f.parentFolderId === folder.id));
                 const visibleParams = filterDefaults(directAttrs.filter(a => a.parameter));
