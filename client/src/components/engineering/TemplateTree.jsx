@@ -1031,8 +1031,13 @@ export default function TemplateTree({ selected, onSelect }) {
         // Don't sync dataType for Dataset (11) — stored as String in Ignition
         const ignDt      = isDataset ? ta.dataType : internalDataType(ignItem.dataType);
         const ignIsParam = ignParam !== undefined;
-        if (localVal !== ignVal || localDesc !== ignDesc || (!isDataset && ta.dataType !== ignDt) || ta.parameter !== ignIsParam) {
-          diffs.push({
+        const isParam = ta.parameter || ignIsParam;
+        const hasNonValueDiff = localDesc !== ignDesc || (!isDataset && ta.dataType !== ignDt) || ta.parameter !== ignIsParam;
+        // For parameter attrs, skip value-only diffs — parameter values are
+        // instance-specific and the UDT definition default is not meaningful.
+        if (isParam && !hasNonValueDiff) continue;
+        if (!isParam && localVal === ignVal && !hasNonValueDiff) continue;
+        diffs.push({
             key: `tmpl:${template.id}:${ta.id}`,
             templateId: template.id, attrId: ta.id,
             instanceName: template.name,
@@ -1101,10 +1106,14 @@ export default function TemplateTree({ selected, onSelect }) {
         let attrs = (t.attributes || []).map(a => {
           const diff = valueDiffs.find(d => d.attrId === a.id);
           if (!diff) return a;
-          const updated = { ...a, value: diff.ignitionValue };
+          const updated = { ...a };
           if (diff.ignDescription != null) updated.description = diff.ignDescription;
           if (diff.ignDataTypeNum != null) updated.dataType = diff.ignDataTypeNum;
           if (diff.ignIsParam != null) updated.parameter = diff.ignIsParam;
+          // Don't overwrite default value for parameter attrs — their values are
+          // instance-specific; only sync tag (non-parameter) default values.
+          const isParam = a.parameter || diff.ignIsParam;
+          if (!isParam) updated.value = diff.ignitionValue;
           return updated;
         });
         // Add new attributes from Ignition, creating folder items as needed
