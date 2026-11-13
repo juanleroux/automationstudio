@@ -8,7 +8,6 @@
 const DEFAULT_DOC_COLS = [
   { id: 'description',  label: 'Description',  colType: 'text',     builtin: true },
   { id: 'area',         label: 'Area',          colType: 'text',     builtin: true },
-  { id: 'flagged',      label: 'Flag',          colType: 'checkbox', builtin: true },
   { id: 'lastModified', label: 'Last Modified', colType: 'text',     builtin: true },
   { id: 'io',           label: 'I/O',           colType: 'checkbox', builtin: true },
   { id: 'plc',          label: 'PLC',           colType: 'checkbox', builtin: true },
@@ -22,7 +21,7 @@ export function openCommissioningReport(project) {
   let docCols = (project?.documentationColumns?.length)
     ? project.documentationColumns
     : DEFAULT_DOC_COLS.map(c => ({ ...c, enabled: true }));
-  docCols = docCols.filter(c => c.enabled !== false);
+  docCols = docCols.filter(c => c.enabled !== false && c.id !== 'flagged');
   const lmIdx = docCols.findIndex(c => c.id === 'lastModified');
   if (lmIdx >= 0 && lmIdx < docCols.length - 1) {
     const [lm] = docCols.splice(lmIdx, 1);
@@ -94,7 +93,6 @@ export function openCommissioningReport(project) {
   function getCellHtml(col, inst, c) {
     if (col.id === 'description') return esc(inst.description || '');
     if (col.id === 'area')        return esc(getAreaLabel(inst.areaId));
-    if (col.id === 'flagged')     return inst.isFlagged ? '<span class="checkbox checked">✓</span>' : '<span class="checkbox"></span>';
     if (col.id === 'lastModified')
       return inst.lastModification
         ? esc(new Date(inst.lastModification).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }))

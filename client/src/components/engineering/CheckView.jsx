@@ -108,7 +108,9 @@ export default function CheckView() {
       templates: (p.templates || []).map(t =>
         t.id !== tid ? t : {
           ...t,
-          instances: (t.instances || []).map(i => i.id !== iid ? i : { ...i, isFlagged: value }),
+          instances: (t.instances || []).map(i =>
+            i.id !== iid ? i : { ...i, isFlagged: value, lastModification: new Date().toISOString() }
+          ),
         }
       ),
     }));
@@ -119,6 +121,14 @@ export default function CheckView() {
     updateProject(p => ({
       ...p,
       checkData: { ...(p.checkData || {}), [key]: { ...(p.checkData?.[key] || {}), [field]: value } },
+      templates: (p.templates || []).map(t =>
+        t.id !== tid ? t : {
+          ...t,
+          instances: (t.instances || []).map(i =>
+            i.id !== iid ? i : { ...i, lastModification: new Date().toISOString() }
+          ),
+        }
+      ),
     }));
   }
 
