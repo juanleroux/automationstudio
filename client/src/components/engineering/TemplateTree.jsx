@@ -1097,6 +1097,25 @@ export default function TemplateTree({ selected, onSelect }) {
         });
       }
 
+      // If the only changes are descriptions (no value/type/param diffs), apply them
+      // immediately without opening the dialog — there is nothing for the user to confirm.
+      if (diffs.length === 0 && autoDescDiffs.length > 0) {
+        setTemplateSyncDialog(null);
+        updateProject(p => ({
+          ...p,
+          templates: p.templates.map(t => {
+            if (t.id !== template.id) return t;
+            const attrs = (t.attributes || []).map(a => {
+              const d = autoDescDiffs.find(x => x.attrId === a.id);
+              return d ? { ...a, description: d.ignDescription } : a;
+            });
+            return { ...t, lastModification: new Date().toISOString(), attributes: attrs };
+          }),
+        }));
+        toast.success(`Updated ${autoDescDiffs.length} description(s) from Ignition`);
+        return;
+      }
+
       setTemplateSyncDialog({ searching: false, diffs, autoDescDiffs, notFound: [], template });
     } catch (err) {
       setTemplateSyncDialog(null);
