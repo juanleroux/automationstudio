@@ -148,6 +148,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
           description: (ia?.description != null) ? ia.description : ta.description,
           _instanceAttr: ia,
           _defaultValue: ta.value,
+          _defaultDescription: ta.description,
         };
       });
 
@@ -186,7 +187,10 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
     return list.filter(attr => {
       const val = String(attr.value ?? '');
       const def = String(attr._defaultValue ?? '');
-      return val !== '' && val !== def;
+      if (val !== '' && val !== def) return true;
+      const desc = String(attr.description ?? '');
+      const defDesc = String(attr._defaultDescription ?? '');
+      return desc !== '' && desc !== defDesc;
     });
   }
 
