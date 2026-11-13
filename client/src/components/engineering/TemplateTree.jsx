@@ -1012,6 +1012,7 @@ export default function TemplateTree({ selected, onSelect }) {
       }
 
       // 1. Compare existing local attributes against Ignition (value + description diffs)
+      const autoDescDiffs = []; // description-only changes — auto-applied without dialog confirmation
       for (const ta of localAttrs) {
         const isDataset = ta.dataType === 11;
         const ignParam  = ignUdt.parameters?.[ta.name];
@@ -1027,16 +1028,31 @@ export default function TemplateTree({ selected, onSelect }) {
         const localVal   = normalize(ta.value);
         const ignVal     = normalize(ignItem.value);
         const localDesc  = ta.description || '';
-        const ignDesc    = extractDoc(ignItem.documentation);
+        // For description: prefer the tag's documentation — Ignition stores documentation
+        // on AtomicTags, not on the parameters dict entry. Falling back to the parameter
+        // object handles the rare case where only a parameter (no matching tag) exists.
+        const ignDescSrc = ignTag ?? ignParam;
+        const ignDesc    = extractDoc(ignDescSrc?.documentation);
         // Don't sync dataType for Dataset (11) — stored as String in Ignition
         const ignDt      = isDataset ? ta.dataType : internalDataType(ignItem.dataType);
         const ignIsParam = ignParam !== undefined;
         const isParam = ta.parameter || ignIsParam;
-        const hasNonValueDiff = localDesc !== ignDesc || (!isDataset && ta.dataType !== ignDt) || ta.parameter !== ignIsParam;
+        const hasDescDiff  = localDesc !== ignDesc;
+        const hasValueDiff = !isParam && localVal !== ignVal;
+        const hasTypeDiff  = !isDataset && ta.dataType !== ignDt;
+        const hasParamDiff = ta.parameter !== ignIsParam;
         // For parameter attrs, skip value-only diffs — parameter values are
         // instance-specific and the UDT definition default is not meaningful.
-        if (isParam && !hasNonValueDiff) continue;
-        if (!isParam && localVal === ignVal && !hasNonValueDiff) continue;
+        if (isParam && !hasDescDiff && !hasTypeDiff && !hasParamDiff) continue;
+        if (!isParam && !hasValueDiff && !hasDescDiff && !hasTypeDiff && !hasParamDiff) continue;
+
+        // Description-only changes are stored separately and auto-applied without requiring
+        // user confirmation — they are documentation metadata and should always sync.
+        if (hasDescDiff && !hasValueDiff && !hasTypeDiff && !hasParamDiff) {
+          autoDescDiffs.push({ attrId: ta.id, ignDescription: ignDesc });
+          continue;
+        }
+
         diffs.push({
             key: `tmpl:${template.id}:${ta.id}`,
             templateId: template.id, attrId: ta.id,
@@ -1081,7 +1097,7 @@ export default function TemplateTree({ selected, onSelect }) {
         });
       }
 
-      setTemplateSyncDialog({ searching: false, diffs, notFound: [], template });
+      setTemplateSyncDialog({ searching: false, diffs, autoDescDiffs, notFound: [], template });
     } catch (err) {
       setTemplateSyncDialog(null);
       toast.error('Failed to fetch UDT definition from Ignition: ' + (err.response?.data?.error || err.message));
@@ -1090,9 +1106,9 @@ export default function TemplateTree({ selected, onSelect }) {
 
   const applyTemplateSyncDialog = () => {
     if (!templateSyncDialog) return;
-    const { diffs, template } = templateSyncDialog;
+    const { diffs, autoDescDiffs = [], template } = templateSyncDialog;
     const checked = diffs.filter(d => d.checked);
-    if (!checked.length) { setTemplateSyncDialog(null); return; }
+    if (!checked.length && !autoDescDiffs.length) { setTemplateSyncDialog(null); return; }
     setTemplateSyncDialog(null);
 
     const valueDiffs = checked.filter(d => !d.diffType);
@@ -1102,18 +1118,25 @@ export default function TemplateTree({ selected, onSelect }) {
       ...p,
       templates: p.templates.map(t => {
         if (t.id !== template.id) return t;
-        // Apply value + description updates to existing attributes
+        // Apply value + description updates to existing attributes.
+        // autoDescDiffs are always applied (description metadata always syncs).
+        // Value/type/param changes only applied when the user checked the diff row.
         let attrs = (t.attributes || []).map(a => {
-          const diff = valueDiffs.find(d => d.attrId === a.id);
-          if (!diff) return a;
+          const valueDiff = valueDiffs.find(d => d.attrId === a.id);
+          const descDiff  = autoDescDiffs.find(d => d.attrId === a.id);
+          if (!valueDiff && !descDiff) return a;
           const updated = { ...a };
-          if (diff.ignDescription != null) updated.description = diff.ignDescription;
-          if (diff.ignDataTypeNum != null) updated.dataType = diff.ignDataTypeNum;
-          if (diff.ignIsParam != null) updated.parameter = diff.ignIsParam;
-          // Don't overwrite default value for parameter attrs — their values are
-          // instance-specific; only sync tag (non-parameter) default values.
-          const isParam = a.parameter || diff.ignIsParam;
-          if (!isParam) updated.value = diff.ignitionValue;
+          // Auto-apply description from Ignition tag documentation
+          if (descDiff) updated.description = descDiff.ignDescription;
+          if (valueDiff) {
+            if (valueDiff.ignDescription != null) updated.description = valueDiff.ignDescription;
+            if (valueDiff.ignDataTypeNum != null) updated.dataType = valueDiff.ignDataTypeNum;
+            if (valueDiff.ignIsParam != null) updated.parameter = valueDiff.ignIsParam;
+            // Don't overwrite default value for parameter attrs — their values are
+            // instance-specific; only sync tag (non-parameter) default values.
+            const isParam = a.parameter || valueDiff.ignIsParam;
+            if (!isParam) updated.value = valueDiff.ignitionValue;
+          }
           return updated;
         });
         // Add new attributes from Ignition, creating folder items as needed
@@ -1153,7 +1176,12 @@ export default function TemplateTree({ selected, onSelect }) {
         return { ...t, lastModification: new Date().toISOString(), attributes: attrs };
       }),
     }));
-    toast.success(`Applied ${valueDiffs.length} value update(s) and added ${newAttrDiffs.length} new attribute(s) from Ignition`);
+    const descCount = autoDescDiffs.length;
+    const parts = [];
+    if (valueDiffs.length) parts.push(`${valueDiffs.length} value update(s)`);
+    if (descCount) parts.push(`${descCount} description(s)`);
+    if (newAttrDiffs.length) parts.push(`${newAttrDiffs.length} new attribute(s)`);
+    toast.success(`Applied ${parts.join(', ')} from Ignition`);
   };
 
   const exportInstancesToJSON = (instanceList) => {
