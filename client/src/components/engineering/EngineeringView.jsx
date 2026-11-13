@@ -871,7 +871,7 @@ export default function EngineeringView() {
         {[
           { id: 'derivation', label: 'Derivation' },
           { id: 'model',      label: 'Model' },
-          { id: 'check',      label: 'Check' },
+          { id: 'check',      label: 'Documentation' },
         ].map(tab => (
           <button
             key={tab.id}

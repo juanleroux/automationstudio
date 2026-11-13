@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Wifi, WifiOff, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw, Layers, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Wifi, WifiOff, Zap, SlidersHorizontal, RotateCcw, Cpu, FolderOpen, Play, Square, RefreshCw, FileCode, RotateCw, Layers, Sparkles, GripVertical, Trash2, Plus, ClipboardList } from 'lucide-react';
 import ColorPicker from '../shared/ColorPicker';
+import { DEFAULT_DOC_COLUMNS } from '../engineering/CheckView';
 import { useProject } from '../../context/ProjectContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../shared/Toast';
@@ -90,6 +91,20 @@ export default function SettingsView() {
   const [tiaProjectOpen, setTiaProjectOpen] = useState(false);
   const [openingProject, setOpeningProject] = useState(false);
   const [saving, setSaving] = useState(false);
+  const dragIdx     = useRef(null);
+  const dragOverIdx = useRef(null);
+  const [addColLabel, setAddColLabel] = useState('');
+  const [addColType,  setAddColType]  = useState('text');
+
+  const docCols = useMemo(() => {
+    if (project?.documentationColumns?.length) return project.documentationColumns;
+    return DEFAULT_DOC_COLUMNS.map(c => ({ ...c, enabled: true }));
+  }, [project]);
+
+  const saveDocCols = (cols) => {
+    if (!project) return;
+    updateProject(p => ({ ...p, documentationColumns: cols }));
+  };
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
   const [resetting, setResetting] = useState(false);
@@ -317,6 +332,7 @@ export default function SettingsView() {
     { id: 'studio5000',    label: 'Rockwell Automation',  desc: 'Project Settings',        icon: FileCode },
     { id: 'controlExpert', label: 'Schneider Electric',   desc: 'Project Settings',        icon: Layers },
     { id: 'ai',            label: 'AI Assistant',         desc: 'Provider & Model',        icon: Sparkles },
+    { id: 'documentation', label: 'Documentation',        desc: 'Column Settings',         icon: ClipboardList },
   ];
 
   return (
@@ -1742,6 +1758,126 @@ export default function SettingsView() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Documentation tab */}
+          {activeTab === 'documentation' && (
+            <div className="flex flex-col gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Documentation Settings</label>
+                <p className="text-xs text-text-muted mt-1">Configure the columns shown in the Documentation view. Drag rows to reorder. Changes apply immediately.</p>
+              </div>
+
+              {!project ? (
+                <div className="p-3 rounded-md text-sm" style={{ background: 'rgba(255,193,7,0.08)', border: '1px solid rgba(255,193,7,0.2)', color: 'var(--text-muted)' }}>
+                  Open a project to configure documentation columns
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Columns</div>
+                    <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                      {/* Always-visible Instance column */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)', opacity: 0.55 }}>
+                        <GripVertical size={14} style={{ color: 'transparent', flexShrink: 0 }} />
+                        <input type="checkbox" checked disabled style={{ cursor: 'not-allowed' }} />
+                        <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>Instance</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: 3 }}>text</span>
+                        <span style={{ width: 28 }} />
+                      </div>
+
+                      {docCols.map((col, idx) => (
+                        <div
+                          key={col.id}
+                          draggable
+                          onDragStart={() => { dragIdx.current = idx; }}
+                          onDragOver={e => { e.preventDefault(); dragOverIdx.current = idx; }}
+                          onDrop={() => {
+                            if (dragIdx.current === null || dragIdx.current === dragOverIdx.current) return;
+                            const updated = [...docCols];
+                            const [item] = updated.splice(dragIdx.current, 1);
+                            updated.splice(dragOverIdx.current, 0, item);
+                            saveDocCols(updated);
+                            dragIdx.current = null;
+                            dragOverIdx.current = null;
+                          }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                            borderBottom: idx < docCols.length - 1 ? '1px solid var(--border)' : 'none',
+                            background: 'var(--bg-main)', cursor: 'grab',
+                          }}
+                        >
+                          <GripVertical size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                          <input
+                            type="checkbox"
+                            checked={col.enabled !== false}
+                            onChange={e => saveDocCols(docCols.map((c, i) => i === idx ? { ...c, enabled: e.target.checked } : c))}
+                          />
+                          {col.builtin ? (
+                            <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>{col.label}</span>
+                          ) : (
+                            <input
+                              type="text"
+                              value={col.label}
+                              onChange={e => saveDocCols(docCols.map((c, i) => i === idx ? { ...c, label: e.target.value } : c))}
+                              style={{ flex: 1, fontSize: 13, background: 'transparent', border: '1px solid var(--border)', borderRadius: 3, padding: '2px 6px', color: 'var(--text-primary)' }}
+                            />
+                          )}
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: 3, flexShrink: 0 }}>
+                            {col.colType}
+                          </span>
+                          {col.builtin ? (
+                            <span style={{ width: 28 }} />
+                          ) : (
+                            <button
+                              className="btn btn-ghost"
+                              style={{ padding: '2px 6px', flexShrink: 0, lineHeight: 1 }}
+                              onClick={() => saveDocCols(docCols.filter((_, i) => i !== idx))}
+                            >
+                              <Trash2 size={13} style={{ color: 'var(--text-muted)' }} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Add Column</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={addColLabel}
+                        onChange={e => setAddColLabel(e.target.value)}
+                        placeholder="Column name"
+                        style={{ flex: 1 }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && addColLabel.trim()) {
+                            saveDocCols([...docCols, { id: 'c_' + Date.now(), label: addColLabel.trim(), colType: addColType, builtin: false, enabled: true }]);
+                            setAddColLabel('');
+                          }
+                        }}
+                      />
+                      <select value={addColType} onChange={e => setAddColType(e.target.value)} style={{ width: 120 }}>
+                        <option value="text">Text</option>
+                        <option value="checkbox">Checkbox</option>
+                      </select>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                        disabled={!addColLabel.trim()}
+                        onClick={() => {
+                          saveDocCols([...docCols, { id: 'c_' + Date.now(), label: addColLabel.trim(), colType: addColType, builtin: false, enabled: true }]);
+                          setAddColLabel('');
+                        }}
+                      >
+                        <Plus size={13} /> Add
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
