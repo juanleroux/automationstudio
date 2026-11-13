@@ -66,12 +66,18 @@ function buildUdtType(template) {
     if (attr.folder) return;
     const dt = ignitionDataType(attr.dataType);
     if (attr.parameter) {
-      udtType.parameters[attr.name] = { dataType: dt, value: attr.value ?? '' };
+      const p = { dataType: dt, value: attr.value ?? '' };
+      if (attr.description) p.documentation = attr.description;
+      udtType.parameters[attr.name] = p;
     } else if (attr.folderId != null) {
       const folderTag = getOrCreateFolderTag(attr.folderId) || udtType;
-      folderTag.tags.push({ name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' });
+      const tag = { name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' };
+      if (attr.description) tag.documentation = attr.description;
+      folderTag.tags.push(tag);
     } else {
-      udtType.tags.push({ name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' });
+      const tag = { name: attr.name, tagType: 'AtomicTag', dataType: dt, value: attr.value ?? '' };
+      if (attr.description) tag.documentation = attr.description;
+      udtType.tags.push(tag);
     }
   });
   return udtType;
