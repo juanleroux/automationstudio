@@ -7,9 +7,9 @@ function csvCell(value, delimiter) {
 }
 
 function lookupAttribute(name, inst, template, prop = 'value') {
-  // Strip optional "Parameters." folder prefix (e.g. "Parameters.PI01" → "PI01")
-  // Also strip any single folder prefix separated by "." (e.g. "Setpoints.SP01" → "SP01")
-  const normalizedName = name.replace(/^parameters\./i, '').replace(/^[^.]+\./, '');
+  // Use only the last dot-separated segment as the attribute name so folder
+  // prefixes like "Setpoints.SP01" or "Parameters.PI01" resolve to "SP01"/"PI01".
+  const normalizedName = name.split('.').pop();
   const ta = (template.attributes || []).find(a => a.name.toLowerCase() === normalizedName.toLowerCase());
   if (!ta) return '';
   const ia = (inst.attributes || []).find(a => a.id === ta.id);
@@ -147,20 +147,21 @@ function formatDataset(value) {
 
 function buildStructuralText(profile, template) {
   const tmpl = profile.structuralExportTemplate || '';
-  // Matches (in order of priority):
-  //   {Token}.Parameters.AttrName[.Value]  → attribute value lookup (.Parameter. or .Parameters.)
-  //   {Token}.AttrName.Value               → attribute value lookup (shorthand, .Value suffix required)
-  //   {Token|Fallback}                     → first non-empty resolveKeyword
-  // AttrName uses [^.\s}]+ to support hyphens and other non-dot chars (e.g. PI-01, FT-100).
-  // Pattern 2 has (?!Parameters?\.) so it cannot steal matches intended for Pattern 1.
-  const RE = /\{([^}]+)\}\.Parameters?\.([^.\s}]+)(?:\.Value)?|\{([^}]+)\}\.(?!Parameters?\.)([^.\s}]+)\.Value|\{([^}]+)\}/g;
+  // Patterns (checked left-to-right):
+  //  1. {Token}.Parameters.AttrName[.Value]  → parameter value
+  //  2. {Token}.AttrPath.(Value|Description) → attr value or description; AttrPath may contain dots (folder-qualified)
+  //  3. {Token}                              → resolveKeyword on Token
+  const RE = /\{([^}]+)\}\.Parameters?\.([^.\s}]+)(?:\.Value)?|\{([^}]+)\}\.(?!Parameters?\.)(.+?)\.(Value|Description)|\{([^}]+)\}/g;
   return (template.instances || []).map(inst =>
-    tmpl.replace(RE, (_, paramToken, paramAttr, shortToken, shortAttr, simpleToken) => {
+    tmpl.replace(RE, (_, paramToken, paramAttr, shortToken, shortAttr, shortProp, simpleToken) => {
       if (paramAttr) {
         return formatDataset(lookupAttribute(paramAttr, inst, template));
       }
       if (shortAttr) {
-        return formatDataset(lookupAttribute(shortAttr, inst, template));
+        const prop = (shortProp || 'value').toLowerCase();
+        return prop === 'description'
+          ? lookupAttribute(shortAttr, inst, template, 'description')
+          : formatDataset(lookupAttribute(shortAttr, inst, template, 'value'));
       }
       const parts = simpleToken.split('|');
       for (const part of parts) {
