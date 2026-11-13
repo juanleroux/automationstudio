@@ -67,7 +67,11 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   };
 
   const updateAttr = useCallback((id, field, value) => {
-    onChange(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+    onChange(prev => {
+      const idx = prev.findIndex(a => a.id === id);
+      if (idx >= 0) return prev.map(a => a.id === id ? { ...a, [field]: value } : a);
+      return [...prev, { id, [field]: value }];
+    });
   }, [onChange]);
 
   const addAttr = useCallback((folderId = null) => {
@@ -141,6 +145,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
         return {
           ...ta,
           value: ia ? ia.value : ta.value,
+          description: (ia?.description != null) ? ia.description : ta.description,
           _instanceAttr: ia,
           _defaultValue: ta.value,
         };
@@ -217,7 +222,6 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
           <EditCell
             value={attr.description}
             onChange={v => updateAttr(attr.id, 'description', v)}
-            disabled={!isTemplate}
           />
         </td>
         <td>
