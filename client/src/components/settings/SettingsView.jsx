@@ -97,8 +97,10 @@ export default function SettingsView() {
   const [addColType,  setAddColType]  = useState('text');
 
   const docCols = useMemo(() => {
-    if (project?.documentationColumns?.length) return project.documentationColumns;
-    return DEFAULT_DOC_COLUMNS.map(c => ({ ...c, enabled: true }));
+    const cols = (project?.documentationColumns?.length)
+      ? project.documentationColumns
+      : DEFAULT_DOC_COLUMNS.map(c => ({ ...c, enabled: true }));
+    return cols.filter(c => c.id !== 'flagged');
   }, [project]);
 
   const saveDocCols = (cols) => {

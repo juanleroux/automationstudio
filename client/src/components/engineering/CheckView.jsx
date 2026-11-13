@@ -1,22 +1,23 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, Flag } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 
 export const DEFAULT_DOC_COLUMNS = [
-  { id: 'description',  label: 'Description',  colType: 'text',     builtin: true, defaultW: 180 },
-  { id: 'area',         label: 'Area',          colType: 'text',     builtin: true, defaultW: 150 },
-  { id: 'flagged',      label: 'Flag',          colType: 'checkbox', builtin: true, defaultW: 56  },
-  { id: 'lastModified', label: 'Last Modified', colType: 'text',     builtin: true, defaultW: 112 },
-  { id: 'io',           label: 'I/O',           colType: 'checkbox', builtin: true, defaultW: 46  },
-  { id: 'plc',          label: 'PLC',           colType: 'checkbox', builtin: true, defaultW: 46  },
-  { id: 'scada',        label: 'SCADA',         colType: 'checkbox', builtin: true, defaultW: 56  },
-  { id: 'mes',          label: 'MES',           colType: 'checkbox', builtin: true, defaultW: 46  },
-  { id: 'notes',        label: 'Notes',         colType: 'text',     builtin: true, defaultW: 180 },
+  { id: 'description',  label: 'Description',  colType: 'text',     builtin: true, defaultW: 200 },
+  { id: 'area',         label: 'Area',          colType: 'text',     builtin: true, defaultW: 160 },
+  { id: 'lastModified', label: 'Last Modified', colType: 'text',     builtin: true, defaultW: 120 },
+  { id: 'io',           label: 'I/O',           colType: 'checkbox', builtin: true, defaultW: 50  },
+  { id: 'plc',          label: 'PLC',           colType: 'checkbox', builtin: true, defaultW: 50  },
+  { id: 'scada',        label: 'SCADA',         colType: 'checkbox', builtin: true, defaultW: 60  },
+  { id: 'mes',          label: 'MES',           colType: 'checkbox', builtin: true, defaultW: 50  },
+  { id: 'notes',        label: 'Notes',         colType: 'text',     builtin: true, defaultW: 200 },
 ];
 
 function getDocColumns(project) {
-  if (project?.documentationColumns?.length) return project.documentationColumns;
-  return DEFAULT_DOC_COLUMNS.map(c => ({ ...c, enabled: true }));
+  const cols = (project?.documentationColumns?.length)
+    ? project.documentationColumns
+    : DEFAULT_DOC_COLUMNS.map(c => ({ ...c, enabled: true }));
+  return cols.filter(c => c.id !== 'flagged'); // flag is now inline in Instance cell
 }
 
 function getAreaLabel(areaId, areas) {
@@ -74,7 +75,7 @@ export default function CheckView() {
   const [colFilters, setColFilters] = useState({});
   const [expanded, setExpanded] = useState(new Set());
   const [colWidths, setColWidths] = useState(() => {
-    const w = { instance: 140 };
+    const w = { instance: 160 };
     DEFAULT_DOC_COLUMNS.forEach(c => { w[c.id] = c.defaultW; });
     return w;
   });
@@ -150,9 +151,6 @@ export default function CheckView() {
               : '';
             if (!d.includes(fv.toLowerCase())) return false;
           }
-        } else if (col.id === 'flagged') {
-          if (fv === 'yes' && !instance.isFlagged) return false;
-          if (fv === 'no'  &&  instance.isFlagged) return false;
         } else {
           const c = checkData[`${template.id}:${instance.id}`] || {};
           if (col.colType === 'checkbox') {
@@ -182,7 +180,7 @@ export default function CheckView() {
   const checkedCount   = filteredRows.filter(({ template, instance }) => {
     const c = checkData[`${template.id}:${instance.id}`];
     if (!c) return false;
-    return enabledCols.some(col => col.colType === 'checkbox' && col.id !== 'flagged' && c[col.id]);
+    return enabledCols.some(col => col.colType === 'checkbox' && c[col.id]);
   }).length;
 
   const startResize = (e, colId) => {
@@ -195,8 +193,9 @@ export default function CheckView() {
     window.addEventListener('mouseup', onUp);
   };
 
-  const isCenter = col => col.colType === 'checkbox' || col.id === 'flagged';
+  const isCenter = col => col.colType === 'checkbox';
   const allCols  = [{ id: 'instance', label: 'Instance', colType: 'text', builtin: true }, ...enabledCols];
+  const totalW   = allCols.reduce((s, c) => s + (colWidths[c.id] || 120), 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -219,7 +218,9 @@ export default function CheckView() {
       <div style={{ flex: 1, overflow: 'auto' }}>
         <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
           <colgroup>
-            {allCols.map(c => <col key={c.id} style={{ width: colWidths[c.id] || 120 }} />)}
+            {allCols.map(c => (
+              <col key={c.id} style={{ width: `${((colWidths[c.id] || 120) / totalW * 100).toFixed(2)}%` }} />
+            ))}
           </colgroup>
           <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -239,9 +240,7 @@ export default function CheckView() {
                   {isCenter(col) ? (
                     <select value={getFilter(col)} onChange={e => setCF(col.id, e.target.value)} style={fselStyle}>
                       <option value="all">All</option>
-                      {col.id === 'flagged'
-                        ? <><option value="yes">Set</option><option value="no">Not set</option></>
-                        : <><option value="yes">Checked</option><option value="no">Unchecked</option></>}
+                      <option value="yes">Checked</option><option value="no">Unchecked</option>
                     </select>
                   ) : (
                     <input type="text" value={getFilter(col)} onChange={e => setCF(col.id, e.target.value)} placeholder="Filter…" style={finStyle} />
@@ -275,22 +274,31 @@ export default function CheckView() {
                     const c = getCheck(template.id, inst.id);
                     return (
                       <tr key={inst.id} style={{ borderBottom: '1px solid var(--border)', color: inst.isFlagged ? '#e55353' : 'inherit' }}>
-                        <td style={tdBase}>{inst.name}</td>
+                        <td style={tdBase}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, width: '100%', overflow: 'hidden' }}>
+                            <Flag
+                              size={12}
+                              fill={inst.isFlagged ? '#e55353' : 'none'}
+                              style={{
+                                cursor: 'pointer', flexShrink: 0,
+                                color: inst.isFlagged ? '#e55353' : 'var(--text-muted)',
+                                opacity: inst.isFlagged ? 1 : 0.35,
+                                transition: 'color 0.15s, opacity 0.15s',
+                              }}
+                              onClick={e => { e.stopPropagation(); toggleFlag(template.id, inst.id, !inst.isFlagged); }}
+                            />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</span>
+                          </span>
+                        </td>
                         {enabledCols.map(col => {
                           const center = isCenter(col);
                           const cs = { ...tdBase, textAlign: center ? 'center' : 'left' };
                           if (col.id === 'description')
-                            return <td key={col.id} style={{ ...cs, color: 'var(--text-muted)' }}>{inst.description || '—'}</td>;
+                            return <td key={col.id} style={{ ...cs, color: inst.isFlagged ? '#e55353' : 'var(--text-muted)' }}>{inst.description || '—'}</td>;
                           if (col.id === 'area')
-                            return <td key={col.id} style={{ ...cs, color: 'var(--text-muted)' }}>{getAreaLabel(inst.areaId, areas) || '—'}</td>;
-                          if (col.id === 'flagged')
-                            return <td key={col.id} style={cs}>
-                              <input type="checkbox" checked={!!inst.isFlagged}
-                                onChange={e => toggleFlag(template.id, inst.id, e.target.checked)}
-                                style={{ cursor: 'pointer' }} />
-                            </td>;
+                            return <td key={col.id} style={{ ...cs, color: inst.isFlagged ? '#e55353' : 'var(--text-muted)' }}>{getAreaLabel(inst.areaId, areas) || '—'}</td>;
                           if (col.id === 'lastModified')
-                            return <td key={col.id} style={{ ...cs, color: 'var(--text-muted)' }}>
+                            return <td key={col.id} style={{ ...cs, color: inst.isFlagged ? '#e55353' : 'var(--text-muted)' }}>
                               {inst.lastModification ? new Date(inst.lastModification).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                             </td>;
                           if (col.colType === 'checkbox')
