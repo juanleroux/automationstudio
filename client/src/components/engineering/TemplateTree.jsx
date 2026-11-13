@@ -1051,7 +1051,6 @@ export default function TemplateTree({ selected, onSelect }) {
               : undefined,
             checked: true,
           });
-        }
       }
 
       // 2. Find attributes in Ignition NOT present locally → offer to add them
