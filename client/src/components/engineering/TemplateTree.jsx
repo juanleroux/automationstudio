@@ -799,6 +799,19 @@ export default function TemplateTree({ selected, onSelect }) {
       }
 
       // Step 3: compute per-attribute diffs
+      // Recursively find a tag by name inside possibly-nested folder tags
+      function findIgnTagInst(tagList, name) {
+        for (const t of (tagList || [])) {
+          if (t.tagType === 'Folder') {
+            const found = findIgnTagInst(t.tags || [], name);
+            if (found) return found;
+          } else if (t.name === name) {
+            return t;
+          }
+        }
+        return null;
+      }
+
       const diffs = [];
       const notFound = [];
       for (const { template, instance } of instanceList) {
@@ -811,7 +824,27 @@ export default function TemplateTree({ selected, onSelect }) {
         for (const ta of (template.attributes || [])) {
           if (ta.folder) continue; // skip folder items
           const isDataset = ta.dataType === 11;
-          if (!ta.parameter && !isDataset) continue;
+          if (!ta.parameter && !isDataset) {
+            // Non-parameter tags: sync instance-level documentation overrides only.
+            // ignInst.tags contains tags where the instance has an explicit override
+            // (e.g. documentation set in Ignition's Tag Editor for this instance).
+            const ignTag = findIgnTagInst(ignInst.tags || [], ta.name);
+            if (!ignTag?.documentation) continue; // no instance-level doc override
+            const ignDesc = extractDoc(ignTag.documentation);
+            const ia = (instance.attributes || []).find(a => a.id === ta.id);
+            const localDesc = ia?.description != null ? ia.description : (ta.description || '');
+            if (ignDesc !== localDesc) {
+              diffs.push({
+                key: `${template.id}:${instance.id}:${ta.id}:desc`,
+                templateId: template.id, instanceId: instance.id, attrId: ta.id,
+                diffType: 'description',
+                instanceName: instance.name, attributeName: ta.name,
+                localValue: localDesc || '(none)', ignitionValue: ignDesc,
+                checked: true,
+              });
+            }
+            continue;
+          }
           const instAttr = (instance.attributes || []).find(a => a.id === ta.id);
           // Dataset values stored without parameter flag live in ignInst.tags, not .parameters
           const ignParam = ignInst.parameters?.[ta.name]
@@ -872,6 +905,7 @@ export default function TemplateTree({ selected, onSelect }) {
     setSyncDialog(null);
 
     const attrChecked = checked.filter(d => !d.diffType);
+    const descChecked = checked.filter(d => d.diffType === 'description');
     const areaChecked = checked.filter(d => d.diffType === 'area');
 
     if (direction === 'from') {
@@ -892,16 +926,27 @@ export default function TemplateTree({ selected, onSelect }) {
           areas: updatedAreas,
           templates: p.templates.map(t => {
             const tAttr = attrChecked.filter(d => d.templateId === t.id);
+            const tDesc = descChecked.filter(d => d.templateId === t.id);
             const tArea = areaChecked.filter(d => d.templateId === t.id);
-            if (!tAttr.length && !tArea.length) return t;
+            if (!tAttr.length && !tDesc.length && !tArea.length) return t;
             return {
               ...t,
               instances: (t.instances || []).map(i => {
                 const iAttr = tAttr.filter(d => d.instanceId === i.id);
+                const iDesc = tDesc.filter(d => d.instanceId === i.id);
                 const iArea = tArea.find(d => d.instanceId === i.id);
-                if (!iAttr.length && !iArea) return i;
+                if (!iAttr.length && !iDesc.length && !iArea) return i;
                 const attrMap = new Map((i.attributes || []).map(a => [a.id, { ...a }]));
-                for (const d of iAttr) attrMap.set(d.attrId, { id: d.attrId, value: d.ignitionValue });
+                // Apply value diffs — preserve any existing description override
+                for (const d of iAttr) {
+                  const existing = attrMap.get(d.attrId) || {};
+                  attrMap.set(d.attrId, { ...existing, id: d.attrId, value: d.ignitionValue });
+                }
+                // Apply description diffs from Ignition instance tag documentation
+                for (const d of iDesc) {
+                  const existing = attrMap.get(d.attrId) || {};
+                  attrMap.set(d.attrId, { ...existing, id: d.attrId, description: d.ignitionValue });
+                }
                 const resolvedAreaId = iArea ? areaResolutions.get(`${iArea.templateId}:${iArea.instanceId}`) : undefined;
                 const areaUpdate = resolvedAreaId !== undefined ? { areaId: resolvedAreaId } : {};
                 return { ...i, ...areaUpdate, attributes: [...attrMap.values()], lastModification: new Date().toISOString() };
