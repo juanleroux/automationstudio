@@ -56,6 +56,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   const isTemplate = mode === 'template';
   const [datasetEditId, setDatasetEditId] = useState(null);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
+  const [paramsExpanded, setParamsExpanded] = useState(true);
 
   const toggleFolder = (id) => {
     setExpandedFolders(prev => {
@@ -82,6 +83,18 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
     };
     onChange(prev => [...prev, newAttr]);
   }, [attributes, isTemplate, onChange]);
+
+  const addParam = useCallback(() => {
+    if (!isTemplate) return;
+    onChange(prev => [...prev, {
+      id: nextId(prev),
+      name: 'Parameter',
+      description: '',
+      dataType: 9,
+      value: '',
+      parameter: true,
+    }]);
+  }, [isTemplate, onChange]);
 
   const addFolder = useCallback(() => {
     if (!isTemplate) return;
@@ -137,6 +150,9 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
   const childAttrs   = source.filter(a => !a.folder && a.folderId != null);
   const ungrouped    = source.filter(a => !a.folder && a.folderId == null);
 
+  // All parameter attrs shown in the virtual Parameters folder (regardless of folderId)
+  const paramAttrs   = source.filter(a => !a.folder && a.parameter);
+
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
 
@@ -182,6 +198,10 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
 
   const datasetEditAttr = datasetEditId !== null ? source.find(a => a.id === datasetEditId) : null;
 
+  // Columns: Name, Description, Type, Value, [Delete for template]
+  // Template = 5 cols, Instance = 4 cols
+  const totalCols = isTemplate ? 5 : 4;
+
   // ── Attribute row renderer ───────────────────────────────────────────────
   function renderAttrRow(attr, indentPx = 0) {
     return (
@@ -204,10 +224,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
           {isTemplate ? (
             <DataTypeSelect
               value={attr.dataType}
-              onChange={v => {
-                updateAttr(attr.id, 'dataType', v);
-                if (v === 11 && !attr.parameter) updateAttr(attr.id, 'parameter', true);
-              }}
+              onChange={v => updateAttr(attr.id, 'dataType', v)}
               style={{ padding: '2px 6px', fontSize: 12 }}
             />
           ) : (
@@ -246,14 +263,6 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
             />
           )}
         </td>
-        <td style={{ textAlign: 'center' }}>
-          <input
-            type="checkbox"
-            checked={!!attr.parameter}
-            onChange={e => updateAttr(attr.id, 'parameter', e.target.checked)}
-            disabled={!isTemplate}
-          />
-        </td>
         {isTemplate && (
           <td style={{ textAlign: 'center' }}>
             <button
@@ -286,7 +295,6 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                 <span className="flex items-center gap-1">Type <SortIcon col="dataType" /></span>
               </th>
               <th>Value</th>
-              <th>Param</th>
               {isTemplate && <th></th>}
             </tr>
           </thead>
@@ -298,31 +306,68 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                 <td><span style={{ color: 'var(--text-disabled)', fontSize: 12 }}>assigned area</span></td>
                 <td><span style={{ color: 'var(--text-disabled)', fontSize: 12 }}>—</span></td>
                 <td><span style={{ color: 'var(--text-muted)' }}>{areaRow.value || <span style={{ color: 'var(--text-disabled)' }}>—</span>}</span></td>
-                <td />
                 {isTemplate && <td />}
               </tr>
+            )}
+
+            {/* ── Parameters folder (virtual, blue, always top) ───── */}
+            {(isTemplate || filterDefaults(paramAttrs).length > 0) && (
+              <React.Fragment>
+                <tr style={{ background: 'rgba(59,130,246,0.08)' }}>
+                  <td colSpan={totalCols - (isTemplate ? 1 : 0)} style={{ padding: '5px 8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        onClick={() => setParamsExpanded(e => !e)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#3b82f6', display: 'flex' }}
+                      >
+                        {paramsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </button>
+                      <Folder size={13} style={{ color: '#3b82f6', flexShrink: 0 }} />
+                      <span style={{ fontWeight: 700, fontSize: 12, color: '#3b82f6' }}>Parameters</span>
+                      <span style={{ fontSize: 10, color: '#3b82f6', opacity: 0.7, marginLeft: 2 }}>
+                        ({paramAttrs.length})
+                      </span>
+                    </div>
+                  </td>
+                  {isTemplate && <td />}
+                </tr>
+                {paramsExpanded && filterDefaults(sortAttrs(paramAttrs)).map(attr => renderAttrRow(attr, 20))}
+                {paramsExpanded && isTemplate && (
+                  <tr
+                    onClick={addParam}
+                    style={{ cursor: 'pointer', background: 'rgba(59,130,246,0.04)' }}
+                    className="add-row"
+                  >
+                    <td colSpan={totalCols} style={{ padding: '5px 12px 5px', paddingLeft: 32 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#3b82f6', opacity: 0.6, fontSize: 12 }}>
+                        <Plus size={12} /> Add Parameter
+                      </span>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             )}
 
             {/* ── Folders (recursive, supports nesting) ───────────── */}
             {(() => {
               function countDeep(fid) {
-                return childAttrs.filter(a => a.folderId === fid).length
+                return childAttrs.filter(a => a.folderId === fid && !a.parameter).length
                   + folderItems.filter(f => f.parentFolderId === fid).reduce((n, sf) => n + countDeep(sf.id), 0);
               }
 
               function renderFolderGroup(folder, depth) {
                 const collapsed     = !expandedFolders.has(folder.id);
-                const directAttrs   = sortAttrs(childAttrs.filter(a => a.folderId === folder.id));
+                // Exclude parameters — they're shown in the virtual Parameters folder
+                const directAttrs   = sortAttrs(childAttrs.filter(a => a.folderId === folder.id && !a.parameter));
                 const subFolders    = sortFolders(folderItems.filter(f => f.parentFolderId === folder.id));
-                const visibleParams = filterDefaults(directAttrs.filter(a => a.parameter));
-                const visibleAttrs  = filterDefaults(directAttrs.filter(a => !a.parameter));
+                const visibleAttrs  = filterDefaults(directAttrs);
                 const headerIndent  = depth * 16;
                 const childIndent   = headerIndent + 20;
 
                 return (
                   <React.Fragment key={folder.id}>
                     <tr style={{ background: 'var(--bg-main)' }}>
-                      <td colSpan={isTemplate ? 5 : 4} style={{ padding: '5px 8px', paddingLeft: 8 + headerIndent }}>
+                      <td colSpan={totalCols - (isTemplate ? 1 : 0)} style={{ padding: '5px 8px', paddingLeft: 8 + headerIndent }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <button
                             onClick={() => toggleFolder(folder.id)}
@@ -361,7 +406,6 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                       )}
                     </tr>
                     {!collapsed && subFolders.map(sf => renderFolderGroup(sf, depth + 1))}
-                    {!collapsed && visibleParams.map(attr => renderAttrRow(attr, childIndent))}
                     {!collapsed && visibleAttrs.map(attr => renderAttrRow(attr, childIndent))}
                     {!collapsed && isTemplate && (
                       <tr
@@ -369,7 +413,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                         style={{ cursor: 'pointer', background: 'var(--bg-card)' }}
                         className="add-row"
                       >
-                        <td colSpan={6} style={{ padding: '5px 12px 5px', paddingLeft: 12 + childIndent }}>
+                        <td colSpan={totalCols} style={{ padding: '5px 12px 5px', paddingLeft: 12 + childIndent }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-disabled)', fontSize: 12 }}>
                             <Plus size={12} /> Add Attribute
                           </span>
@@ -383,14 +427,13 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
               return sortFolders(folderItems.filter(f => f.parentFolderId == null)).map(f => renderFolderGroup(f, 0));
             })()}
 
-            {/* ── Ungrouped: parameters first, then attributes ─────── */}
-            {filterDefaults(sortAttrs(ungrouped.filter(a => a.parameter))).map(attr => renderAttrRow(attr, 0))}
+            {/* ── Ungrouped: non-parameter attributes only ─────────── */}
             {filterDefaults(sortAttrs(ungrouped.filter(a => !a.parameter))).map(attr => renderAttrRow(attr, 0))}
 
             {/* Empty state */}
-            {folderItems.length === 0 && filterDefaults(ungrouped).length === 0 && !areaVisible && (
+            {folderItems.length === 0 && paramAttrs.length === 0 && filterDefaults(ungrouped.filter(a => !a.parameter)).length === 0 && !areaVisible && (
               <tr>
-                <td colSpan={isTemplate ? 6 : 5} className="text-center py-8 text-text-muted text-xs">
+                <td colSpan={totalCols} className="text-center py-8 text-text-muted text-xs">
                   {isTemplate
                     ? 'No attributes. Use the buttons below to add one.'
                     : (hideDefaults && source.length > 0
@@ -403,7 +446,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
             {/* ── Add row (template only) ──────────────────────────── */}
             {isTemplate && (
               <tr style={{ cursor: 'default' }} className="add-row">
-                <td colSpan={6} style={{ padding: '6px 12px' }}>
+                <td colSpan={totalCols} style={{ padding: '6px 12px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                     <span
                       onClick={addFolder}
