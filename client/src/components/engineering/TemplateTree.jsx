@@ -1043,6 +1043,7 @@ export default function TemplateTree({ selected, onSelect }) {
             instanceName: template.name,
             attributeName: ta.name,
             localValue: localVal, ignitionValue: ignVal,
+            localDescription: localDesc,
             ignDescription: ignDesc,
             ignDataTypeNum: isDataset ? undefined : ignDt,
             ignIsParam,

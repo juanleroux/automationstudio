@@ -109,6 +109,11 @@ export default function SyncDiffDialog({ syncDialog, onClose, onToggle, onSelect
                               type: {d.ignTypeChange}
                             </div>
                           )}
+                          {d.ignDescription != null && d.localDescription !== d.ignDescription && (
+                            <div style={{ fontFamily: 'sans-serif', fontWeight: 400, fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                              desc: {d.localDescription || '(none)'} → {d.ignDescription || '(none)'}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
