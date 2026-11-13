@@ -313,18 +313,18 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
             {/* ── Parameters folder (virtual, blue, always top) ───── */}
             {(isTemplate || filterDefaults(paramAttrs).length > 0) && (
               <React.Fragment>
-                <tr style={{ background: 'rgba(59,130,246,0.08)' }}>
+                <tr style={{ background: 'var(--bg-main)' }}>
                   <td colSpan={totalCols - (isTemplate ? 1 : 0)} style={{ padding: '5px 8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <button
                         onClick={() => setParamsExpanded(e => !e)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#3b82f6', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-muted)', display: 'flex' }}
                       >
                         {paramsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </button>
                       <Folder size={13} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                      <span style={{ fontWeight: 700, fontSize: 12, color: '#3b82f6' }}>Parameters</span>
-                      <span style={{ fontSize: 10, color: '#3b82f6', opacity: 0.7, marginLeft: 2 }}>
+                      <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>Parameters</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 2 }}>
                         ({paramAttrs.length})
                       </span>
                     </div>
@@ -375,7 +375,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                           >
                             {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                           </button>
-                          <Folder size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                          <Folder size={13} style={{ color: '#FFCA28', flexShrink: 0 }} />
                           {isTemplate ? (
                             <EditCell
                               value={folder.name}
@@ -393,7 +393,7 @@ export default function AttributeGrid({ attributes, templateAttributes, mode, on
                         </div>
                       </td>
                       {isTemplate && (
-                        <td style={{ textAlign: 'right', paddingRight: 6 }}>
+                        <td style={{ textAlign: 'center' }}>
                           <button
                             className="btn-ghost btn-icon"
                             style={{ padding: 3, color: '#e55353' }}
