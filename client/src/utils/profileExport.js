@@ -6,12 +6,16 @@ function csvCell(value, delimiter) {
   return str;
 }
 
-function lookupAttribute(name, inst, template) {
+function lookupAttribute(name, inst, template, prop = 'value') {
   // Strip optional "Parameters." folder prefix (e.g. "Parameters.PI01" → "PI01")
-  const normalizedName = name.replace(/^parameters\./i, '');
+  // Also strip any single folder prefix separated by "." (e.g. "Setpoints.SP01" → "SP01")
+  const normalizedName = name.replace(/^parameters\./i, '').replace(/^[^.]+\./, '');
   const ta = (template.attributes || []).find(a => a.name.toLowerCase() === normalizedName.toLowerCase());
   if (!ta) return '';
   const ia = (inst.attributes || []).find(a => a.id === ta.id);
+  if (prop === 'description') {
+    return (ia?.description != null) ? ia.description : (ta.description || '');
+  }
   return (ia != null && ia.value != null) ? ia.value : (ta.value || '');
 }
 
@@ -21,8 +25,8 @@ function lookupAttribute(name, inst, template) {
  * Supports:
  *   Instance.Name | Instance.Description | Template.Name   — built-in
  *   <AttrName>                                              — attribute value
- *   <AttrName>.Value                                        — attribute value (explicit)
- *   <AttrName>.Description                                  — attribute description
+ *   <Folder>.<AttrName>.Value                               — attribute value (folder-qualified)
+ *   <AttrName>.Description / <Folder>.<AttrName>.Description — instance description override, then template default
  *   <AttrName>.Name                                         — attribute name
  */
 function resolveKeyword(keyword, attr, inst, template) {
@@ -49,7 +53,10 @@ function resolveKeyword(keyword, attr, inst, template) {
         const ia = (inst.attributes || []).find(a => a.id === ta.id);
         return (ia != null && ia.value != null) ? ia.value : (ta.value || '');
       }
-      if (suffix === '.description') return ta.description || '';
+      if (suffix === '.description') {
+        const ia = (inst.attributes || []).find(a => a.id === ta.id);
+        return (ia?.description != null) ? ia.description : (ta.description || '');
+      }
       if (suffix === '.name')        return ta.name || '';
     }
   }
