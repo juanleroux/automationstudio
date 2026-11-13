@@ -105,6 +105,34 @@ export default function SettingsView() {
     if (!project) return;
     updateProject(p => ({ ...p, documentationColumns: cols }));
   };
+
+  // Auto-save project fields (engineering, siemens, projectDetails) on change
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (!project) return;
+    updateProject(prev => ({
+      ...prev,
+      name: projectDetails.name.trim() || prev.name,
+      description: projectDetails.description,
+      engineering,
+      siemens,
+    }));
+  }, [engineering, siemens, projectDetails]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save server config (proposal settings) with debounce
+  const configDirty = useRef(false);
+  const configTimer = useRef(null);
+  useEffect(() => {
+    if (!config || !configDirty.current) return;
+    clearTimeout(configTimer.current);
+    configTimer.current = setTimeout(async () => {
+      try { await saveConfig(config); }
+      catch (err) { toast.error('Failed to save settings: ' + (err.response?.data?.error || err.message)); }
+    }, 600);
+    return () => { clearTimeout(configTimer.current); };
+  }, [config]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
   const [resetting, setResetting] = useState(false);
@@ -129,6 +157,7 @@ export default function SettingsView() {
   }, []);
 
   const setCompany = (field, value) => {
+    configDirty.current = true;
     setConfig(prev => ({ ...prev, proposal: { ...prev.proposal, [field]: value } }));
   };
 
@@ -326,13 +355,13 @@ export default function SettingsView() {
   };
 
   const tabs = [
-    { id: 'general',       label: 'General',              desc: 'Project & Appearance',   icon: SlidersHorizontal },
+    { id: 'general',       label: 'General',              desc: 'Project & Appearance',    icon: SlidersHorizontal },
+    { id: 'documentation', label: 'Documentation',        desc: 'Documentation Settings',  icon: ClipboardList },
     { id: 'engineering',   label: 'Ignition',             desc: 'Project Settings',        icon: Zap },
     { id: 'siemens',       label: 'Siemens',              desc: 'Project Settings',        icon: Cpu },
     { id: 'studio5000',    label: 'Rockwell Automation',  desc: 'Project Settings',        icon: FileCode },
     { id: 'controlExpert', label: 'Schneider Electric',   desc: 'Project Settings',        icon: Layers },
     { id: 'ai',            label: 'AI Assistant',         desc: 'Provider & Model',        icon: Sparkles },
-    { id: 'documentation', label: 'Documentation',        desc: 'Column Settings',         icon: ClipboardList },
   ];
 
   return (
@@ -370,16 +399,6 @@ export default function SettingsView() {
           );
         })}
         <div style={{ flex: 1 }} />
-        <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-          <button
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={saving}
-            style={{ width: '100%', fontSize: 12 }}
-          >
-            {saving ? 'Saving...' : 'Save Settings'}
-          </button>
-        </div>
       </div>
 
       {/* Content */}

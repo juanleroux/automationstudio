@@ -5,7 +5,7 @@ import { useProject } from '../../context/ProjectContext';
 export const DEFAULT_DOC_COLUMNS = [
   { id: 'description',  label: 'Description',  colType: 'text',     builtin: true, defaultW: 180 },
   { id: 'area',         label: 'Area',          colType: 'text',     builtin: true, defaultW: 150 },
-  { id: 'flagged',      label: 'Flagged',       colType: 'checkbox', builtin: true, defaultW: 76  },
+  { id: 'flagged',      label: 'Flag',          colType: 'checkbox', builtin: true, defaultW: 56  },
   { id: 'lastModified', label: 'Last Modified', colType: 'text',     builtin: true, defaultW: 112 },
   { id: 'io',           label: 'I/O',           colType: 'checkbox', builtin: true, defaultW: 46  },
   { id: 'plc',          label: 'PLC',           colType: 'checkbox', builtin: true, defaultW: 46  },
@@ -84,7 +84,12 @@ export default function CheckView() {
   const checkData = project?.checkData || {};
 
   const docColumns  = useMemo(() => getDocColumns(project), [project]);
-  const enabledCols = useMemo(() => docColumns.filter(c => c.enabled !== false), [docColumns]);
+  const enabledCols = useMemo(() => {
+    const cols = docColumns.filter(c => c.enabled !== false);
+    const lmIdx = cols.findIndex(c => c.id === 'lastModified');
+    if (lmIdx >= 0 && lmIdx < cols.length - 1) { const [lm] = cols.splice(lmIdx, 1); cols.push(lm); }
+    return cols;
+  }, [docColumns]);
 
   const instanceFilter = colFilters._instance || '';
 
@@ -94,6 +99,18 @@ export default function CheckView() {
 
   function getCheck(tid, iid) {
     return checkData[`${tid}:${iid}`] || {};
+  }
+
+  function toggleFlag(tid, iid, value) {
+    updateProject(p => ({
+      ...p,
+      templates: (p.templates || []).map(t =>
+        t.id !== tid ? t : {
+          ...t,
+          instances: (t.instances || []).map(i => i.id !== iid ? i : { ...i, isFlagged: value }),
+        }
+      ),
+    }));
   }
 
   function setCheck(tid, iid, field, value) {
@@ -223,7 +240,7 @@ export default function CheckView() {
                     <select value={getFilter(col)} onChange={e => setCF(col.id, e.target.value)} style={fselStyle}>
                       <option value="all">All</option>
                       {col.id === 'flagged'
-                        ? <><option value="yes">Flagged</option><option value="no">Not flagged</option></>
+                        ? <><option value="yes">Set</option><option value="no">Not set</option></>
                         : <><option value="yes">Checked</option><option value="no">Unchecked</option></>}
                     </select>
                   ) : (
@@ -257,11 +274,8 @@ export default function CheckView() {
                   {isExp && instances.map(inst => {
                     const c = getCheck(template.id, inst.id);
                     return (
-                      <tr key={inst.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={tdBase}>
-                          {inst.isFlagged && <span style={{ color: '#e55353', marginRight: 5, fontSize: 10 }}>●</span>}
-                          {inst.name}
-                        </td>
+                      <tr key={inst.id} style={{ borderBottom: '1px solid var(--border)', color: inst.isFlagged ? '#e55353' : 'inherit' }}>
+                        <td style={tdBase}>{inst.name}</td>
                         {enabledCols.map(col => {
                           const center = isCenter(col);
                           const cs = { ...tdBase, textAlign: center ? 'center' : 'left' };
@@ -271,7 +285,9 @@ export default function CheckView() {
                             return <td key={col.id} style={{ ...cs, color: 'var(--text-muted)' }}>{getAreaLabel(inst.areaId, areas) || '—'}</td>;
                           if (col.id === 'flagged')
                             return <td key={col.id} style={cs}>
-                              {inst.isFlagged ? <span style={{ color: '#e55353' }}>●</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                              <input type="checkbox" checked={!!inst.isFlagged}
+                                onChange={e => toggleFlag(template.id, inst.id, e.target.checked)}
+                                style={{ cursor: 'pointer' }} />
                             </td>;
                           if (col.id === 'lastModified')
                             return <td key={col.id} style={{ ...cs, color: 'var(--text-muted)' }}>
