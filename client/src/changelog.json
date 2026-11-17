@@ -1,5 +1,17 @@
 [
   {
+    "hash": "36d3366",
+    "date": "2026-11-17",
+    "version": "v1.2.196",
+    "subject": "fix: include UdtInstance items in template folder diff detection"
+  },
+  {
+    "hash": "21f2775",
+    "date": "2026-11-17",
+    "version": "v1.2.195",
+    "subject": "fix: Ignition sync — instance dataset lookup, Setpoints folder detection, Interlocks UdtInstance surfacing"
+  },
+  {
     "hash": "1be7d4c1",
     "date": "2026-11-12",
     "version": "v1.2.163",
