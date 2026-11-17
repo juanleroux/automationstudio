@@ -1128,7 +1128,7 @@ export default function TemplateTree({ selected, onSelect }) {
       for (const ignAttr of [...ignParams, ...ignTagsFlat]) {
         if (localNames.has(ignAttr.name)) {
           // Check if the attribute exists locally but in a different folder than Ignition
-          if (ignAttr.folderPath?.length > 0 && !ignAttr.isUdtInstance) {
+          if (ignAttr.folderPath?.length > 0) {
             const localAttr = localAttrs.find(a => a.name === ignAttr.name && !a.folder);
             if (localAttr) {
               const allAttrs = template.attributes || [];
