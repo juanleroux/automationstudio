@@ -848,7 +848,7 @@ export default function TemplateTree({ selected, onSelect }) {
           const instAttr = (instance.attributes || []).find(a => a.id === ta.id);
           // Dataset values stored without parameter flag live in ignInst.tags, not .parameters
           const ignParam = ignInst.parameters?.[ta.name]
-            ?? (isDataset ? (ignInst.tags || []).find(t => t.name === ta.name) : undefined);
+            ?? (isDataset ? findIgnTagInst(ignInst.tags || [], ta.name) : undefined);
           const rawLocal = instAttr != null ? (instAttr.value ?? '') : (ta.value ?? '');
           const rawIgn   = ignParam != null ? (ignParam.value ?? '') : (ta.value ?? '');
           // Dataset: normalize by parsing+re-serializing so object vs JSON-string
@@ -1051,6 +1051,8 @@ export default function TemplateTree({ selected, onSelect }) {
             result.push(...flattenIgnTags(t.tags || [], [...folderPath, t.name]));
           } else if (t.tagType === 'AtomicTag' || !t.tagType) {
             result.push({ name: t.name, value: String(t.value ?? ''), dataType: t.dataType, parameter: false, folderPath, documentation: t.documentation });
+          } else if (t.tagType === 'UdtInstance') {
+            result.push({ name: t.name, value: '', dataType: t.dataType || '', parameter: false, folderPath, documentation: t.documentation, isUdtInstance: true, typeId: t.typeId });
           }
         }
         return result;
@@ -1124,7 +1126,33 @@ export default function TemplateTree({ selected, onSelect }) {
       const ignTagsFlat = flattenIgnTags(ignUdt.tags || []);
 
       for (const ignAttr of [...ignParams, ...ignTagsFlat]) {
-        if (localNames.has(ignAttr.name)) continue;
+        if (localNames.has(ignAttr.name)) {
+          // Check if the attribute exists locally but in a different folder than Ignition
+          if (ignAttr.folderPath?.length > 0 && !ignAttr.isUdtInstance) {
+            const localAttr = localAttrs.find(a => a.name === ignAttr.name && !a.folder);
+            if (localAttr) {
+              const allAttrs = template.attributes || [];
+              const localFolder = localAttr.folderId != null
+                ? allAttrs.find(a => a.id === localAttr.folderId)
+                : null;
+              const expectedFolderName = ignAttr.folderPath[ignAttr.folderPath.length - 1];
+              if (!localFolder || localFolder.name !== expectedFolderName) {
+                diffs.push({
+                  key: `tmpl:folder:${template.id}:${localAttr.id}`,
+                  templateId: template.id, attrId: localAttr.id,
+                  diffType: 'folder',
+                  instanceName: template.name,
+                  attributeName: ignAttr.name,
+                  localValue: localFolder ? `in "${localFolder.name}"` : '(no folder)',
+                  ignitionValue: `in "${expectedFolderName}"`,
+                  ignFolderPath: ignAttr.folderPath,
+                  checked: true,
+                });
+              }
+            }
+          }
+          continue;
+        }
         diffs.push({
           key: `tmpl:new:${template.id}:${ignAttr.name}`,
           templateId: template.id, attrId: null,
@@ -1177,6 +1205,7 @@ export default function TemplateTree({ selected, onSelect }) {
 
     const valueDiffs = checked.filter(d => !d.diffType);
     const newAttrDiffs = checked.filter(d => d.diffType === 'new');
+    const folderDiffs = checked.filter(d => d.diffType === 'folder');
 
     updateProject(p => ({
       ...p,
@@ -1203,8 +1232,8 @@ export default function TemplateTree({ selected, onSelect }) {
           }
           return updated;
         });
-        // Add new attributes from Ignition, creating folder items as needed
-        if (newAttrDiffs.length) {
+        // Add new attributes from Ignition, and handle folder moves/additions
+        if (newAttrDiffs.length || folderDiffs.length) {
           let nextId = attrs.reduce((m, a) => Math.max(m, a.id || 0), 0);
           newAttrDiffs.forEach(d => {
             let folderId = null;
@@ -1236,6 +1265,26 @@ export default function TemplateTree({ selected, onSelect }) {
               ...(folderId != null ? { folderId } : {}),
             });
           });
+          // Move attributes into the correct folder path from Ignition
+          folderDiffs.forEach(d => {
+            const folderPath = d.ignFolderPath || [];
+            if (!folderPath.length) return;
+            let parentFolderId = null;
+            for (const folderName of folderPath) {
+              let folderItem = attrs.find(
+                a => a.folder && a.name === folderName && (a.parentFolderId ?? null) === parentFolderId
+              );
+              if (!folderItem) {
+                nextId++;
+                folderItem = { id: nextId, folder: true, name: folderName };
+                if (parentFolderId != null) folderItem.parentFolderId = parentFolderId;
+                attrs.push(folderItem);
+              }
+              parentFolderId = folderItem.id;
+            }
+            const targetFolderId = parentFolderId;
+            attrs = attrs.map(a => a.id === d.attrId ? { ...a, folderId: targetFolderId } : a);
+          });
         }
         return { ...t, lastModification: new Date().toISOString(), attributes: attrs };
       }),
@@ -1245,6 +1294,7 @@ export default function TemplateTree({ selected, onSelect }) {
     if (valueDiffs.length) parts.push(`${valueDiffs.length} value update(s)`);
     if (descCount) parts.push(`${descCount} description(s)`);
     if (newAttrDiffs.length) parts.push(`${newAttrDiffs.length} new attribute(s)`);
+    if (folderDiffs.length) parts.push(`${folderDiffs.length} folder move(s)`);
     toast.success(`Applied ${parts.join(', ')} from Ignition`);
   };
 
